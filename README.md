@@ -72,16 +72,22 @@ cp main.js manifest.json styles.css /path/to/your/vault/.obsidian/plugins/obsidi
 #### Claude Code (推荐)
 
 ```bash
-# 全局安装
-npm install -g @anthropic-ai/claude-code
+# 插件会自动使用 npx @zed-industries/claude-code-acp
+# 无需手动安装，只需配置 API Key
 
-# 或使用 npx (无需安装)
-# 插件会自动使用 npx
+# 设置环境变量 (添加到 ~/.zshrc 或 ~/.bashrc)
+export ANTHROPIC_API_KEY="your-api-key-here"
+
+# 或创建配置文件
+mkdir -p ~/.config/claude-code
+echo '{"apiKey":"your-api-key-here"}' > ~/.config/claude-code/config.json
 ```
 
-配置 API Key:
+> **获取 API Key**: https://console.anthropic.com
+
+验证：
 ```bash
-claude auth
+npx @zed-industries/claude-code-acp --version
 ```
 
 #### Qwen Code

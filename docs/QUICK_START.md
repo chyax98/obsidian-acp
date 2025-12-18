@@ -60,28 +60,40 @@ Claude Code 是 Anthropic 官方的编程助手,功能强大且对 ACP 支持完
 #### 安装
 
 ```bash
-npm install -g @anthropic-ai/claude-code
+# 插件会自动使用 npx @zed-industries/claude-code-acp
+# 无需手动安装
 ```
 
-或者不全局安装,插件会自动使用 `npx` 启动。
+#### 配置 API Key
 
-#### 配置
+**方式 1: 环境变量** (推荐)
+```bash
+# 添加到 ~/.zshrc 或 ~/.bashrc
+export ANTHROPIC_API_KEY="your-api-key-here"
+
+# 重新加载
+source ~/.zshrc
+```
+
+**方式 2: 配置文件**
+```bash
+mkdir -p ~/.config/claude-code
+echo '{"apiKey":"your-api-key-here"}' > ~/.config/claude-code/config.json
+```
+
+> **获取 API Key**: 访问 [console.anthropic.com](https://console.anthropic.com)
+
+#### 验证
 
 ```bash
-claude auth
+npx @zed-industries/claude-code-acp --version
 ```
 
-按照提示输入您的 Anthropic API Key。
-
-> **获取 API Key**: 访问 [console.anthropic.com](https://console.anthropic.com) 注册并获取
-
-#### 验证安装
-
+**重要**: 从终端启动 Obsidian 以继承环境变量
 ```bash
-claude --version
+export ANTHROPIC_API_KEY="your-api-key-here"
+open -a Obsidian
 ```
-
-应该显示版本号,例如 `claude-code v1.2.3`
 
 ---
 

@@ -484,15 +484,15 @@ Agent 会:
 
 2. **检查 Agent 版本**:
    ```bash
-   claude --version
+   npx @zed-industries/claude-code-acp --version
    ```
-   确保是最新版本
+   确保可以正常运行
 
-3. **重新安装 Agent**:
+3. **检查 API Key**:
    ```bash
-   npm uninstall -g @anthropic-ai/claude-code
-   npm install -g @anthropic-ai/claude-code
+   echo $ANTHROPIC_API_KEY
    ```
+   如果为空，需要配置环境变量
 
 4. **尝试其他 Agent**:
    - 如果只有特定 Agent 出现问题

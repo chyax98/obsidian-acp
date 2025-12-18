@@ -208,7 +208,17 @@ export class AcpConnection {
 			const acpArgs = skipAcpArgs ? [] : (options.acpArgs || getBackendAcpArgs(options.backendId));
 
 			// 清理环境变量（避免干扰子进程）
-			const cleanEnv = { ...process.env, ...options.env };
+			const cleanEnv: Record<string, string> = {};
+			for (const [key, value] of Object.entries(process.env)) {
+				if (value !== undefined) {
+					cleanEnv[key] = value;
+				}
+			}
+			// 添加自定义环境变量
+			if (options.env) {
+				Object.assign(cleanEnv, options.env);
+			}
+			// 删除可能干扰的变量
 			delete cleanEnv.NODE_OPTIONS;
 			delete cleanEnv.NODE_INSPECT;
 			delete cleanEnv.NODE_DEBUG;

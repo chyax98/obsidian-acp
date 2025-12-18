@@ -16,3 +16,16 @@ export {
 	type RequestHandle,
 	type QueueStats,
 } from './request-queue';
+
+export {
+	SessionManager,
+	type SessionManagerConfig,
+	type SessionState,
+	type StopReason,
+	type Message,
+	type MessageRole,
+	type ToolCall,
+	type ToolCallStatus,
+	type Turn,
+	type PlanEntry,
+} from './session-manager';

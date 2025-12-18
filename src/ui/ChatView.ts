@@ -4,12 +4,15 @@
  * 提供与 AI Agent 交互的侧边栏界面
  */
 
-import { ItemView, WorkspaceLeaf, Notice, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, setIcon, Component } from 'obsidian';
 import type AcpPlugin from '../main';
 import { SessionManager } from '../acp/core/session-manager';
 import { AcpConnection } from '../acp/core/connection';
 import type { Message, ToolCall, PlanEntry, SessionState } from '../acp/core/session-manager';
 import type { DetectedAgent } from '../acp/detector';
+import { PermissionModal, isReadOperation } from './PermissionModal';
+import type { RequestPermissionParams, PermissionOutcome } from '../acp/types/permissions';
+import { MessageRenderer } from './MessageRenderer';
 
 // ============================================================================
 // 常量
@@ -42,6 +45,9 @@ export class AcpChatView extends ItemView {
 	// Agent 信息
 	private availableAgents: DetectedAgent[] = [];
 	private selectedAgent: DetectedAgent | null = null;
+
+	// Obsidian Component（用于 MarkdownRenderer 生命周期管理）
+	private markdownComponent: Component = new Component();
 
 	// DOM 元素
 	private headerEl!: HTMLElement;
@@ -94,6 +100,9 @@ export class AcpChatView extends ItemView {
 	async onOpen(): Promise<void> {
 		console.log('[ChatView] 打开视图');
 
+		// 加载 Markdown 组件
+		this.markdownComponent.load();
+
 		// 创建基础结构
 		const container = this.contentEl;
 		container.empty();
@@ -125,6 +134,9 @@ export class AcpChatView extends ItemView {
 		if (this.connection) {
 			this.connection.disconnect();
 		}
+
+		// 卸载 Markdown 组件
+		this.markdownComponent.unload();
 	}
 
 	// ========================================================================
@@ -371,6 +383,11 @@ export class AcpChatView extends ItemView {
 			this.handleToolCall(toolCall);
 		};
 
+		// 计划更新
+		this.sessionManager.onPlan = (plan: PlanEntry[]) => {
+			this.handlePlan(plan);
+		};
+
 		// 状态变更
 		this.sessionManager.onStateChange = (state: SessionState) => {
 			this.handleStateChange(state);
@@ -379,6 +396,11 @@ export class AcpChatView extends ItemView {
 		// 回合结束
 		this.sessionManager.onTurnEnd = () => {
 			this.handleTurnEnd();
+		};
+
+		// 权限请求
+		this.sessionManager.onPermissionRequest = async (params: RequestPermissionParams) => {
+			return await this.handlePermissionRequest(params);
 		};
 
 		// 错误
@@ -402,8 +424,18 @@ export class AcpChatView extends ItemView {
 	 * 处理工具调用
 	 */
 	private handleToolCall(toolCall: ToolCall): void {
-		// T12 会实现完整的工具调用渲染
-		console.log('[ChatView] 工具调用:', toolCall);
+		// 使用 MessageRenderer 渲染工具调用卡片
+		MessageRenderer.renderToolCall(this.messagesEl, toolCall);
+		this.scrollToBottom();
+	}
+
+	/**
+	 * 处理计划更新
+	 */
+	private handlePlan(plan: PlanEntry[]): void {
+		// 使用 MessageRenderer 渲染计划
+		MessageRenderer.renderPlan(this.messagesEl, plan);
+		this.scrollToBottom();
 	}
 
 	/**
@@ -446,6 +478,46 @@ export class AcpChatView extends ItemView {
 		console.error('[ChatView] 错误:', error);
 		this.addSystemMessage(`❌ 错误: ${error.message}`);
 		new Notice(`错误: ${error.message}`);
+	}
+
+	/**
+	 * 处理权限请求
+	 */
+	private async handlePermissionRequest(params: RequestPermissionParams): Promise<PermissionOutcome> {
+		console.log('[ChatView] 权限请求:', params);
+
+		// 自动批准读取操作（如果设置启用）
+		if (this.plugin.settings.autoApproveRead && isReadOperation(params)) {
+			// 查找"允许一次"选项
+			const allowOnceOption = params.options.find((opt) => opt.kind === 'allow_once');
+			if (allowOnceOption) {
+				console.log('[ChatView] 自动批准读取操作');
+				this.addSystemMessage(`✓ 自动批准: ${params.toolCall.title || '读取操作'}`);
+				return { type: 'selected', optionId: allowOnceOption.optionId };
+			}
+		}
+
+		// 显示权限弹窗
+		try {
+			const modal = new PermissionModal(this.app, params);
+			const outcome = await modal.show();
+
+			// 记录用户选择
+			if (outcome.type === 'selected') {
+				const option = params.options.find((opt) => opt.optionId === outcome.optionId);
+				if (option) {
+					const action = option.kind.startsWith('allow') ? '✓ 已允许' : '✗ 已拒绝';
+					this.addSystemMessage(`${action}: ${params.toolCall.title || '操作'}`);
+				}
+			} else {
+				this.addSystemMessage(`⚠ 已取消: ${params.toolCall.title || '操作'}`);
+			}
+
+			return outcome;
+		} catch (error) {
+			console.error('[ChatView] 权限请求处理失败:', error);
+			return { type: 'cancelled' };
+		}
 	}
 
 	// ========================================================================
@@ -511,47 +583,18 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 添加消息
 	 */
-	private addMessage(message: Message): void {
-		const messageEl = this.messagesEl.createDiv({
-			cls: `acp-message acp-message-${message.role}`,
-			attr: { 'data-message-id': message.id },
-		});
-
-		// 消息头部（显示角色）
-		const headerEl = messageEl.createDiv({ cls: 'acp-message-header' });
-		headerEl.textContent = message.role === 'user' ? '你' : 'Agent';
-
-		// 消息内容
-		const contentEl = messageEl.createDiv({ cls: 'acp-message-content' });
-		contentEl.textContent = message.content;
-
-		// 如果正在流式输出，添加光标
-		if (message.isStreaming) {
-			contentEl.addClass('acp-message-streaming');
-		}
-
+	private async addMessage(message: Message): Promise<void> {
+		// 使用 MessageRenderer 渲染
+		await MessageRenderer.renderMessage(this.messagesEl, message, this.markdownComponent, this.app);
 		this.scrollToBottom();
 	}
 
 	/**
 	 * 更新消息
 	 */
-	private updateMessage(message: Message): void {
-		const messageEl = this.messagesEl.querySelector(`[data-message-id="${message.id}"]`);
-		if (!messageEl) {
-			console.warn('[ChatView] 找不到消息元素:', message.id);
-			return;
-		}
-
-		const contentEl = messageEl.querySelector('.acp-message-content') as HTMLElement;
-		if (contentEl) {
-			contentEl.textContent = message.content;
-
-			if (!message.isStreaming) {
-				contentEl.removeClass('acp-message-streaming');
-			}
-		}
-
+	private async updateMessage(message: Message): Promise<void> {
+		// 使用 MessageRenderer 更新
+		await MessageRenderer.updateMessage(this.messagesEl, message, this.markdownComponent, this.app);
 		this.scrollToBottom();
 	}
 

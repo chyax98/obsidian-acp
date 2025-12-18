@@ -276,6 +276,437 @@
 }
 
 /* ============================================================================
+   工具调用卡片
+   ============================================================================ */
+
+.acp-tool-call {
+	margin: 8px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background-color: var(--background-secondary);
+	overflow: hidden;
+}
+
+.acp-tool-call-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	cursor: pointer;
+	user-select: none;
+	background-color: var(--background-secondary-alt);
+}
+
+.acp-tool-call-header:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.acp-tool-call-icon {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.acp-tool-call-status-pending .svg-icon {
+	color: var(--text-muted);
+}
+
+.acp-tool-call-status-in_progress .svg-icon {
+	color: var(--interactive-accent);
+	animation: rotate 1s linear infinite;
+}
+
+.acp-tool-call-status-completed .svg-icon {
+	color: var(--color-green);
+}
+
+.acp-tool-call-status-error .svg-icon {
+	color: var(--color-red);
+}
+
+.acp-tool-call-status-cancelled .svg-icon {
+	color: var(--text-muted);
+}
+
+@keyframes rotate {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.acp-tool-call-title {
+	flex: 1;
+	font-weight: 500;
+	font-size: 0.95em;
+}
+
+.acp-tool-call-kind {
+	padding: 2px 8px;
+	border-radius: 4px;
+	font-size: 0.8em;
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.acp-tool-call-content {
+	max-height: 0;
+	overflow: hidden;
+	transition: max-height 0.3s ease;
+}
+
+.acp-tool-call-content-expanded {
+	max-height: 500px;
+	overflow-y: auto;
+}
+
+.acp-tool-call-content-block {
+	padding: 10px 12px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.acp-tool-call-content-text {
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	font-size: 0.9em;
+	line-height: 1.5;
+}
+
+.acp-tool-call-content-terminal {
+	background-color: var(--code-background);
+	border-radius: 4px;
+}
+
+.acp-tool-call-content-terminal pre {
+	margin: 0;
+	padding: 8px;
+	overflow-x: auto;
+}
+
+.acp-tool-call-content-terminal code {
+	font-family: var(--font-monospace);
+	font-size: 0.85em;
+	color: var(--code-normal);
+}
+
+.acp-tool-call-empty {
+	padding: 10px 12px;
+	color: var(--text-muted);
+	font-style: italic;
+	font-size: 0.9em;
+	text-align: center;
+}
+
+/* Diff 渲染 */
+.acp-diff {
+	margin: 0;
+	padding: 0;
+	background-color: var(--code-background);
+	border-radius: 4px;
+	overflow-x: auto;
+	font-family: var(--font-monospace);
+	font-size: 0.85em;
+}
+
+.acp-diff-line {
+	padding: 2px 8px;
+	white-space: pre;
+}
+
+.acp-diff-added {
+	background-color: rgba(46, 160, 67, 0.15);
+	color: var(--color-green);
+}
+
+.acp-diff-removed {
+	background-color: rgba(248, 81, 73, 0.15);
+	color: var(--color-red);
+}
+
+.acp-diff-hunk {
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+	font-weight: 600;
+}
+
+/* ============================================================================
+   计划显示
+   ============================================================================ */
+
+.acp-plan {
+	margin: 12px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background-color: var(--background-secondary);
+	overflow: hidden;
+}
+
+.acp-plan-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	background-color: var(--background-secondary-alt);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.acp-plan-icon {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+	color: var(--interactive-accent);
+}
+
+.acp-plan-title {
+	font-weight: 600;
+	font-size: 0.95em;
+}
+
+.acp-plan-list {
+	padding: 0;
+}
+
+.acp-plan-entry {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.acp-plan-entry:last-child {
+	border-bottom: none;
+}
+
+.acp-plan-entry-icon {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+}
+
+.acp-plan-entry-pending .acp-plan-entry-icon .svg-icon {
+	color: var(--text-muted);
+}
+
+.acp-plan-entry-in_progress .acp-plan-entry-icon .svg-icon {
+	color: var(--interactive-accent);
+	animation: rotate 1s linear infinite;
+}
+
+.acp-plan-entry-completed .acp-plan-entry-icon .svg-icon {
+	color: var(--color-green);
+}
+
+.acp-plan-entry-cancelled .acp-plan-entry-icon .svg-icon {
+	color: var(--text-muted);
+}
+
+.acp-plan-entry-content {
+	flex: 1;
+	font-size: 0.9em;
+	line-height: 1.5;
+}
+
+.acp-plan-entry-priority {
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-size: 0.75em;
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.acp-plan-priority-high {
+	background-color: var(--color-red);
+	color: var(--text-on-accent);
+}
+
+.acp-plan-priority-normal {
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.acp-plan-priority-low {
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+	opacity: 0.7;
+}
+
+/* ============================================================================
+   权限请求弹窗
+   ============================================================================ */
+
+/* 弹窗容器 */
+.acp-permission-modal {
+	padding: 20px;
+	max-width: 600px;
+}
+
+/* 标题 */
+.acp-permission-title h2 {
+	margin: 0 0 16px 0;
+	color: var(--text-normal);
+	font-size: 1.4em;
+	font-weight: 600;
+}
+
+/* 权限信息容器 */
+.acp-permission-info {
+	margin-bottom: 24px;
+	padding: 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background-color: var(--background-secondary);
+}
+
+/* 工具名称 */
+.acp-permission-tool-title {
+	font-size: 1.1em;
+	font-weight: 600;
+	margin-bottom: 8px;
+	color: var(--text-normal);
+}
+
+/* 工具类型 */
+.acp-permission-tool-kind {
+	font-size: 0.9em;
+	color: var(--text-muted);
+	margin-bottom: 12px;
+}
+
+/* 参数区域 */
+.acp-permission-params {
+	margin-top: 12px;
+}
+
+.acp-permission-params-label {
+	font-weight: 600;
+	margin-bottom: 6px;
+	color: var(--text-normal);
+	font-size: 0.95em;
+}
+
+.acp-permission-params-content {
+	margin: 0;
+	padding: 12px;
+	background-color: var(--code-background);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	font-family: var(--font-monospace);
+	font-size: 0.85em;
+	line-height: 1.5;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	color: var(--code-normal);
+}
+
+/* 位置信息 */
+.acp-permission-locations {
+	margin-top: 12px;
+}
+
+.acp-permission-locations-label {
+	font-weight: 600;
+	margin-bottom: 6px;
+	color: var(--text-normal);
+	font-size: 0.95em;
+}
+
+.acp-permission-locations-list {
+	margin: 0;
+	padding-left: 20px;
+	list-style: disc;
+}
+
+.acp-permission-locations-list li {
+	font-size: 0.9em;
+	color: var(--text-muted);
+	margin: 4px 0;
+	font-family: var(--font-monospace);
+}
+
+/* 选项按钮容器 */
+.acp-permission-options {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.acp-permission-options-group {
+	display: flex;
+	gap: 8px;
+	justify-content: center;
+	flex-wrap: wrap;
+}
+
+/* 选项按钮 */
+.acp-permission-button {
+	padding: 10px 24px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	cursor: pointer;
+	font-weight: 500;
+	font-size: 0.95em;
+	transition: all 0.2s;
+	min-width: 120px;
+}
+
+/* 允许按钮 */
+.acp-permission-button-allow {
+	background-color: var(--color-green);
+	color: var(--text-on-accent);
+	border-color: var(--color-green);
+}
+
+.acp-permission-button-allow:hover {
+	background-color: var(--interactive-success-hover);
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(46, 160, 67, 0.3);
+}
+
+/* 拒绝按钮 */
+.acp-permission-button-reject {
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+}
+
+.acp-permission-button-reject:hover {
+	background-color: var(--background-modifier-hover);
+	border-color: var(--text-muted);
+	transform: translateY(-2px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* CTA 样式（允许一次） */
+.acp-permission-button.mod-cta {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: var(--interactive-accent);
+}
+
+.acp-permission-button.mod-cta:hover {
+	background-color: var(--interactive-accent-hover);
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(var(--interactive-accent-rgb), 0.3);
+}
+
+/* 响应式 */
+@media (max-width: 500px) {
+	.acp-permission-options-group {
+		flex-direction: column;
+	}
+
+	.acp-permission-button {
+		width: 100%;
+	}
+}
+
+/* ============================================================================
    响应式调整
    ============================================================================ */
 

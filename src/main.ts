@@ -4,7 +4,9 @@
  * 支持连接 Claude Code、Codex、Gemini 等 AI Agent
  */
 
-import { App, Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from 'obsidian';
+import { App, Plugin, WorkspaceLeaf } from 'obsidian';
+import { AcpSettingTab } from './ui/SettingsTab';
+import type { AcpBackendId } from './acp/backends/types';
 
 // ============================================================================
 // 类型定义
@@ -13,9 +15,28 @@ import { App, Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from 'obsidian'
 /**
  * 插件设置接口
  */
-interface AcpPluginSettings {
-	/** 默认使用的 Agent 后端 */
-	defaultBackend: string;
+export interface AcpPluginSettings {
+	/** 选中的 Agent 后端 */
+	selectedBackend: AcpBackendId;
+
+	/** 自定义 CLI 路径 (用于 custom 后端) */
+	customCliPath: string;
+
+	/** 工作目录模式 */
+	workingDir: 'vault' | 'current-note-folder' | 'custom';
+
+	/** 自定义工作目录路径 */
+	customWorkingDir?: string;
+
+	/** 各后端的自定义路径覆盖 */
+	backendPaths?: Record<string, string>;
+
+	/** 是否显示工具调用详情 */
+	showToolCallDetails: boolean;
+
+	/** 是否自动批准文件读取 */
+	autoApproveRead: boolean;
+
 	/** 是否启用调试模式 */
 	debugMode: boolean;
 }
@@ -24,7 +45,13 @@ interface AcpPluginSettings {
  * 默认设置
  */
 const DEFAULT_SETTINGS: AcpPluginSettings = {
-	defaultBackend: 'claude-code',
+	selectedBackend: 'claude',
+	customCliPath: '',
+	workingDir: 'vault',
+	customWorkingDir: undefined,
+	backendPaths: {},
+	showToolCallDetails: true,
+	autoApproveRead: false,
 	debugMode: false,
 };
 
@@ -113,66 +140,5 @@ export default class AcpPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-	}
-}
-
-// ============================================================================
-// 设置页面
-// ============================================================================
-
-/**
- * ACP 插件设置页面
- */
-class AcpSettingTab extends PluginSettingTab {
-	plugin: AcpPlugin;
-
-	constructor(app: App, plugin: AcpPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		containerEl.createEl('h2', { text: 'ACP Agent Client 设置' });
-
-		// Agent 后端选择
-		new Setting(containerEl)
-			.setName('默认 Agent')
-			.setDesc('选择默认使用的 AI Agent 后端')
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption('claude-code', 'Claude Code')
-					.addOption('codex', 'Codex CLI')
-					.addOption('gemini', 'Gemini CLI')
-					.addOption('qwen-code', 'Qwen Code')
-					.addOption('goose', 'Goose')
-					.setValue(this.plugin.settings.defaultBackend)
-					.onChange(async (value) => {
-						this.plugin.settings.defaultBackend = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		// 调试模式
-		new Setting(containerEl)
-			.setName('调试模式')
-			.setDesc('启用后会在控制台输出详细的 ACP 通信日志')
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.debugMode).onChange(async (value) => {
-					this.plugin.settings.debugMode = value;
-					await this.plugin.saveSettings();
-				})
-			);
-
-		// 关于信息
-		containerEl.createEl('h3', { text: '关于' });
-		containerEl.createEl('p', {
-			text: 'ACP (Agent Client Protocol) 是一个标准化协议，用于连接代码编辑器与 AI 编码助手。',
-		});
-		containerEl.createEl('p', {
-			text: '支持的 Agent: Claude Code, Codex, Gemini CLI, Qwen Code, Goose 等',
-		});
 	}
 }

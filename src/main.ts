@@ -6,6 +6,7 @@
 
 import { App, Plugin, WorkspaceLeaf } from 'obsidian';
 import { AcpSettingTab } from './ui/SettingsTab';
+import { AcpChatView, ACP_CHAT_VIEW_TYPE } from './ui/ChatView';
 import type { AcpBackendId } from './acp/backends/types';
 
 // ============================================================================
@@ -56,13 +57,6 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
 };
 
 // ============================================================================
-// 常量
-// ============================================================================
-
-/** ChatView 的唯一标识符 */
-export const ACP_CHAT_VIEW_TYPE = 'acp-chat-view';
-
-// ============================================================================
 // 主插件类
 // ============================================================================
 
@@ -84,8 +78,8 @@ export default class AcpPlugin extends Plugin {
 		// 加载设置
 		await this.loadSettings();
 
-		// TODO: T09 - 注册 ChatView
-		// this.registerView(ACP_CHAT_VIEW_TYPE, (leaf) => new AcpChatView(leaf, this));
+		// 注册 ChatView
+		this.registerView(ACP_CHAT_VIEW_TYPE, (leaf) => new AcpChatView(leaf, this));
 
 		// 添加打开 ACP Chat 的命令
 		this.addCommand({

@@ -1,0 +1,584 @@
+/**
+ * ACP ChatView - 聊天视图
+ *
+ * 提供与 AI Agent 交互的侧边栏界面
+ */
+
+import { ItemView, WorkspaceLeaf, Notice, setIcon } from 'obsidian';
+import type AcpPlugin from '../main';
+import { SessionManager } from '../acp/core/session-manager';
+import { AcpConnection } from '../acp/core/connection';
+import type { Message, ToolCall, PlanEntry, SessionState } from '../acp/core/session-manager';
+import type { DetectedAgent } from '../acp/detector';
+
+// ============================================================================
+// 常量
+// ============================================================================
+
+/** ChatView 的唯一标识符 */
+export const ACP_CHAT_VIEW_TYPE = 'acp-chat-view';
+
+// ============================================================================
+// ChatView 类
+// ============================================================================
+
+/**
+ * ACP 聊天视图
+ *
+ * 负责：
+ * - 显示聊天界面
+ * - Agent 选择和连接
+ * - 消息发送和接收
+ * - 会话状态管理
+ */
+export class AcpChatView extends ItemView {
+	// 插件引用
+	private plugin: AcpPlugin;
+
+	// ACP 核心
+	private connection: AcpConnection | null = null;
+	private sessionManager: SessionManager | null = null;
+
+	// Agent 信息
+	private availableAgents: DetectedAgent[] = [];
+	private selectedAgent: DetectedAgent | null = null;
+
+	// DOM 元素
+	private headerEl!: HTMLElement;
+	private messagesEl!: HTMLElement;
+	private inputContainerEl!: HTMLElement;
+	private inputEl!: HTMLTextAreaElement;
+	private sendButtonEl!: HTMLButtonElement;
+	private cancelButtonEl!: HTMLButtonElement;
+	private agentSelectEl!: HTMLSelectElement;
+	private connectButtonEl!: HTMLButtonElement;
+	private statusEl!: HTMLElement;
+
+	// ========================================================================
+	// 构造函数
+	// ========================================================================
+
+	constructor(leaf: WorkspaceLeaf, plugin: AcpPlugin) {
+		super(leaf);
+		this.plugin = plugin;
+	}
+
+	// ========================================================================
+	// ItemView 实现
+	// ========================================================================
+
+	/**
+	 * 视图类型
+	 */
+	getViewType(): string {
+		return ACP_CHAT_VIEW_TYPE;
+	}
+
+	/**
+	 * 显示文本
+	 */
+	getDisplayText(): string {
+		return 'ACP Chat';
+	}
+
+	/**
+	 * 图标
+	 */
+	getIcon(): string {
+		return 'bot';
+	}
+
+	/**
+	 * 打开视图
+	 */
+	async onOpen(): Promise<void> {
+		console.log('[ChatView] 打开视图');
+
+		// 创建基础结构
+		const container = this.contentEl;
+		container.empty();
+		container.addClass('acp-chat-container');
+
+		// 创建头部
+		this.createHeader(container);
+
+		// 创建消息区域
+		this.createMessagesArea(container);
+
+		// 创建输入区域
+		this.createInputArea(container);
+
+		// 加载可用 Agent
+		await this.loadAvailableAgents();
+	}
+
+	/**
+	 * 关闭视图
+	 */
+	async onClose(): Promise<void> {
+		console.log('[ChatView] 关闭视图');
+
+		// 断开连接
+		if (this.sessionManager) {
+			this.sessionManager.end();
+		}
+		if (this.connection) {
+			this.connection.disconnect();
+		}
+	}
+
+	// ========================================================================
+	// UI 创建
+	// ========================================================================
+
+	/**
+	 * 创建头部区域
+	 */
+	private createHeader(container: HTMLElement): void {
+		this.headerEl = container.createDiv({ cls: 'acp-chat-header' });
+
+		// Agent 选择器容器
+		const selectorContainer = this.headerEl.createDiv({ cls: 'acp-agent-selector' });
+
+		// Agent 下拉框
+		this.agentSelectEl = selectorContainer.createEl('select', { cls: 'acp-agent-select' });
+		this.agentSelectEl.createEl('option', {
+			text: '选择 Agent...',
+			value: '',
+		});
+
+		// 连接按钮
+		this.connectButtonEl = selectorContainer.createEl('button', {
+			cls: 'acp-connect-button',
+			text: '连接',
+		});
+		this.connectButtonEl.addEventListener('click', () => this.handleConnect());
+
+		// 状态指示器
+		this.statusEl = this.headerEl.createDiv({ cls: 'acp-status' });
+		this.updateStatus('未连接', 'idle');
+	}
+
+	/**
+	 * 创建消息区域
+	 */
+	private createMessagesArea(container: HTMLElement): void {
+		this.messagesEl = container.createDiv({ cls: 'acp-chat-messages' });
+
+		// 欢迎消息
+		this.addSystemMessage('欢迎使用 ACP Agent Client!\n请选择一个 Agent 并连接。');
+	}
+
+	/**
+	 * 创建输入区域
+	 */
+	private createInputArea(container: HTMLElement): void {
+		this.inputContainerEl = container.createDiv({ cls: 'acp-chat-input' });
+
+		// 输入框
+		this.inputEl = this.inputContainerEl.createEl('textarea', {
+			cls: 'acp-input-textarea',
+			attr: {
+				placeholder: '输入消息...',
+				rows: '3',
+			},
+		});
+
+		// 监听回车键
+		this.inputEl.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' && !e.shiftKey) {
+				e.preventDefault();
+				this.handleSend();
+			}
+		});
+
+		// 按钮容器
+		const buttonContainer = this.inputContainerEl.createDiv({ cls: 'acp-input-buttons' });
+
+		// 发送按钮
+		this.sendButtonEl = buttonContainer.createEl('button', {
+			cls: 'acp-send-button mod-cta',
+			text: '发送',
+		});
+		this.sendButtonEl.addEventListener('click', () => this.handleSend());
+
+		// 取消按钮（初始隐藏）
+		this.cancelButtonEl = buttonContainer.createEl('button', {
+			cls: 'acp-cancel-button',
+			text: '取消',
+		});
+		this.cancelButtonEl.style.display = 'none';
+		this.cancelButtonEl.addEventListener('click', () => this.handleCancel());
+
+		// 初始状态禁用输入
+		this.setInputEnabled(false);
+	}
+
+	// ========================================================================
+	// Agent 管理
+	// ========================================================================
+
+	/**
+	 * 加载可用 Agent
+	 */
+	private async loadAvailableAgents(): Promise<void> {
+		try {
+			// 从检测器获取已检测的 Agent
+			const { detectInstalledClis } = await import('../acp/detector');
+			const result = await detectInstalledClis();
+			this.availableAgents = result.agents;
+
+			// 更新下拉框
+			this.agentSelectEl.empty();
+			this.agentSelectEl.createEl('option', {
+				text: '选择 Agent...',
+				value: '',
+			});
+
+			if (this.availableAgents.length === 0) {
+				this.agentSelectEl.createEl('option', {
+					text: '未检测到可用 Agent',
+					value: '',
+					attr: { disabled: 'true' },
+				});
+				this.addSystemMessage('⚠️ 未检测到可用的 Agent CLI。\n请安装 Claude Code、Codex 或其他支持的 Agent。');
+			} else {
+				for (const agent of this.availableAgents) {
+					this.agentSelectEl.createEl('option', {
+						text: agent.name,
+						value: agent.backendId,
+					});
+				}
+
+				// 选择默认 Agent
+				const defaultBackend = this.plugin.settings.selectedBackend;
+				const defaultAgent = this.availableAgents.find((a) => a.backendId === defaultBackend);
+				if (defaultAgent) {
+					this.agentSelectEl.value = defaultAgent.backendId;
+				}
+			}
+		} catch (error) {
+			console.error('[ChatView] 加载 Agent 失败:', error);
+			new Notice('加载 Agent 失败');
+		}
+	}
+
+	/**
+	 * 处理连接按钮点击
+	 */
+	private async handleConnect(): Promise<void> {
+		// 如果已连接，则断开
+		if (this.connection?.isConnected) {
+			this.handleDisconnect();
+			return;
+		}
+
+		// 获取选中的 Agent
+		const agentId = this.agentSelectEl.value;
+		if (!agentId) {
+			new Notice('请先选择一个 Agent');
+			return;
+		}
+
+		this.selectedAgent = this.availableAgents.find((a) => a.backendId === agentId) || null;
+		if (!this.selectedAgent) {
+			new Notice('Agent 无效');
+			return;
+		}
+
+		try {
+			this.updateStatus('连接中...', 'connecting');
+			this.connectButtonEl.disabled = true;
+
+			// 创建连接
+			this.connection = new AcpConnection();
+
+			// 连接到 Agent
+			const workingDir = (this.plugin.app.vault.adapter as any).basePath || process.cwd();
+			await this.connection.connect({
+				backendId: this.selectedAgent.backendId,
+				cliPath: this.selectedAgent.cliPath,
+				workingDir: workingDir,
+				acpArgs: this.selectedAgent.acpArgs,
+			});
+
+			// 创建会话管理器
+			this.sessionManager = new SessionManager({
+				connection: this.connection,
+				workingDir,
+			});
+
+			// 绑定会话回调
+			this.setupSessionCallbacks();
+
+			// 创建新会话
+			await this.sessionManager.start();
+
+			this.updateStatus('已连接', 'connected');
+			this.connectButtonEl.textContent = '断开';
+			this.connectButtonEl.disabled = false;
+			this.setInputEnabled(true);
+
+			this.addSystemMessage(`✅ 已连接到 ${this.selectedAgent.name}`);
+			new Notice(`已连接到 ${this.selectedAgent.name}`);
+		} catch (error) {
+			console.error('[ChatView] 连接失败:', error);
+			this.updateStatus('连接失败', 'error');
+			this.connectButtonEl.disabled = false;
+			this.addSystemMessage(`❌ 连接失败: ${error}`);
+			new Notice('连接失败');
+		}
+	}
+
+	/**
+	 * 断开连接
+	 */
+	private handleDisconnect(): void {
+		if (this.sessionManager) {
+			this.sessionManager.end();
+			this.sessionManager = null;
+		}
+
+		if (this.connection) {
+			this.connection.disconnect();
+			this.connection = null;
+		}
+
+		this.updateStatus('未连接', 'idle');
+		this.connectButtonEl.textContent = '连接';
+		this.setInputEnabled(false);
+
+		this.addSystemMessage('已断开连接');
+	}
+
+	// ========================================================================
+	// 会话管理
+	// ========================================================================
+
+	/**
+	 * 设置会话回调
+	 */
+	private setupSessionCallbacks(): void {
+		if (!this.sessionManager) return;
+
+		// 消息更新
+		this.sessionManager.onMessage = (message: Message, isNew: boolean) => {
+			this.handleMessage(message, isNew);
+		};
+
+		// 工具调用
+		this.sessionManager.onToolCall = (toolCall: ToolCall) => {
+			this.handleToolCall(toolCall);
+		};
+
+		// 状态变更
+		this.sessionManager.onStateChange = (state: SessionState) => {
+			this.handleStateChange(state);
+		};
+
+		// 回合结束
+		this.sessionManager.onTurnEnd = () => {
+			this.handleTurnEnd();
+		};
+
+		// 错误
+		this.sessionManager.onError = (error: Error) => {
+			this.handleError(error);
+		};
+	}
+
+	/**
+	 * 处理消息
+	 */
+	private handleMessage(message: Message, isNew: boolean): void {
+		if (isNew) {
+			this.addMessage(message);
+		} else {
+			this.updateMessage(message);
+		}
+	}
+
+	/**
+	 * 处理工具调用
+	 */
+	private handleToolCall(toolCall: ToolCall): void {
+		// T12 会实现完整的工具调用渲染
+		console.log('[ChatView] 工具调用:', toolCall);
+	}
+
+	/**
+	 * 处理状态变更
+	 */
+	private handleStateChange(state: SessionState): void {
+		switch (state) {
+			case 'processing':
+				this.updateStatus('处理中...', 'processing');
+				this.sendButtonEl.style.display = 'none';
+				this.cancelButtonEl.style.display = 'inline-block';
+				this.inputEl.disabled = true;
+				break;
+
+			case 'idle':
+				this.updateStatus('已连接', 'connected');
+				this.sendButtonEl.style.display = 'inline-block';
+				this.cancelButtonEl.style.display = 'none';
+				this.inputEl.disabled = false;
+				break;
+
+			case 'cancelled':
+				this.addSystemMessage('⚠️ 已取消');
+				break;
+		}
+	}
+
+	/**
+	 * 处理回合结束
+	 */
+	private handleTurnEnd(): void {
+		// 自动滚动到底部
+		this.scrollToBottom();
+	}
+
+	/**
+	 * 处理错误
+	 */
+	private handleError(error: Error): void {
+		console.error('[ChatView] 错误:', error);
+		this.addSystemMessage(`❌ 错误: ${error.message}`);
+		new Notice(`错误: ${error.message}`);
+	}
+
+	// ========================================================================
+	// 用户操作
+	// ========================================================================
+
+	/**
+	 * 处理发送
+	 */
+	private async handleSend(): Promise<void> {
+		const text = this.inputEl.value.trim();
+		if (!text) {
+			return;
+		}
+
+		if (!this.sessionManager) {
+			new Notice('未连接到 Agent');
+			return;
+		}
+
+		// 清空输入框
+		this.inputEl.value = '';
+
+		try {
+			// 发送提示
+			await this.sessionManager.sendPrompt(text);
+		} catch (error) {
+			console.error('[ChatView] 发送失败:', error);
+			new Notice('发送失败');
+		}
+	}
+
+	/**
+	 * 处理取消
+	 */
+	private async handleCancel(): Promise<void> {
+		if (!this.sessionManager) {
+			return;
+		}
+
+		try {
+			await this.sessionManager.cancel();
+		} catch (error) {
+			console.error('[ChatView] 取消失败:', error);
+		}
+	}
+
+	// ========================================================================
+	// 消息渲染
+	// ========================================================================
+
+	/**
+	 * 添加系统消息
+	 */
+	private addSystemMessage(text: string): void {
+		const messageEl = this.messagesEl.createDiv({ cls: 'acp-message acp-message-system' });
+		const contentEl = messageEl.createDiv({ cls: 'acp-message-content' });
+		contentEl.textContent = text;
+
+		this.scrollToBottom();
+	}
+
+	/**
+	 * 添加消息
+	 */
+	private addMessage(message: Message): void {
+		const messageEl = this.messagesEl.createDiv({
+			cls: `acp-message acp-message-${message.role}`,
+			attr: { 'data-message-id': message.id },
+		});
+
+		// 消息头部（显示角色）
+		const headerEl = messageEl.createDiv({ cls: 'acp-message-header' });
+		headerEl.textContent = message.role === 'user' ? '你' : 'Agent';
+
+		// 消息内容
+		const contentEl = messageEl.createDiv({ cls: 'acp-message-content' });
+		contentEl.textContent = message.content;
+
+		// 如果正在流式输出，添加光标
+		if (message.isStreaming) {
+			contentEl.addClass('acp-message-streaming');
+		}
+
+		this.scrollToBottom();
+	}
+
+	/**
+	 * 更新消息
+	 */
+	private updateMessage(message: Message): void {
+		const messageEl = this.messagesEl.querySelector(`[data-message-id="${message.id}"]`);
+		if (!messageEl) {
+			console.warn('[ChatView] 找不到消息元素:', message.id);
+			return;
+		}
+
+		const contentEl = messageEl.querySelector('.acp-message-content') as HTMLElement;
+		if (contentEl) {
+			contentEl.textContent = message.content;
+
+			if (!message.isStreaming) {
+				contentEl.removeClass('acp-message-streaming');
+			}
+		}
+
+		this.scrollToBottom();
+	}
+
+	// ========================================================================
+	// UI 辅助方法
+	// ========================================================================
+
+	/**
+	 * 更新状态指示器
+	 */
+	private updateStatus(text: string, state: 'idle' | 'connecting' | 'connected' | 'processing' | 'error'): void {
+		this.statusEl.textContent = text;
+		this.statusEl.className = `acp-status acp-status-${state}`;
+	}
+
+	/**
+	 * 设置输入区域启用状态
+	 */
+	private setInputEnabled(enabled: boolean): void {
+		this.inputEl.disabled = !enabled;
+		this.sendButtonEl.disabled = !enabled;
+	}
+
+	/**
+	 * 滚动到底部
+	 */
+	private scrollToBottom(): void {
+		this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+	}
+}

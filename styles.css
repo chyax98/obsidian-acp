@@ -1,8 +1,291 @@
-/*
+/* ============================================================================
+   ACP Chat View Styles
+   ============================================================================ */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+/* 容器 */
+.acp-chat-container {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 0;
+}
 
-If your plugin does not need CSS, delete this file.
+/* ============================================================================
+   头部区域
+   ============================================================================ */
 
-*/
+.acp-chat-header {
+	padding: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+	flex-shrink: 0;
+}
+
+.acp-agent-selector {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.acp-agent-select {
+	flex: 1;
+	padding: 6px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	cursor: pointer;
+}
+
+.acp-agent-select:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+.acp-connect-button {
+	padding: 6px 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--interactive-normal);
+	color: var(--text-normal);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.acp-connect-button:hover {
+	background-color: var(--interactive-hover);
+}
+
+.acp-connect-button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.acp-status {
+	margin-top: 8px;
+	padding: 4px 8px;
+	font-size: 0.9em;
+	border-radius: 4px;
+	text-align: center;
+}
+
+.acp-status-idle {
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.acp-status-connecting {
+	background-color: var(--color-yellow);
+	color: var(--text-on-accent);
+}
+
+.acp-status-connected {
+	background-color: var(--color-green);
+	color: var(--text-on-accent);
+}
+
+.acp-status-processing {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	animation: pulse 1.5s ease-in-out infinite;
+}
+
+.acp-status-error {
+	background-color: var(--color-red);
+	color: var(--text-on-accent);
+}
+
+@keyframes pulse {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.7;
+	}
+}
+
+/* ============================================================================
+   消息区域
+   ============================================================================ */
+
+.acp-chat-messages {
+	flex: 1;
+	overflow-y: auto;
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* 消息通用样式 */
+.acp-message {
+	display: flex;
+	flex-direction: column;
+	max-width: 85%;
+	padding: 10px 14px;
+	border-radius: 8px;
+	animation: messageSlideIn 0.2s ease-out;
+}
+
+@keyframes messageSlideIn {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* 用户消息 */
+.acp-message-user {
+	align-self: flex-end;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.acp-message-user .acp-message-header {
+	color: var(--text-on-accent);
+	opacity: 0.9;
+}
+
+/* Agent 消息 */
+.acp-message-assistant {
+	align-self: flex-start;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+}
+
+/* 系统消息 */
+.acp-message-system {
+	align-self: center;
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: 0.9em;
+	max-width: 95%;
+	text-align: center;
+}
+
+/* 消息头部 */
+.acp-message-header {
+	font-size: 0.85em;
+	font-weight: 600;
+	margin-bottom: 4px;
+	color: var(--text-muted);
+}
+
+/* 消息内容 */
+.acp-message-content {
+	line-height: 1.6;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+}
+
+/* 流式输出光标 */
+.acp-message-streaming::after {
+	content: '▊';
+	animation: blink 1s step-end infinite;
+	margin-left: 2px;
+}
+
+@keyframes blink {
+	50% {
+		opacity: 0;
+	}
+}
+
+/* ============================================================================
+   输入区域
+   ============================================================================ */
+
+.acp-chat-input {
+	padding: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+	flex-shrink: 0;
+}
+
+.acp-input-textarea {
+	width: 100%;
+	min-height: 60px;
+	max-height: 200px;
+	padding: 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	resize: vertical;
+	font-family: var(--font-text);
+	font-size: var(--font-ui-small);
+	line-height: 1.5;
+}
+
+.acp-input-textarea:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+.acp-input-textarea:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.acp-input-buttons {
+	display: flex;
+	gap: 8px;
+	margin-top: 8px;
+	justify-content: flex-end;
+}
+
+.acp-send-button,
+.acp-cancel-button {
+	padding: 8px 20px;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-weight: 500;
+	transition: all 0.2s;
+}
+
+.acp-send-button {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.acp-send-button:hover:not(:disabled) {
+	background-color: var(--interactive-accent-hover);
+	transform: translateY(-1px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.acp-send-button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.acp-cancel-button {
+	background-color: var(--background-modifier-error);
+	color: var(--text-on-accent);
+}
+
+.acp-cancel-button:hover {
+	background-color: var(--color-red);
+	transform: translateY(-1px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================================================
+   响应式调整
+   ============================================================================ */
+
+@media (max-width: 768px) {
+	.acp-message {
+		max-width: 95%;
+	}
+
+	.acp-chat-messages {
+		padding: 12px;
+	}
+}
+

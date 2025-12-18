@@ -186,14 +186,17 @@ export class AcpConnection {
 
 			// 确定 CLI 路径
 			let cliPath: string;
+			let skipAcpArgs = false; // 是否跳过 ACP 参数
+
 			if (options.backendId === 'custom') {
 				if (!options.cliPath) {
 					throw new Error('自定义 Agent 需要指定 CLI 路径');
 				}
 				cliPath = options.cliPath;
 			} else if (options.backendId === 'claude') {
-				// Claude 使用特殊的 npx 包
+				// Claude 使用特殊的 npx 包，不需要额外的 ACP 参数
 				cliPath = 'npx @zed-industries/claude-code-acp';
+				skipAcpArgs = true; // @zed-industries/claude-code-acp 本身就是 ACP 版本
 			} else {
 				cliPath = options.cliPath || config?.defaultCliPath || config?.cliCommand || '';
 				if (!cliPath) {
@@ -201,11 +204,17 @@ export class AcpConnection {
 				}
 			}
 
-			// 获取 ACP 参数
-			const acpArgs = options.acpArgs || getBackendAcpArgs(options.backendId);
+			// 获取 ACP 参数（Claude 跳过）
+			const acpArgs = skipAcpArgs ? [] : (options.acpArgs || getBackendAcpArgs(options.backendId));
+
+			// 清理环境变量（避免干扰子进程）
+			const cleanEnv = { ...process.env, ...options.env };
+			delete cleanEnv.NODE_OPTIONS;
+			delete cleanEnv.NODE_INSPECT;
+			delete cleanEnv.NODE_DEBUG;
 
 			// 创建 spawn 配置
-			const spawnConfig = createSpawnConfig(cliPath, this.workingDir, acpArgs, options.env);
+			const spawnConfig = createSpawnConfig(cliPath, this.workingDir, acpArgs, cleanEnv);
 
 			console.log(`[ACP] 启动 ${options.backendId}: ${spawnConfig.command} ${spawnConfig.args.join(' ')}`);
 

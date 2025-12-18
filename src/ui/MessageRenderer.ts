@@ -4,12 +4,18 @@
  * 负责渲染聊天消息，支持：
  * - Markdown 渲染（使用 Obsidian MarkdownRenderer）
  * - 代码块语法高亮
- * - 工具调用卡片（基础版）
+ * - 工具调用卡片（增强版，T12）
  * - 计划显示
+ *
+ * T12 增强：
+ * - 显示工具执行时间和持续时长
+ * - 显示输入参数和输出结果
+ * - 带行号的 Diff 渲染
+ * - 复制按钮和文件路径点击
  */
 
-import { MarkdownRenderer, Component, setIcon, App } from 'obsidian';
-import type { Message, ToolCall, PlanEntry } from '../acp/core/session-manager';
+import { MarkdownRenderer, Component, setIcon, App, Notice } from 'obsidian';
+import type { Message, ToolCall, PlanEntry, Turn } from '../acp/core/session-manager';
 
 // ============================================================================
 // MessageRenderer 类
@@ -140,16 +146,14 @@ export class MessageRenderer {
 	// ========================================================================
 
 	/**
-	 * 渲染工具调用卡片（基础版）
-	 *
-	 * 注意：完整的工具调用渲染将在 T12 实现。
-	 * 这里仅提供基础卡片显示。
+	 * 渲染工具调用卡片（增强版，T12）
 	 *
 	 * @param container - 容器元素
 	 * @param toolCall - 工具调用对象
+	 * @param app - Obsidian App 实例（用于文件跳转）
 	 * @returns 工具调用元素
 	 */
-	static renderToolCall(container: HTMLElement, toolCall: ToolCall): HTMLElement {
+	static renderToolCall(container: HTMLElement, toolCall: ToolCall, app?: App): HTMLElement {
 		// 查找是否已存在
 		let toolCallEl = container.querySelector(
 			`[data-tool-call-id="${toolCall.toolCallId}"]`
@@ -174,9 +178,16 @@ export class MessageRenderer {
 		const iconEl = headerEl.createDiv({ cls: 'acp-tool-call-icon' });
 		this.setToolCallIcon(iconEl, toolCall.status);
 
+		// 标题容器（包含标题和时间）
+		const titleContainerEl = headerEl.createDiv({ cls: 'acp-tool-call-title-container' });
+
 		// 标题
-		const titleEl = headerEl.createDiv({ cls: 'acp-tool-call-title' });
+		const titleEl = titleContainerEl.createDiv({ cls: 'acp-tool-call-title' });
 		titleEl.textContent = toolCall.title || '工具调用';
+
+		// 时间信息（T12 增强）
+		const timeEl = titleContainerEl.createDiv({ cls: 'acp-tool-call-time' });
+		timeEl.textContent = this.formatToolCallTime(toolCall);
 
 		// 类型标签
 		const kindEl = headerEl.createDiv({ cls: 'acp-tool-call-kind' });
@@ -188,8 +199,8 @@ export class MessageRenderer {
 			attr: { 'data-expanded': 'false' },
 		});
 
-		// 渲染内容
-		this.renderToolCallContent(contentEl, toolCall);
+		// 渲染内容（T12 增强：传递 app）
+		this.renderToolCallContent(contentEl, toolCall, app);
 
 		// 点击头部切换折叠/展开
 		headerEl.addEventListener('click', () => {
@@ -217,11 +228,17 @@ export class MessageRenderer {
 			titleEl.textContent = toolCall.title || '工具调用';
 		}
 
+		// 更新时间
+		const timeEl = toolCallEl.querySelector('.acp-tool-call-time');
+		if (timeEl) {
+			timeEl.textContent = this.formatToolCallTime(toolCall);
+		}
+
 		// 更新内容
 		const contentEl = toolCallEl.querySelector('.acp-tool-call-content');
 		if (contentEl) {
 			contentEl.empty();
-			this.renderToolCallContent(contentEl as HTMLElement, toolCall);
+			this.renderToolCallContent(contentEl as HTMLElement, toolCall, undefined);
 		}
 	}
 
@@ -272,9 +289,40 @@ export class MessageRenderer {
 	}
 
 	/**
-	 * 渲染工具调用内容
+	 * 格式化工具调用时间（T12 增强）
 	 */
-	private static renderToolCallContent(contentEl: HTMLElement, toolCall: ToolCall): void {
+	private static formatToolCallTime(toolCall: ToolCall): string {
+		if (toolCall.endTime) {
+			const duration = toolCall.endTime - toolCall.startTime;
+			return this.formatDuration(duration);
+		}
+
+		if (toolCall.status === 'in_progress') {
+			return '执行中...';
+		}
+
+		return '等待中';
+	}
+
+	/**
+	 * 格式化持续时间
+	 */
+	private static formatDuration(ms: number): string {
+		if (ms < 1000) {
+			return `${ms}ms`;
+		}
+		if (ms < 60000) {
+			return `${(ms / 1000).toFixed(1)}s`;
+		}
+		const minutes = Math.floor(ms / 60000);
+		const seconds = ((ms % 60000) / 1000).toFixed(0);
+		return `${minutes}m ${seconds}s`;
+	}
+
+	/**
+	 * 渲染工具调用内容（T12 增强）
+	 */
+	private static renderToolCallContent(contentEl: HTMLElement, toolCall: ToolCall, app?: App): void {
 		if (!toolCall.content || toolCall.content.length === 0) {
 			contentEl.createDiv({
 				cls: 'acp-tool-call-empty',
@@ -293,21 +341,21 @@ export class MessageRenderer {
 					// content 类型有嵌套的 content 属性
 					const textContent = content.content;
 					if (textContent && textContent.type === 'text') {
-						blockEl.textContent = textContent.text || '';
+						// T12 增强：添加复制按钮
+						this.renderTextContentWithCopy(blockEl, textContent.text || '');
 					}
 					break;
 
 				case 'diff':
 					blockEl.addClass('acp-tool-call-content-diff');
-					// 构建 diff 字符串
-					const diffText = this.buildDiffString(content);
-					this.renderDiff(blockEl, diffText);
+					// T12 增强：带行号和文件路径点击的 diff
+					this.renderDiffEnhanced(blockEl, content, app);
 					break;
 
 				case 'terminal':
 					blockEl.addClass('acp-tool-call-content-terminal');
-					const terminalEl = blockEl.createEl('pre');
-					terminalEl.createEl('code', { text: content.terminalId });
+					// T12 增强：添加复制按钮
+					this.renderTerminalOutput(blockEl, content.terminalId);
 					break;
 
 				default:
@@ -317,7 +365,7 @@ export class MessageRenderer {
 	}
 
 	/**
-	 * 构建 diff 字符串
+	 * 构建 diff 字符串（保留用于向后兼容）
 	 */
 	private static buildDiffString(diffContent: { oldText?: string | null; newText?: string; path?: string }): string {
 		const lines: string[] = [];
@@ -345,7 +393,7 @@ export class MessageRenderer {
 	}
 
 	/**
-	 * 渲染 diff 内容
+	 * 渲染 diff 内容（保留用于向后兼容）
 	 */
 	private static renderDiff(container: HTMLElement, diff: string): void {
 		const lines = diff.split('\n');
@@ -364,6 +412,268 @@ export class MessageRenderer {
 
 			lineEl.textContent = line;
 		}
+	}
+
+	// ========================================================================
+	// T12 增强方法
+	// ========================================================================
+
+	/**
+	 * 渲染带复制按钮的文本内容（T12）
+	 */
+	private static renderTextContentWithCopy(container: HTMLElement, text: string): void {
+		const wrapperEl = container.createDiv({ cls: 'acp-content-with-copy' });
+
+		// 文本内容
+		const textEl = wrapperEl.createDiv({ cls: 'acp-content-text' });
+		textEl.textContent = text;
+
+		// 复制按钮
+		const copyBtn = wrapperEl.createDiv({ cls: 'acp-copy-button' });
+		setIcon(copyBtn, 'copy');
+		copyBtn.setAttribute('aria-label', '复制');
+
+		copyBtn.addEventListener('click', async (e) => {
+			e.stopPropagation();
+			await navigator.clipboard.writeText(text);
+			new Notice('已复制到剪贴板');
+
+			// 临时切换图标
+			copyBtn.empty();
+			setIcon(copyBtn, 'check');
+			setTimeout(() => {
+				copyBtn.empty();
+				setIcon(copyBtn, 'copy');
+			}, 1500);
+		});
+	}
+
+	/**
+	 * 渲染增强版 diff（带行号和文件路径点击，T12）
+	 */
+	private static renderDiffEnhanced(
+		container: HTMLElement,
+		diffContent: { oldText?: string | null; newText?: string; path?: string },
+		app?: App
+	): void {
+		const wrapperEl = container.createDiv({ cls: 'acp-diff-enhanced' });
+
+		// 文件路径头部
+		if (diffContent.path) {
+			const pathHeaderEl = wrapperEl.createDiv({ cls: 'acp-diff-path' });
+
+			// 文件路径
+			const pathEl = pathHeaderEl.createEl('span', {
+				cls: 'acp-diff-path-text',
+				text: diffContent.path,
+			});
+
+			// 如果提供了 app，添加点击跳转
+			if (app) {
+				pathEl.addClass('acp-diff-path-clickable');
+				pathEl.addEventListener('click', () => {
+					this.openFile(app, diffContent.path!);
+				});
+			}
+
+			// 复制按钮
+			const copyBtn = pathHeaderEl.createDiv({ cls: 'acp-copy-button acp-copy-button-small' });
+			setIcon(copyBtn, 'copy');
+			copyBtn.setAttribute('aria-label', '复制 diff');
+
+			copyBtn.addEventListener('click', async (e) => {
+				e.stopPropagation();
+				const diffText = this.buildDiffString(diffContent);
+				await navigator.clipboard.writeText(diffText);
+				new Notice('已复制 diff');
+
+				copyBtn.empty();
+				setIcon(copyBtn, 'check');
+				setTimeout(() => {
+					copyBtn.empty();
+					setIcon(copyBtn, 'copy');
+				}, 1500);
+			});
+		}
+
+		// Diff 内容
+		const preEl = wrapperEl.createEl('pre', { cls: 'acp-diff' });
+
+		let lineNumber = 1;
+
+		// 渲染删除的行
+		if (diffContent.oldText) {
+			const oldLines = diffContent.oldText.split('\n');
+			for (const line of oldLines) {
+				const lineEl = preEl.createEl('div', { cls: 'acp-diff-line acp-diff-removed' });
+
+				// 行号
+				const lineNumEl = lineEl.createEl('span', { cls: 'acp-diff-line-number' });
+				lineNumEl.textContent = lineNumber.toString().padStart(4, ' ');
+
+				// 内容
+				const contentEl = lineEl.createEl('span', { cls: 'acp-diff-line-content' });
+				contentEl.textContent = `-${line}`;
+
+				lineNumber++;
+			}
+		}
+
+		// 重置行号（新增内容从 1 开始）
+		lineNumber = 1;
+
+		// 渲染新增的行
+		if (diffContent.newText) {
+			const newLines = diffContent.newText.split('\n');
+			for (const line of newLines) {
+				const lineEl = preEl.createEl('div', { cls: 'acp-diff-line acp-diff-added' });
+
+				// 行号
+				const lineNumEl = lineEl.createEl('span', { cls: 'acp-diff-line-number' });
+				lineNumEl.textContent = lineNumber.toString().padStart(4, ' ');
+
+				// 内容
+				const contentEl = lineEl.createEl('span', { cls: 'acp-diff-line-content' });
+				contentEl.textContent = `+${line}`;
+
+				lineNumber++;
+			}
+		}
+	}
+
+	/**
+	 * 渲染终端输出（带复制按钮，T12）
+	 */
+	private static renderTerminalOutput(container: HTMLElement, terminalId: string): void {
+		const wrapperEl = container.createDiv({ cls: 'acp-terminal-wrapper' });
+
+		// 终端内容
+		const preEl = wrapperEl.createEl('pre');
+		const codeEl = preEl.createEl('code', { text: terminalId });
+
+		// 复制按钮
+		const copyBtn = wrapperEl.createDiv({ cls: 'acp-copy-button acp-copy-button-terminal' });
+		setIcon(copyBtn, 'copy');
+		copyBtn.setAttribute('aria-label', '复制终端输出');
+
+		copyBtn.addEventListener('click', async (e) => {
+			e.stopPropagation();
+			await navigator.clipboard.writeText(terminalId);
+			new Notice('已复制终端输出');
+
+			copyBtn.empty();
+			setIcon(copyBtn, 'check');
+			setTimeout(() => {
+				copyBtn.empty();
+				setIcon(copyBtn, 'copy');
+			}, 1500);
+		});
+	}
+
+	/**
+	 * 打开文件（在 Obsidian 中，T12）
+	 */
+	private static openFile(app: App, path: string): void {
+		// 尝试在 Obsidian 中打开文件
+		const file = app.vault.getAbstractFileByPath(path);
+		if (file) {
+			app.workspace.openLinkText(path, '', false);
+		} else {
+			new Notice(`文件不存在: ${path}`);
+		}
+	}
+
+	// ========================================================================
+	// 工具调用分组渲染（T12）
+	// ========================================================================
+
+	/**
+	 * 渲染工具调用组（按回合分组，T12）
+	 *
+	 * @param container - 容器元素
+	 * @param toolCalls - 工具调用列表
+	 * @param groupTitle - 分组标题
+	 * @param app - Obsidian App 实例
+	 * @returns 分组元素
+	 */
+	static renderToolCallGroup(
+		container: HTMLElement,
+		toolCalls: ToolCall[],
+		groupTitle?: string,
+		app?: App
+	): HTMLElement {
+		const groupEl = container.createDiv({ cls: 'acp-tool-call-group' });
+
+		// 分组头部
+		const headerEl = groupEl.createDiv({ cls: 'acp-tool-call-group-header' });
+
+		// 展开/折叠图标
+		const toggleIcon = headerEl.createDiv({ cls: 'acp-tool-call-group-toggle' });
+		setIcon(toggleIcon, 'chevron-down');
+
+		// 标题
+		const titleEl = headerEl.createDiv({ cls: 'acp-tool-call-group-title' });
+		titleEl.textContent = groupTitle || `工具调用组 (${toolCalls.length})`;
+
+		// 统计信息（T12 增强）
+		const statsEl = headerEl.createDiv({ cls: 'acp-tool-call-group-stats' });
+		const stats = this.calculateToolCallStats(toolCalls);
+		statsEl.innerHTML = `
+			<span class="acp-tool-call-stat acp-tool-call-stat-total">${stats.total}</span>
+			<span class="acp-tool-call-stat acp-tool-call-stat-completed">${stats.completed}</span>
+			<span class="acp-tool-call-stat acp-tool-call-stat-error">${stats.error}</span>
+		`;
+
+		// 工具调用列表容器
+		const listEl = groupEl.createDiv({ cls: 'acp-tool-call-group-list' });
+		listEl.setAttribute('data-expanded', 'true'); // 默认展开
+
+		// 渲染每个工具调用
+		for (const toolCall of toolCalls) {
+			this.renderToolCall(listEl, toolCall, app);
+		}
+
+		// 点击头部切换展开/折叠
+		headerEl.addEventListener('click', () => {
+			const expanded = listEl.getAttribute('data-expanded') === 'true';
+			listEl.setAttribute('data-expanded', expanded ? 'false' : 'true');
+			listEl.toggleClass('acp-tool-call-group-list-collapsed', expanded);
+
+			// 切换图标
+			toggleIcon.empty();
+			setIcon(toggleIcon, expanded ? 'chevron-right' : 'chevron-down');
+		});
+
+		return groupEl;
+	}
+
+	/**
+	 * 计算工具调用统计信息（T12）
+	 */
+	private static calculateToolCallStats(toolCalls: ToolCall[]): {
+		total: number;
+		completed: number;
+		error: number;
+		inProgress: number;
+	} {
+		const stats = {
+			total: toolCalls.length,
+			completed: 0,
+			error: 0,
+			inProgress: 0,
+		};
+
+		for (const toolCall of toolCalls) {
+			if (toolCall.status === 'completed') {
+				stats.completed++;
+			} else if (toolCall.status === 'error') {
+				stats.error++;
+			} else if (toolCall.status === 'in_progress') {
+				stats.inProgress++;
+			}
+		}
+
+		return stats;
 	}
 
 	// ========================================================================

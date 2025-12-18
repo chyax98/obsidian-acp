@@ -340,10 +340,24 @@
 	}
 }
 
-.acp-tool-call-title {
+/* T12 增强：标题容器 */
+.acp-tool-call-title-container {
 	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.acp-tool-call-title {
 	font-weight: 500;
 	font-size: 0.95em;
+}
+
+/* T12 增强：时间显示 */
+.acp-tool-call-time {
+	font-size: 0.8em;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
 }
 
 .acp-tool-call-kind {
@@ -402,7 +416,105 @@
 	text-align: center;
 }
 
-/* Diff 渲染 */
+/* ============================================================================
+   T12 增强：复制按钮
+   ============================================================================ */
+
+.acp-content-with-copy,
+.acp-terminal-wrapper {
+	position: relative;
+}
+
+.acp-content-text {
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	font-size: 0.9em;
+	line-height: 1.5;
+	padding-right: 40px; /* 为复制按钮留空间 */
+}
+
+.acp-copy-button {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	border-radius: 4px;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	opacity: 0.7;
+	transition: all 0.2s;
+}
+
+.acp-copy-button:hover {
+	opacity: 1;
+	background-color: var(--background-modifier-hover);
+}
+
+.acp-copy-button .svg-icon {
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+.acp-copy-button-small {
+	width: 20px;
+	height: 20px;
+	top: 4px;
+	right: 4px;
+}
+
+.acp-copy-button-small .svg-icon {
+	width: 12px;
+	height: 12px;
+}
+
+.acp-copy-button-terminal {
+	top: 12px;
+	right: 12px;
+}
+
+/* ============================================================================
+   T12 增强：Diff 渲染
+   ============================================================================ */
+
+.acp-diff-enhanced {
+	position: relative;
+}
+
+.acp-diff-path {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	background-color: var(--background-modifier-border);
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-family: var(--font-monospace);
+	font-size: 0.85em;
+}
+
+.acp-diff-path-text {
+	color: var(--text-normal);
+	font-weight: 500;
+}
+
+.acp-diff-path-clickable {
+	cursor: pointer;
+	color: var(--interactive-accent);
+	text-decoration: underline;
+	text-decoration-style: dotted;
+}
+
+.acp-diff-path-clickable:hover {
+	color: var(--interactive-accent-hover);
+	text-decoration-style: solid;
+}
+
+/* Diff 渲染（基础版保留） */
 .acp-diff {
 	margin: 0;
 	padding: 0;
@@ -414,17 +526,39 @@
 }
 
 .acp-diff-line {
+	display: flex;
 	padding: 2px 8px;
 	white-space: pre;
 }
 
+/* T12 增强：行号 */
+.acp-diff-line-number {
+	display: inline-block;
+	width: 50px;
+	text-align: right;
+	margin-right: 12px;
+	color: var(--text-muted);
+	user-select: none;
+	opacity: 0.6;
+}
+
+.acp-diff-line-content {
+	flex: 1;
+}
+
 .acp-diff-added {
 	background-color: rgba(46, 160, 67, 0.15);
+}
+
+.acp-diff-added .acp-diff-line-content {
 	color: var(--color-green);
 }
 
 .acp-diff-removed {
 	background-color: rgba(248, 81, 73, 0.15);
+}
+
+.acp-diff-removed .acp-diff-line-content {
 	color: var(--color-red);
 }
 
@@ -432,6 +566,98 @@
 	background-color: var(--background-modifier-border);
 	color: var(--text-muted);
 	font-weight: 600;
+}
+
+/* ============================================================================
+   T12 增强：工具调用分组
+   ============================================================================ */
+
+.acp-tool-call-group {
+	margin: 12px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background-color: var(--background-secondary);
+	overflow: hidden;
+}
+
+.acp-tool-call-group-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	cursor: pointer;
+	user-select: none;
+	background-color: var(--background-secondary-alt);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.acp-tool-call-group-header:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.acp-tool-call-group-toggle {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform 0.2s;
+}
+
+.acp-tool-call-group-toggle .svg-icon {
+	color: var(--text-muted);
+}
+
+.acp-tool-call-group-title {
+	flex: 1;
+	font-weight: 600;
+	font-size: 0.95em;
+}
+
+.acp-tool-call-group-stats {
+	display: flex;
+	gap: 8px;
+	font-size: 0.8em;
+	font-family: var(--font-monospace);
+}
+
+.acp-tool-call-stat {
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-weight: 500;
+}
+
+.acp-tool-call-stat-total {
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.acp-tool-call-stat-completed {
+	background-color: rgba(46, 160, 67, 0.2);
+	color: var(--color-green);
+}
+
+.acp-tool-call-stat-error {
+	background-color: rgba(248, 81, 73, 0.2);
+	color: var(--color-red);
+}
+
+.acp-tool-call-group-list {
+	padding: 8px;
+	max-height: 500px;
+	overflow-y: auto;
+	transition: max-height 0.3s ease;
+}
+
+.acp-tool-call-group-list-collapsed {
+	max-height: 0;
+	overflow: hidden;
+	padding: 0;
+}
+
+.acp-tool-call-group-list .acp-tool-call {
+	margin: 4px 0;
 }
 
 /* ============================================================================

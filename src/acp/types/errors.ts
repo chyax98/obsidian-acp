@@ -99,7 +99,7 @@ export function createAcpError(
 		retryable?: boolean;
 		details?: unknown;
 		cause?: Error;
-	}
+	},
 ): AcpError {
 	return {
 		type,

@@ -6,11 +6,33 @@
     "module": "ESNext",
     "target": "ES6",
     "allowJs": true,
-    "noImplicitAny": true,
     "moduleResolution": "node",
     "importHelpers": true,
     "isolatedModules": true,
+
+    /* 核心类型检查（保持严格）*/
+    "strict": true,
+    "noImplicitAny": true,
     "strictNullChecks": true,
+    "strictFunctionTypes": true,
+
+    /* 代码质量检查（暂时放松）*/
+    "noUnusedLocals": false,              // 暂时关闭
+    "noUnusedParameters": false,          // 暂时关闭
+    "noImplicitReturns": false,           // 暂时关闭
+    "noImplicitOverride": false,          // 暂时关闭
+
+    /* 其他必要配置 */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,                 // 跳过库检查（提高速度）
+    "forceConsistentCasingInFileNames": true,
+
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
     "lib": [
       "DOM",
       "ES5",
@@ -23,6 +45,8 @@
   ],
   "exclude": [
     "node_modules",
-    "tmp"
+    "tmp",
+    "dist",
+    "tests"
   ]
 }

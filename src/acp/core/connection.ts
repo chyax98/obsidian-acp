@@ -78,7 +78,7 @@ export function createSpawnConfig(
 	cliPath: string,
 	workingDir: string,
 	acpArgs?: string[],
-	customEnv?: Record<string, string>
+	customEnv?: Record<string, string>,
 ): { command: string; args: string[]; options: SpawnOptions } {
 	const isWindows = Platform.isWin;
 	const env = { ...process.env, ...customEnv };
@@ -186,17 +186,12 @@ export class AcpConnection {
 
 			// 确定 CLI 路径
 			let cliPath: string;
-			let skipAcpArgs = false; // 是否跳过 ACP 参数
 
 			if (options.backendId === 'custom') {
 				if (!options.cliPath) {
 					throw new Error('自定义 Agent 需要指定 CLI 路径');
 				}
 				cliPath = options.cliPath;
-			} else if (options.backendId === 'claude') {
-				// Claude 使用特殊的 npx 包，不需要额外的 ACP 参数
-				cliPath = 'npx @zed-industries/claude-code-acp';
-				skipAcpArgs = true; // @zed-industries/claude-code-acp 本身就是 ACP 版本
 			} else {
 				cliPath = options.cliPath || config?.defaultCliPath || config?.cliCommand || '';
 				if (!cliPath) {
@@ -204,8 +199,8 @@ export class AcpConnection {
 				}
 			}
 
-			// 获取 ACP 参数（Claude 跳过）
-			const acpArgs = skipAcpArgs ? [] : (options.acpArgs || getBackendAcpArgs(options.backendId));
+			// 获取 ACP 参数
+			const acpArgs = options.acpArgs || getBackendAcpArgs(options.backendId);
 
 			// 清理环境变量（避免干扰子进程）
 			const cleanEnv: Record<string, string> = {};
@@ -277,7 +272,7 @@ export class AcpConnection {
 
 		// stderr 日志
 		this.child.stderr?.on('data', (data: Buffer) => {
-			console.error(`[ACP STDERR]:`, data.toString());
+			console.error('[ACP STDERR]:', data.toString());
 		});
 
 		// 进程错误
@@ -346,7 +341,7 @@ export class AcpConnection {
 		try {
 			// 检查是否为请求或通知 (有 method 字段)
 			if ('method' in message) {
-				this.handleIncomingRequest(message as AcpRequest | AcpNotification).catch((error) => {
+				this.handleIncomingRequest(message).catch((error) => {
 					console.error('[ACP] 处理请求失败:', error);
 				});
 				return;
@@ -354,13 +349,13 @@ export class AcpConnection {
 
 			// 检查是否为响应 (有 id 字段且在待处理列表中)
 			if ('id' in message) {
-				const response = message as AcpResponse;
+				const response = message;
 
 				if (this.requestQueue.has(response.id)) {
 					if (response.error) {
 						this.requestQueue.rejectWithMessage(
 							response.id,
-							response.error.message || '未知 ACP 错误'
+							response.error.message || '未知 ACP 错误',
 						);
 					} else {
 						// 检查 end_turn
@@ -518,7 +513,7 @@ export class AcpConnection {
 	 */
 	private async initialize(): Promise<InitializeResponse> {
 		const params = {
-			protocolVersion: '1',
+			protocolVersion: 1, // 数字类型
 			clientInfo: {
 				name: 'obsidian-acp',
 				version: '0.1.0',
@@ -534,7 +529,7 @@ export class AcpConnection {
 		const response = await Promise.race([
 			this.sendRequest<InitializeResponse>(AcpMethod.INITIALIZE, params),
 			new Promise<never>((_, reject) =>
-				setTimeout(() => reject(new Error('初始化超时 (60s)')), 60000)
+				setTimeout(() => reject(new Error('初始化超时 (60s)')), 60000),
 			),
 		]);
 
@@ -556,8 +551,12 @@ export class AcpConnection {
 	async newSession(workingDir?: string): Promise<NewSessionResponse> {
 		const cwd = workingDir || this.workingDir;
 
+		// 调试日志
+		console.log('[ACP] session/new 参数:', { cwd, mcpServers: [] });
+
 		const response = await this.sendRequest<NewSessionResponse>(AcpMethod.SESSION_NEW, {
-			workingDirectory: cwd,
+			cwd,
+			mcpServers: [], // ACP 协议要求的字段
 		});
 
 		this.sessionId = response.sessionId;
@@ -574,7 +573,7 @@ export class AcpConnection {
 
 		return await this.sendRequest<PromptResponse>(AcpMethod.SESSION_PROMPT, {
 			sessionId: this.sessionId,
-			content: [{ type: 'text', text }],
+			prompt: [{ type: 'text', text }], // 修正：使用 prompt 而不是 content
 		});
 	}
 
@@ -642,7 +641,7 @@ export class AcpConnection {
 	 * 处理权限请求
 	 */
 	private async handlePermissionRequest(
-		params: RequestPermissionParams
+		params: RequestPermissionParams,
 	): Promise<{ outcome: { type: string; optionId?: string } }> {
 		// 暂停 prompt 超时
 		this.pausePromptTimeouts();

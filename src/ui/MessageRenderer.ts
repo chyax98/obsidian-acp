@@ -14,7 +14,8 @@
  * - 复制按钮和文件路径点击
  */
 
-import { MarkdownRenderer, Component, setIcon, App, Notice } from 'obsidian';
+import type { Component, App } from 'obsidian';
+import { MarkdownRenderer, setIcon, Notice } from 'obsidian';
 import type { Message, ToolCall, PlanEntry, Turn } from '../acp/core/session-manager';
 
 // ============================================================================
@@ -45,7 +46,7 @@ export class MessageRenderer {
 		message: Message,
 		component: Component,
 		app: App,
-		sourcePath: string = ''
+		sourcePath: string = '',
 	): Promise<void> {
 		// 清空容器
 		container.empty();
@@ -72,7 +73,7 @@ export class MessageRenderer {
 					message.content,
 					contentEl,
 					sourcePath,
-					component
+					component,
 				);
 			} catch (error) {
 				console.error('[MessageRenderer] Markdown 渲染失败:', error);
@@ -101,7 +102,7 @@ export class MessageRenderer {
 		message: Message,
 		component: Component,
 		app: App,
-		sourcePath: string = ''
+		sourcePath: string = '',
 	): Promise<void> {
 		const messageEl = container.querySelector(`[data-message-id="${message.id}"]`);
 		if (!messageEl) {
@@ -125,7 +126,7 @@ export class MessageRenderer {
 					message.content,
 					contentEl,
 					sourcePath,
-					component
+					component,
 				);
 			} catch (error) {
 				console.error('[MessageRenderer] Markdown 更新失败:', error);
@@ -156,7 +157,7 @@ export class MessageRenderer {
 	static renderToolCall(container: HTMLElement, toolCall: ToolCall, app?: App): HTMLElement {
 		// 查找是否已存在
 		let toolCallEl = container.querySelector(
-			`[data-tool-call-id="${toolCall.toolCallId}"]`
+			`[data-tool-call-id="${toolCall.toolCallId}"]`,
 		) as HTMLElement;
 
 		if (toolCallEl) {
@@ -336,7 +337,7 @@ export class MessageRenderer {
 			const blockEl = contentEl.createDiv({ cls: 'acp-tool-call-content-block' });
 
 			switch (content.type) {
-				case 'content':
+				case 'content': {
 					blockEl.addClass('acp-tool-call-content-text');
 					// content 类型有嵌套的 content 属性
 					const textContent = content.content;
@@ -345,6 +346,7 @@ export class MessageRenderer {
 						this.renderTextContentWithCopy(blockEl, textContent.text || '');
 					}
 					break;
+				}
 
 				case 'diff':
 					blockEl.addClass('acp-tool-call-content-diff');
@@ -454,7 +456,7 @@ export class MessageRenderer {
 	private static renderDiffEnhanced(
 		container: HTMLElement,
 		diffContent: { oldText?: string | null; newText?: string; path?: string },
-		app?: App
+		app?: App,
 	): void {
 		const wrapperEl = container.createDiv({ cls: 'acp-diff-enhanced' });
 
@@ -600,7 +602,7 @@ export class MessageRenderer {
 		container: HTMLElement,
 		toolCalls: ToolCall[],
 		groupTitle?: string,
-		app?: App
+		app?: App,
 	): HTMLElement {
 		const groupEl = container.createDiv({ cls: 'acp-tool-call-group' });
 

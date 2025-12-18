@@ -20,27 +20,48 @@ const DEFAULT_ACP_ARGS = ['--experimental-acp'];
 /**
  * 所有 ACP 后端配置
  *
- * 包括已启用和暂时禁用的后端。
+ * 此插件专注于 Claude Code SDK 模式，其他 Agent 已禁用。
+ * Claude Code 通过 SDK 直接调用，无需 CLI 检测。
  */
 export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
+	// ========================================
+	// Claude Code - SDK 模式（主要支持）
+	// ========================================
 	claude: {
 		id: 'claude',
-		name: 'Claude Code',
-		description: 'Anthropic 官方 AI 编程助手',
-		cliCommand: 'claude',
-		authRequired: true,
+		name: 'Claude Code (SDK)',
+		description: 'Anthropic Claude Code - 通过 SDK 直接调用，无需安装 CLI',
+		cliCommand: undefined, // SDK 模式不需要 CLI
+		authRequired: false, // SDK 会使用 Claude Code 已有的认证
 		enabled: true,
 		supportsStreaming: false,
-		// 使用默认 acpArgs
+		acpArgs: [], // SDK 模式不需要参数
 	},
 
+	// ========================================
+	// Claude Code - ACP 模式（CLI）
+	// ========================================
+	'claude-acp': {
+		id: 'claude-acp',
+		name: 'Claude Code (ACP)',
+		description: 'Anthropic Claude Code - 通过 ACP 协议连接 CLI',
+		cliCommand: 'claude',
+		authRequired: false,
+		enabled: true,
+		supportsStreaming: false,
+		acpArgs: ['--experimental-acp'],
+	},
+
+	// ========================================
+	// 其他 Agent
+	// ========================================
 	codex: {
 		id: 'codex',
 		name: 'Codex CLI',
 		description: 'OpenAI Codex 命令行工具',
 		cliCommand: 'codex',
 		authRequired: false,
-		enabled: true,
+		enabled: true, // 启用
 		supportsStreaming: false,
 	},
 
@@ -50,7 +71,7 @@ export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 		description: 'Google Gemini 命令行工具',
 		cliCommand: 'gemini',
 		authRequired: true,
-		enabled: false, // 暂未完全支持
+		enabled: false, // 已禁用
 		supportsStreaming: true,
 	},
 
@@ -61,7 +82,7 @@ export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 		cliCommand: 'qwen',
 		defaultCliPath: 'npx @qwen-code/qwen-code',
 		authRequired: true,
-		enabled: true,
+		enabled: false, // 已禁用
 		supportsStreaming: true,
 	},
 
@@ -71,9 +92,9 @@ export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 		description: 'Block 开源 AI 编程助手',
 		cliCommand: 'goose',
 		authRequired: false,
-		enabled: true,
+		enabled: false, // 已禁用
 		supportsStreaming: false,
-		acpArgs: ['acp'], // goose 使用子命令
+		acpArgs: ['acp'],
 	},
 
 	auggie: {
@@ -82,7 +103,7 @@ export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 		description: 'Augment 代码助手',
 		cliCommand: 'auggie',
 		authRequired: false,
-		enabled: true,
+		enabled: false, // 已禁用
 		supportsStreaming: false,
 		acpArgs: ['--acp'],
 	},
@@ -93,7 +114,7 @@ export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 		description: 'Moonshot Kimi 命令行工具',
 		cliCommand: 'kimi',
 		authRequired: false,
-		enabled: true,
+		enabled: true, // 重新启用测试 ACP
 		supportsStreaming: false,
 		acpArgs: ['--acp'],
 	},
@@ -104,18 +125,18 @@ export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 		description: 'OpenCode 开源编程助手',
 		cliCommand: 'opencode',
 		authRequired: false,
-		enabled: true,
+		enabled: false, // 已禁用
 		supportsStreaming: false,
-		acpArgs: ['acp'], // opencode 使用子命令
+		acpArgs: ['acp'],
 	},
 
 	custom: {
 		id: 'custom',
 		name: '自定义 Agent',
 		description: '用户配置的自定义 ACP Agent',
-		cliCommand: undefined, // 用户配置
+		cliCommand: undefined,
 		authRequired: false,
-		enabled: true,
+		enabled: false, // 已禁用
 		supportsStreaming: false,
 	},
 };

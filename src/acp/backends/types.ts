@@ -11,18 +11,15 @@
 /**
  * 所有支持的 ACP 后端 ID
  *
- * - claude: Claude Code (Anthropic)
- * - codex: Codex CLI (OpenAI)
- * - gemini: Gemini CLI (Google)
- * - qwen: Qwen Code (Alibaba)
- * - goose: Goose (Block)
- * - auggie: Augment Code
- * - kimi: Kimi CLI (Moonshot)
- * - opencode: OpenCode
- * - custom: 用户自定义 Agent
+ * - claude: Claude Code (SDK 模式) - 通过 SDK 直接调用
+ * - claude-acp: Claude Code (ACP 模式) - 通过 CLI
+ * - codex: OpenAI Codex
+ * - kimi: Moonshot Kimi
+ * - 其他后端保留供未来扩展
  */
 export type AcpBackendId =
 	| 'claude'
+	| 'claude-acp'
 	| 'codex'
 	| 'gemini'
 	| 'qwen'

@@ -287,7 +287,7 @@ export class SessionStorage {
 		}
 
 		if (this.data.sessions.length <= keepCount) {
-			console.log(`[SessionStorage] 会话数量未超过限制，无需清理`);
+			console.log('[SessionStorage] 会话数量未超过限制，无需清理');
 			return;
 		}
 

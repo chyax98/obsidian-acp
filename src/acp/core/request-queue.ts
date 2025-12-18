@@ -108,7 +108,7 @@ export class RequestQueue {
 				timeoutDuration: timeoutMs,
 			};
 
-			this.requests.set(id, pending);
+			this.requests.set(id, pending as PendingRequest<unknown>);
 		});
 
 		return { id, promise };

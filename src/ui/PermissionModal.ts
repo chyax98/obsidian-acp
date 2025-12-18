@@ -4,7 +4,8 @@
  * 当 Agent 请求执行工具时，显示权限请求弹窗，等待用户批准或拒绝。
  */
 
-import { App, Modal, Notice } from 'obsidian';
+import type { App } from 'obsidian';
+import { Modal, Notice } from 'obsidian';
 import type { RequestPermissionParams, PermissionOutcome, PermissionOption } from '../acp/types/permissions';
 
 // ============================================================================

@@ -2,17 +2,16 @@
  * ACP 插件设置页面
  *
  * 提供：
- * - Agent 后端选择
  * - 工作目录配置
- * - 自定义 CLI 路径
+ * - Claude API Key（可选）
  * - UI 偏好设置
+ *
+ * 专注于 Claude Code SDK 模式，简化配置。
  */
 
-import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
+import type { App } from 'obsidian';
+import { PluginSettingTab, Setting } from 'obsidian';
 import type AcpPlugin from '../main';
-import type { AcpPluginSettings } from '../main';
-import { getAllBackends, getEnabledBackends } from '../acp/backends/registry';
-import type { AcpBackendId } from '../acp/backends/types';
 
 // ============================================================================
 // 设置页面类
@@ -34,16 +33,18 @@ export class AcpSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		// 标题
-		containerEl.createEl('h2', { text: 'ACP Agent Client 设置' });
+		containerEl.createEl('h2', { text: 'Claude Code 设置' });
 
-		// 基础设置部分
-		this.displayBasicSettings(containerEl);
+		// 描述
+		const descDiv = containerEl.createDiv({ cls: 'setting-item-description' });
+		descDiv.style.marginBottom = '1.5em';
+		descDiv.setText('通过 Claude Code SDK 连接，无需安装额外的 CLI 工具。');
+
+		// API Key 配置（可选）
+		this.displayApiKeySettings(containerEl);
 
 		// 工作目录设置
 		this.displayWorkingDirectorySettings(containerEl);
-
-		// 后端路径覆盖
-		this.displayBackendPathSettings(containerEl);
 
 		// UI 偏好设置
 		this.displayUiPreferences(containerEl);
@@ -53,44 +54,43 @@ export class AcpSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * 基础设置部分
+	 * API Key 设置部分
 	 */
-	private displayBasicSettings(containerEl: HTMLElement): void {
-		containerEl.createEl('h3', { text: '基础设置' });
+	private displayApiKeySettings(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', { text: 'API 认证（可选）' });
 
-		// 默认 Agent 后端选择
-		const backends = getEnabledBackends();
-		const backendOptions: Record<string, string> = {};
-		backends.forEach((config) => {
-			backendOptions[config.id] = config.name;
-		});
+		const desc = containerEl.createDiv({ cls: 'setting-item-description' });
+		desc.style.marginBottom = '1em';
+		desc.setText('默认会使用 Claude Code 的已有认证。如需覆盖，可在此设置自定义配置。');
 
+		// API Key 设置
 		new Setting(containerEl)
-			.setName('默认 Agent 后端')
-			.setDesc('选择默认使用的 AI Agent 后端。连接时会自动使用此后端。')
-			.addDropdown((dropdown) => {
-				for (const [id, name] of Object.entries(backendOptions)) {
-					dropdown.addOption(id, name);
-				}
-				dropdown.setValue(this.plugin.settings.selectedBackend).onChange(async (value) => {
-					this.plugin.settings.selectedBackend = value as AcpBackendId;
-					await this.plugin.saveSettings();
-				});
+			.setName('自定义 API Key')
+			.setDesc('留空则使用系统 Claude Code 认证')
+			.addText((text) => {
+				text
+					.setPlaceholder('sk-ant-...')
+					.setValue(this.plugin.settings.apiKey || '')
+					.onChange(async (value) => {
+						this.plugin.settings.apiKey = value || undefined;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = 'password';
 			});
 
-		// 自定义 CLI 路径（用于 custom 后端）
+		// API URL 设置
 		new Setting(containerEl)
-			.setName('自定义 Agent CLI 路径')
-			.setDesc('仅在选择"自定义 Agent"后端时使用。例如: /usr/local/bin/my-agent 或 npx my-agent-package')
-			.addText((text) =>
+			.setName('自定义 API Base URL')
+			.setDesc('留空则使用默认 Anthropic API (用于代理或第三方兼容服务)')
+			.addText((text) => {
 				text
-					.setPlaceholder('例如: /usr/local/bin/my-agent')
-					.setValue(this.plugin.settings.customCliPath)
+					.setPlaceholder('https://api.anthropic.com')
+					.setValue(this.plugin.settings.apiUrl || '')
 					.onChange(async (value) => {
-						this.plugin.settings.customCliPath = value;
+						this.plugin.settings.apiUrl = value || undefined;
 						await this.plugin.saveSettings();
-					})
-			);
+					});
+			});
 	}
 
 	/**
@@ -132,66 +132,9 @@ export class AcpSettingTab extends PluginSettingTab {
 						.onChange(async (value) => {
 							this.plugin.settings.customWorkingDir = value;
 							await this.plugin.saveSettings();
-						})
+						}),
 				);
 		}
-	}
-
-	/**
-	 * 后端路径覆盖设置
-	 */
-	private displayBackendPathSettings(containerEl: HTMLElement): void {
-		containerEl.createEl('h3', { text: '后端路径覆盖 (高级)' });
-
-		const desc = containerEl.createDiv({ cls: 'setting-item-description' });
-		desc.setText('为特定后端指定自定义 CLI 路径，留空则使用自动检测或默认路径。');
-
-		const backends = getAllBackends();
-
-		backends.forEach((backend) => {
-			// 跳过 custom 后端
-			if (backend.id === 'custom') return;
-
-			// 跳过未启用的后端
-			if (!backend.enabled) return;
-
-			const currentPath = this.plugin.settings.backendPaths?.[backend.id] || '';
-			const placeholder = backend.defaultCliPath || backend.cliCommand || '';
-
-			new Setting(containerEl)
-				.setName(`${backend.name} (${backend.id})`)
-				.setDesc(backend.description || '')
-				.addText((text) =>
-					text
-						.setPlaceholder(placeholder)
-						.setValue(currentPath)
-						.onChange(async (value) => {
-							if (!this.plugin.settings.backendPaths) {
-								this.plugin.settings.backendPaths = {};
-							}
-							if (value.trim() === '') {
-								// 清空则删除覆盖
-								delete this.plugin.settings.backendPaths[backend.id];
-							} else {
-								this.plugin.settings.backendPaths[backend.id] = value;
-							}
-							await this.plugin.saveSettings();
-						})
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon('reset')
-						.setTooltip('重置为默认')
-						.onClick(async () => {
-							if (this.plugin.settings.backendPaths) {
-								delete this.plugin.settings.backendPaths[backend.id];
-							}
-							await this.plugin.saveSettings();
-							new Notice(`已重置 ${backend.name} 路径`);
-							this.display();
-						})
-				);
-		});
 	}
 
 	/**
@@ -208,7 +151,7 @@ export class AcpSettingTab extends PluginSettingTab {
 				toggle.setValue(this.plugin.settings.showToolCallDetails).onChange(async (value) => {
 					this.plugin.settings.showToolCallDetails = value;
 					await this.plugin.saveSettings();
-				})
+				}),
 			);
 
 		// 自动批准文件读取
@@ -219,7 +162,7 @@ export class AcpSettingTab extends PluginSettingTab {
 				toggle.setValue(this.plugin.settings.autoApproveRead).onChange(async (value) => {
 					this.plugin.settings.autoApproveRead = value;
 					await this.plugin.saveSettings();
-				})
+				}),
 			);
 
 		// 调试模式
@@ -230,7 +173,7 @@ export class AcpSettingTab extends PluginSettingTab {
 				toggle.setValue(this.plugin.settings.debugMode).onChange(async (value) => {
 					this.plugin.settings.debugMode = value;
 					await this.plugin.saveSettings();
-				})
+				}),
 			);
 	}
 
@@ -243,22 +186,22 @@ export class AcpSettingTab extends PluginSettingTab {
 		const aboutDiv = containerEl.createDiv({ cls: 'acp-about-section' });
 
 		aboutDiv.createEl('p', {
-			text: 'ACP (Agent Client Protocol) 是一个标准化协议，用于连接代码编辑器与 AI 编码助手。',
+			text: '此插件通过 Claude Code SDK 连接 Anthropic Claude，为 Obsidian 提供 AI 编程助手功能。',
 		});
 
 		aboutDiv.createEl('p', {
-			text: '本插件支持以下 Agent:',
-		});
-
-		const list = aboutDiv.createEl('ul');
-		const backends = getAllBackends().filter((b) => b.enabled);
-		backends.forEach((backend) => {
-			const li = list.createEl('li');
-			li.setText(`${backend.name} - ${backend.description || ''}`);
+			text: '无需安装额外的 CLI 工具，直接使用 Claude Code 的 SDK 进行通信。',
 		});
 
 		const linkDiv = aboutDiv.createDiv({ cls: 'acp-about-links' });
 		linkDiv.style.marginTop = '1em';
+
+		const claudeLink = linkDiv.createEl('a', {
+			text: 'Claude Code 文档',
+			href: 'https://docs.anthropic.com/claude/docs',
+		});
+		claudeLink.style.marginRight = '1em';
+
 		linkDiv.createEl('a', {
 			text: 'ACP 协议文档',
 			href: 'https://github.com/agent-client-protocol/agent-client-protocol',

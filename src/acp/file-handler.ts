@@ -8,7 +8,8 @@
  * - 操作历史记录
  */
 
-import { Vault, TFile, normalizePath } from 'obsidian';
+import type { Vault } from 'obsidian';
+import { TFile, normalizePath } from 'obsidian';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 

@@ -459,7 +459,7 @@ export class SessionManager {
 	 * 处理会话更新
 	 */
 	private handleSessionUpdate(data: SessionNotificationParams): void {
-		const update = data.update as SessionUpdateData;
+		const update = data.update;
 
 		switch (update.sessionUpdate) {
 			case 'agent_message_chunk':
@@ -467,11 +467,11 @@ export class SessionManager {
 				break;
 
 			case 'tool_call':
-				this.handleToolCall(update as ToolCallUpdateData);
+				this.handleToolCall(update);
 				break;
 
 			case 'tool_call_update':
-				this.handleToolCallUpdate(update as ToolCallStatusUpdateData);
+				this.handleToolCallUpdate(update);
 				break;
 
 			case 'plan':

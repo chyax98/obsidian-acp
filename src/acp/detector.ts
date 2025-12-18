@@ -60,9 +60,10 @@ class AcpCliDetector {
 	 * 执行 CLI 检测
 	 *
 	 * @param force 是否强制重新检测
+	 * @param manualPaths 用户手动配置的 Agent 路径 (backendId -> path)
 	 * @returns 检测结果
 	 */
-	async detect(force = false): Promise<DetectionResult> {
+	async detect(force = false, manualPaths?: Record<string, string>): Promise<DetectionResult> {
 		// 如果已检测且不强制，返回缓存结果
 		if (this.isDetected && !force) {
 			return {
@@ -82,7 +83,9 @@ class AcpCliDetector {
 		const whichCommand = this.getWhichCommand();
 
 		// 并行检测所有 CLI
-		const detectionPromises = cliList.map((cli) => this.detectSingleCli(cli, whichCommand));
+		const detectionPromises = cliList.map((cli) =>
+			this.detectSingleCli(cli, whichCommand, manualPaths?.[cli.backendId]),
+		);
 
 		const results = await Promise.allSettled(detectionPromises);
 
@@ -122,45 +125,88 @@ class AcpCliDetector {
 
 	/**
 	 * 检测单个 CLI
+	 *
+	 * @param cli CLI 配置
+	 * @param whichCommand which/where 命令
+	 * @param manualPath 用户手动配置的路径（可选）
 	 */
-	private async detectSingleCli(cli: DetectableAcpCli, whichCommand: string): Promise<DetectedAgent | null> {
+	private async detectSingleCli(
+		cli: DetectableAcpCli,
+		whichCommand: string,
+		manualPath?: string,
+	): Promise<DetectedAgent | null> {
+		// 1. 先尝试自动检测
 		try {
-			// 扩展 PATH 包含常见安装路径
-			const expandedPath = [
-				process.env.PATH || '',
-				'/usr/local/bin',
-				'/opt/homebrew/bin',
-				`${process.env.HOME}/.local/bin`,
-				`${process.env.HOME}/bin`,
-			].filter(Boolean).join(':');
-
-			// 执行 which/where 命令
 			const result = execSync(`${whichCommand} ${cli.cmd}`, {
 				encoding: 'utf-8',
 				stdio: 'pipe',
-				timeout: 1000, // 1 秒超时
-				env: { ...process.env, PATH: expandedPath },
+				timeout: 1000,
 			});
 
-			// 解析路径 (取第一行，去除换行)
 			const cliPath = result.trim().split('\n')[0].trim();
+			if (cliPath) {
+				const version = await this.getCliVersion(cli.cmd);
+				return {
+					backendId: cli.backendId,
+					name: cli.name,
+					cliPath,
+					acpArgs: cli.args,
+					version,
+				};
+			}
+		} catch {
+			// 自动检测失败，继续尝试手动路径
+		}
 
-			if (!cliPath) {
+		// 2. 如果自动检测失败，尝试使用手动配置的路径
+		if (manualPath) {
+			const validated = await this.validateManualPath(manualPath, cli.cmd);
+			if (validated) {
+				return {
+					backendId: cli.backendId,
+					name: cli.name,
+					cliPath: validated.path,
+					acpArgs: cli.args,
+					version: validated.version,
+				};
+			}
+		}
+
+		// 3. 两种方式都失败，返回 null
+		return null;
+	}
+
+	/**
+	 * 验证手动配置的路径
+	 *
+	 * @param manualPath 用户配置的路径
+	 * @param cmd CLI 命令名
+	 * @returns 验证结果（路径和版本）或 null
+	 */
+	private async validateManualPath(
+		manualPath: string,
+		cmd: string,
+	): Promise<{ path: string; version?: string } | null> {
+		try {
+			// 1. 检查文件是否存在且可执行
+			const result = execSync(`test -x "${manualPath}" && echo "ok"`, {
+				encoding: 'utf-8',
+				stdio: 'pipe',
+				timeout: 1000,
+				shell: '/bin/sh',
+			});
+
+			if (!result.trim().includes('ok')) {
 				return null;
 			}
 
-			// 尝试获取版本信息
-			const version = await this.getCliVersion(cli.cmd, expandedPath);
+			// 2. 尝试获取版本
+			const version = await this.getCliVersion(manualPath);
 
-			return {
-				backendId: cli.backendId,
-				name: cli.name,
-				cliPath,
-				acpArgs: cli.args,
-				version,
-			};
+			console.log(`[ACP Detector] 使用手动配置的路径: ${manualPath}`);
+			return { path: manualPath, version };
 		} catch {
-			// CLI 未安装，静默返回 null
+			console.warn(`[ACP Detector] 手动配置的路径无效: ${manualPath}`);
 			return null;
 		}
 	}
@@ -168,14 +214,13 @@ class AcpCliDetector {
 	/**
 	 * 尝试获取 CLI 版本
 	 */
-	private async getCliVersion(cmd: string, expandedPath?: string): Promise<string | undefined> {
+	private async getCliVersion(cmd: string): Promise<string | undefined> {
 		try {
 			// 尝试 --version 参数
 			const result = execSync(`${cmd} --version`, {
 				encoding: 'utf-8',
 				stdio: 'pipe',
 				timeout: 2000,
-				env: expandedPath ? { ...process.env, PATH: expandedPath } : process.env,
 			});
 
 			// 提取版本号 (简单匹配 x.x.x 格式)
@@ -262,9 +307,15 @@ export const cliDetector = new AcpCliDetector();
 
 /**
  * 便捷函数：执行检测
+ *
+ * @param force 是否强制重新检测
+ * @param manualPaths 用户手动配置的 Agent 路径
  */
-export async function detectInstalledClis(force = false): Promise<DetectionResult> {
-	return cliDetector.detect(force);
+export async function detectInstalledClis(
+	force = false,
+	manualPaths?: Record<string, string>,
+): Promise<DetectionResult> {
+	return cliDetector.detect(force, manualPaths);
 }
 
 /**

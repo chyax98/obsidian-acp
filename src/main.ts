@@ -4,7 +4,8 @@
  * 支持连接 Claude Code、Codex、Gemini 等 AI Agent
  */
 
-import { App, Plugin, WorkspaceLeaf } from 'obsidian';
+import type { WorkspaceLeaf } from 'obsidian';
+import { App, Plugin } from 'obsidian';
 import { AcpSettingTab } from './ui/SettingsTab';
 import { AcpChatView, ACP_CHAT_VIEW_TYPE } from './ui/ChatView';
 import type { AcpBackendId } from './acp/backends/types';
@@ -15,22 +16,21 @@ import type { AcpBackendId } from './acp/backends/types';
 
 /**
  * 插件设置接口
+ *
+ * 专注于 Claude Code SDK 模式，简化配置。
  */
 export interface AcpPluginSettings {
-	/** 选中的 Agent 后端 */
-	selectedBackend: AcpBackendId;
-
-	/** 自定义 CLI 路径 (用于 custom 后端) */
-	customCliPath: string;
-
 	/** 工作目录模式 */
 	workingDir: 'vault' | 'current-note-folder' | 'custom';
 
 	/** 自定义工作目录路径 */
 	customWorkingDir?: string;
 
-	/** 各后端的自定义路径覆盖 */
-	backendPaths?: Record<string, string>;
+	/** 自定义 API Key（留空则使用系统 Claude Code 认证）*/
+	apiKey?: string;
+
+	/** 自定义 API Base URL（留空则使用默认）*/
+	apiUrl?: string;
 
 	/** 是否显示工具调用详情 */
 	showToolCallDetails: boolean;
@@ -46,11 +46,10 @@ export interface AcpPluginSettings {
  * 默认设置
  */
 const DEFAULT_SETTINGS: AcpPluginSettings = {
-	selectedBackend: 'claude',
-	customCliPath: '',
 	workingDir: 'vault',
 	customWorkingDir: undefined,
-	backendPaths: {},
+	apiKey: undefined,
+	apiUrl: undefined,
 	showToolCallDetails: true,
 	autoApproveRead: false,
 	debugMode: false,
@@ -70,9 +69,9 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
  * - 设置管理
  */
 export default class AcpPlugin extends Plugin {
-	settings: AcpPluginSettings;
+	settings: AcpPluginSettings = DEFAULT_SETTINGS;
 
-	async onload() {
+	async onload(): Promise<void> {
 		console.log('ACP Plugin: 加载中...');
 
 		// 加载设置

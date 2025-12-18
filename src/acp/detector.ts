@@ -125,11 +125,21 @@ class AcpCliDetector {
 	 */
 	private async detectSingleCli(cli: DetectableAcpCli, whichCommand: string): Promise<DetectedAgent | null> {
 		try {
+			// 扩展 PATH 包含常见安装路径
+			const expandedPath = [
+				process.env.PATH || '',
+				'/usr/local/bin',
+				'/opt/homebrew/bin',
+				`${process.env.HOME}/.local/bin`,
+				`${process.env.HOME}/bin`,
+			].filter(Boolean).join(':');
+
 			// 执行 which/where 命令
 			const result = execSync(`${whichCommand} ${cli.cmd}`, {
 				encoding: 'utf-8',
 				stdio: 'pipe',
 				timeout: 1000, // 1 秒超时
+				env: { ...process.env, PATH: expandedPath },
 			});
 
 			// 解析路径 (取第一行，去除换行)
@@ -140,7 +150,7 @@ class AcpCliDetector {
 			}
 
 			// 尝试获取版本信息
-			const version = await this.getCliVersion(cli.cmd);
+			const version = await this.getCliVersion(cli.cmd, expandedPath);
 
 			return {
 				backendId: cli.backendId,
@@ -158,13 +168,14 @@ class AcpCliDetector {
 	/**
 	 * 尝试获取 CLI 版本
 	 */
-	private async getCliVersion(cmd: string): Promise<string | undefined> {
+	private async getCliVersion(cmd: string, expandedPath?: string): Promise<string | undefined> {
 		try {
 			// 尝试 --version 参数
 			const result = execSync(`${cmd} --version`, {
 				encoding: 'utf-8',
 				stdio: 'pipe',
 				timeout: 2000,
+				env: expandedPath ? { ...process.env, PATH: expandedPath } : process.env,
 			});
 
 			// 提取版本号 (简单匹配 x.x.x 格式)

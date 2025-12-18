@@ -82,6 +82,9 @@ export class ClaudeSdkConnection {
 				// 继承系统环境（以便使用 Claude Code 认证）
 				env: { ...process.env },
 
+				// 关键修复：指定 Claude Code CLI 路径（避免 import.meta.url undefined）
+				pathToClaudeCodeExecutable: 'claude',
+
 				// 权限回调
 				canUseTool: async (toolName, toolInput, { toolUseID }) => {
 					if (callbacks.onPermissionRequest) {

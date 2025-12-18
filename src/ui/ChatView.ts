@@ -277,45 +277,14 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
-	 * 获取工作目录（完整健壮版本 - 基于官方 API 和最佳实践）
+	 * 获取工作目录（硬编码测试版本）
 	 */
 	private getWorkingDirectory(): string {
-		// 1. 尝试从 Vault adapter 获取（使用官方 FileSystemAdapter.getBasePath()）
-		try {
-			const adapter = this.plugin.app.vault.adapter;
-
-			// 使用官方 API：getBasePath() 方法
-			if ('getBasePath' in adapter && typeof adapter.getBasePath === 'function') {
-				const basePath = adapter.getBasePath();
-				if (basePath && typeof basePath === 'string' && basePath.length > 0) {
-					console.log('[ChatView] 使用 Vault 路径:', basePath);
-					return this.validatePath(basePath);
-				}
-			}
-		} catch (error) {
-			console.warn('[ChatView] 无法获取 Vault 路径:', error);
-		}
-
-		// 2. 尝试使用用户自定义配置
-		if (this.plugin.settings.customWorkingDir) {
-			const customDir = this.plugin.settings.customWorkingDir;
-			console.log('[ChatView] 使用自定义路径:', customDir);
-			return this.validatePath(customDir);
-		}
-
-		// 3. 使用 process.cwd() 作为 fallback
-		try {
-			const cwd = process.cwd();
-			if (cwd && typeof cwd === 'string' && cwd !== '/') {
-				console.log('[ChatView] 使用 process.cwd():', cwd);
-				return this.validatePath(cwd);
-			}
-		} catch (error) {
-			console.warn('[ChatView] process.cwd() 失败:', error);
-		}
-
-		// 4. 抛出错误，不使用硬编码 fallback
-		throw new Error('无法获取有效的工作目录。请在设置中手动配置工作目录。');
+		// 临时硬编码测试 - 验证是否是 API 问题
+		const HARDCODED_PATH = '/Users/Apple/note-vsc';
+		console.log('[ChatView] 🔴 使用硬编码路径测试:', HARDCODED_PATH);
+		new Notice(`测试：硬编码路径 ${HARDCODED_PATH}`);
+		return HARDCODED_PATH;
 	}
 
 	/**
@@ -730,8 +699,22 @@ export class AcpChatView extends ItemView {
 		this.cancelButtonEl.style.display = 'inline-block';
 		this.inputEl.disabled = true;
 
-		// 获取工作目录
-		const workingDir = this.getWorkingDirectory();
+		// 获取工作目录（完整错误处理）
+		let workingDir: string;
+		try {
+			workingDir = this.getWorkingDirectory();
+			console.log('[ChatView] 最终工作目录:', workingDir);
+		} catch (error) {
+			const errorMsg = `无法获取工作目录: ${error}`;
+			console.error('[ChatView]', errorMsg);
+			this.handleSdkError(new Error(errorMsg));
+			new Notice(errorMsg);
+			this.updateStatus('错误', 'error');
+			this.sendButtonEl.style.display = 'inline-block';
+			this.cancelButtonEl.style.display = 'none';
+			this.inputEl.disabled = false;
+			return;
+		}
 
 		// 构建 SDK 回调
 		const callbacks: ClaudeCallbacks = {

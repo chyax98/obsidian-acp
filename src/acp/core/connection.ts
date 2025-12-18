@@ -30,23 +30,11 @@ import type {
 	NewSessionResponse,
 } from '../types';
 import { JSONRPC_VERSION, createRequest, AcpMethod } from '../types';
+import { RequestQueue } from './request-queue';
 
 // ============================================================================
 // 类型定义
 // ============================================================================
-
-/**
- * 待处理请求
- */
-interface PendingRequest<T = unknown> {
-	resolve: (value: T) => void;
-	reject: (error: Error) => void;
-	timeoutId?: ReturnType<typeof setTimeout>;
-	method: string;
-	isPaused: boolean;
-	startTime: number;
-	timeoutDuration: number;
-}
 
 /**
  * 文件操作信息
@@ -136,9 +124,8 @@ export class AcpConnection {
 	private child: ChildProcess | null = null;
 	private state: ConnectionState = 'disconnected';
 
-	// 请求管理
-	private pendingRequests = new Map<RequestId, PendingRequest>();
-	private nextRequestId = 1;
+	// 请求队列
+	private requestQueue = new RequestQueue();
 
 	// 会话状态
 	private sessionId: string | null = null;
@@ -249,16 +236,10 @@ export class AcpConnection {
 			this.child = null;
 		}
 
-		// 拒绝所有待处理请求
-		for (const [id, request] of this.pendingRequests) {
-			if (request.timeoutId) {
-				clearTimeout(request.timeoutId);
-			}
-			request.reject(new Error('连接已断开'));
-		}
+		// 清空请求队列
+		this.requestQueue.clear('连接已断开');
 
 		// 重置状态
-		this.pendingRequests.clear();
 		this.sessionId = null;
 		this.isInitialized = false;
 		this.backend = null;
@@ -355,17 +336,13 @@ export class AcpConnection {
 			// 检查是否为响应 (有 id 字段且在待处理列表中)
 			if ('id' in message) {
 				const response = message as AcpResponse;
-				const pending = this.pendingRequests.get(response.id);
 
-				if (pending) {
-					this.pendingRequests.delete(response.id);
-
-					if (pending.timeoutId) {
-						clearTimeout(pending.timeoutId);
-					}
-
+				if (this.requestQueue.has(response.id)) {
 					if (response.error) {
-						pending.reject(new Error(response.error.message || '未知 ACP 错误'));
+						this.requestQueue.rejectWithMessage(
+							response.id,
+							response.error.message || '未知 ACP 错误'
+						);
 					} else {
 						// 检查 end_turn
 						if (response.result && typeof response.result === 'object') {
@@ -374,7 +351,7 @@ export class AcpConnection {
 								this.onEndTurn();
 							}
 						}
-						pending.resolve(response.result);
+						this.requestQueue.resolve(response.id, response.result);
 					}
 				}
 			}
@@ -434,35 +411,17 @@ export class AcpConnection {
 	 * 发送请求并等待响应
 	 */
 	private sendRequest<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> {
-		const id = this.nextRequestId++;
+		// 超时时间: session/prompt 2 分钟，其他 1 分钟
+		const timeoutDuration = method === AcpMethod.SESSION_PROMPT ? 120000 : 60000;
+
+		// 创建请求
+		const { id, promise } = this.requestQueue.create<T>(method, timeoutDuration);
 		const message = createRequest(id, method, params);
 
-		return new Promise((resolve, reject) => {
-			// 超时时间: session/prompt 2 分钟，其他 1 分钟
-			const timeoutDuration = method === AcpMethod.SESSION_PROMPT ? 120000 : 60000;
-			const startTime = Date.now();
+		// 发送消息
+		this.sendMessage(message);
 
-			const timeoutId = setTimeout(() => {
-				const request = this.pendingRequests.get(id);
-				if (request && !request.isPaused) {
-					this.pendingRequests.delete(id);
-					reject(new Error(`请求 ${method} 超时 (${timeoutDuration / 1000}s)`));
-				}
-			}, timeoutDuration);
-
-			const pending: PendingRequest<T> = {
-				resolve: resolve as (value: unknown) => void,
-				reject,
-				timeoutId,
-				method,
-				isPaused: false,
-				startTime,
-				timeoutDuration,
-			};
-
-			this.pendingRequests.set(id, pending);
-			this.sendMessage(message);
-		});
+		return promise;
 	}
 
 	/**
@@ -514,65 +473,21 @@ export class AcpConnection {
 	}
 
 	// ========================================================================
-	// 超时管理
+	// 超时管理 (委托给 RequestQueue)
 	// ========================================================================
-
-	/**
-	 * 暂停指定请求的超时
-	 */
-	private pauseRequestTimeout(requestId: RequestId): void {
-		const request = this.pendingRequests.get(requestId);
-		if (request && !request.isPaused && request.timeoutId) {
-			clearTimeout(request.timeoutId);
-			request.isPaused = true;
-			request.timeoutId = undefined;
-		}
-	}
-
-	/**
-	 * 恢复指定请求的超时
-	 */
-	private resumeRequestTimeout(requestId: RequestId): void {
-		const request = this.pendingRequests.get(requestId);
-		if (request && request.isPaused) {
-			const elapsed = Date.now() - request.startTime;
-			const remaining = Math.max(0, request.timeoutDuration - elapsed);
-
-			if (remaining > 0) {
-				request.timeoutId = setTimeout(() => {
-					if (this.pendingRequests.has(requestId) && !request.isPaused) {
-						this.pendingRequests.delete(requestId);
-						request.reject(new Error(`请求 ${request.method} 超时`));
-					}
-				}, remaining);
-				request.isPaused = false;
-			} else {
-				this.pendingRequests.delete(requestId);
-				request.reject(new Error(`请求 ${request.method} 超时`));
-			}
-		}
-	}
 
 	/**
 	 * 暂停所有 session/prompt 请求的超时
 	 */
 	private pausePromptTimeouts(): void {
-		for (const [id, request] of this.pendingRequests) {
-			if (request.method === AcpMethod.SESSION_PROMPT) {
-				this.pauseRequestTimeout(id);
-			}
-		}
+		this.requestQueue.pauseByMethod(AcpMethod.SESSION_PROMPT);
 	}
 
 	/**
 	 * 恢复所有 session/prompt 请求的超时
 	 */
 	private resumePromptTimeouts(): void {
-		for (const [id, request] of this.pendingRequests) {
-			if (request.method === AcpMethod.SESSION_PROMPT && request.isPaused) {
-				this.resumeRequestTimeout(id);
-			}
-		}
+		this.requestQueue.resumeByMethod(AcpMethod.SESSION_PROMPT);
 	}
 
 	// ========================================================================

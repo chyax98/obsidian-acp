@@ -63,5 +63,12 @@ export {
 	type FileOperationRecord,
 } from './file-handler';
 
+// 会话持久化
+export {
+	SessionStorage,
+	type StoredSession,
+	type SessionSummary,
+} from './session-storage';
+
 // 类型定义
 export * from './types';

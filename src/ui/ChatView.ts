@@ -825,15 +825,81 @@ export class AcpChatView extends ItemView {
 		console.log('[ChatView] 可用命令更新:', commands.length, '个命令');
 		this.availableCommands = commands;
 
-		// 在输入框下方显示可用命令提示
+		// 在输入框上方显示可用命令按钮
 		if (commands.length > 0) {
-			// 移除旧的命令提示
-			const oldHint = this.inputContainerEl.querySelector('.acp-commands-hint');
-			if (oldHint) oldHint.remove();
+			this.renderAvailableCommands(commands);
+		} else {
+			// 移除旧的命令栏
+			const oldCommandsBar = this.inputContainerEl.querySelector('.acp-available-commands-bar');
+			if (oldCommandsBar) oldCommandsBar.remove();
+		}
+	}
 
-			// 创建新的命令提示
-			const hintEl = this.inputContainerEl.createDiv({ cls: 'acp-commands-hint' });
-			hintEl.textContent = `可用命令: ${commands.map((c) => c.name).join(', ')}`;
+	/**
+	 * 渲染可用命令按钮栏
+	 */
+	private renderAvailableCommands(commands: any[]): void {
+		// 移除旧的命令栏
+		const oldCommandsBar = this.inputContainerEl.querySelector('.acp-available-commands-bar');
+		if (oldCommandsBar) oldCommandsBar.remove();
+
+		// 创建新的命令栏（在输入框之前）
+		const commandsBar = this.inputContainerEl.createDiv({ cls: 'acp-available-commands-bar' });
+
+		// 标题
+		const titleEl = commandsBar.createDiv({ cls: 'acp-commands-bar-title' });
+		const iconEl = titleEl.createDiv({ cls: 'acp-commands-bar-icon' });
+		setIcon(iconEl, 'zap');
+		titleEl.createDiv({ cls: 'acp-commands-bar-text', text: '快捷命令' });
+
+		// 命令按钮容器
+		const buttonsContainer = commandsBar.createDiv({ cls: 'acp-commands-bar-buttons' });
+
+		for (const cmd of commands) {
+			const cmdButton = buttonsContainer.createEl('button', {
+				cls: 'acp-command-button',
+			});
+
+			// 命令图标
+			const cmdIconEl = cmdButton.createDiv({ cls: 'acp-command-button-icon' });
+			setIcon(cmdIconEl, 'terminal');
+
+			// 命令名称
+			cmdButton.createDiv({
+				cls: 'acp-command-button-text',
+				text: `/${cmd.name}`,
+			});
+
+			// 点击事件
+			cmdButton.addEventListener('click', () => {
+				this.handleCommandClick(cmd);
+			});
+
+			// 悬停提示
+			cmdButton.setAttribute('aria-label', cmd.description || cmd.name);
+		}
+
+		// 将命令栏移动到输入框之前
+		this.inputContainerEl.insertBefore(commandsBar, this.inputEl);
+	}
+
+	/**
+	 * 处理命令按钮点击
+	 */
+	private async handleCommandClick(command: any): Promise<void> {
+		// 如果命令有输入提示，弹出输入框
+		if (command.input && command.input.hint) {
+			// 预填充输入框
+			this.inputEl.value = `/${command.name} ${command.input.hint}`;
+			this.inputEl.focus();
+
+			// 选中 hint 部分，方便用户替换
+			const hintStart = `/${command.name} `.length;
+			this.inputEl.setSelectionRange(hintStart, this.inputEl.value.length);
+		} else {
+			// 直接发送命令
+			this.inputEl.value = `/${command.name}`;
+			await this.handleSend();
 		}
 	}
 }

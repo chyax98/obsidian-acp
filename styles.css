@@ -1338,6 +1338,234 @@
 }
 
 /* ============================================================================
+   Phase 2: 图片渲染
+   ============================================================================ */
+
+/* 图片容器 */
+.acp-content-image-wrapper {
+	margin: 8px 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+/* 图片元素 */
+.acp-content-image {
+	max-width: 100%;
+	max-height: 400px;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.3s ease;
+}
+
+.acp-content-image:hover {
+	transform: scale(1.02);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 图片加载状态 */
+.acp-image-loading {
+	opacity: 0.5;
+	animation: imagePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes imagePulse {
+	0%, 100% {
+		opacity: 0.5;
+	}
+	50% {
+		opacity: 0.8;
+	}
+}
+
+.acp-image-loaded {
+	opacity: 1;
+}
+
+/* 图片错误占位符 */
+.acp-image-error-placeholder {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 40px;
+	background-color: var(--background-secondary);
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: 6px;
+	color: var(--text-muted);
+}
+
+.acp-image-error-icon {
+	width: 48px;
+	height: 48px;
+	margin-bottom: 12px;
+	color: var(--text-faint);
+}
+
+.acp-image-error-text {
+	font-size: 0.9em;
+	font-style: italic;
+}
+
+/* 图片预览模态框 */
+.acp-image-preview-modal {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	background-color: rgba(0, 0, 0, 0.9);
+}
+
+.acp-image-preview {
+	max-width: 90vw;
+	max-height: 90vh;
+	cursor: pointer;
+	border-radius: 8px;
+}
+
+/* ============================================================================
+   Phase 2: ToolCall Locations
+   ============================================================================ */
+
+/* Locations 容器 */
+.acp-tool-call-locations {
+	padding: 10px 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	background-color: var(--background-primary-alt);
+}
+
+.acp-tool-call-locations-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.acp-tool-call-locations-icon {
+	flex-shrink: 0;
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+.acp-tool-call-locations-title {
+	font-size: 0.85em;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.acp-tool-call-locations-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.acp-tool-call-location-item {
+	display: flex;
+	align-items: center;
+	padding: 6px 8px;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.2s;
+	font-family: var(--font-monospace);
+	font-size: 0.8em;
+}
+
+.acp-tool-call-location-item:hover {
+	background-color: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+	transform: translateX(2px);
+}
+
+.acp-location-path {
+	flex: 1;
+	color: var(--interactive-accent);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.acp-location-position {
+	color: var(--text-muted);
+	margin-left: 4px;
+	flex-shrink: 0;
+}
+
+/* ============================================================================
+   Phase 2: Available Commands
+   ============================================================================ */
+
+/* 可用命令栏 */
+.acp-available-commands-bar {
+	padding: 10px 12px;
+	background-color: var(--background-secondary-alt);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	margin-bottom: 12px;
+}
+
+.acp-commands-bar-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.acp-commands-bar-icon {
+	flex-shrink: 0;
+	width: 14px;
+	height: 14px;
+	color: var(--color-yellow);
+}
+
+.acp-commands-bar-text {
+	font-size: 0.85em;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.acp-commands-bar-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.acp-command-button {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: 0.85em;
+	transition: all 0.2s;
+}
+
+.acp-command-button:hover {
+	background-color: var(--interactive-hover);
+	border-color: var(--interactive-accent);
+	transform: translateY(-1px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.acp-command-button-icon {
+	flex-shrink: 0;
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+.acp-command-button-text {
+	font-family: var(--font-monospace);
+	font-weight: 500;
+}
+
+/* ============================================================================
    Turn 容器和智能滚动
    ============================================================================ */
 

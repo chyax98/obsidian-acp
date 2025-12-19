@@ -15,7 +15,7 @@
  */
 
 import type { Component, App } from 'obsidian';
-import { MarkdownRenderer, setIcon, Notice } from 'obsidian';
+import { MarkdownRenderer, setIcon, Notice, Modal, MarkdownView } from 'obsidian';
 import type { Message, ToolCall, PlanEntry, Turn } from '../acp/core/session-manager';
 
 // ============================================================================
@@ -61,19 +61,28 @@ export class MessageRenderer {
 
 		// 判断是否为 Markdown 内容
 		if (message.content && message.content.trim()) {
-			try {
-				// 使用 Obsidian MarkdownRenderer 渲染
-				await MarkdownRenderer.render(
-					app,
-					message.content,
-					contentEl,
-					sourcePath,
-					component,
-				);
-			} catch (error) {
-				console.error('[MessageRenderer] Markdown 渲染失败:', error);
-				// 降级：直接显示文本
-				contentEl.textContent = message.content;
+			// 检查是否包含图片占位符（从 handleAgentMessageChunk 生成的）
+			const imagePattern = /!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
+			const hasImages = imagePattern.test(message.content);
+
+			if (hasImages) {
+				// 如果有图片，需要特殊处理
+				await this.renderContentWithImages(contentEl, message.content, app, sourcePath, component);
+			} else {
+				try {
+					// 使用 Obsidian MarkdownRenderer 渲染
+					await MarkdownRenderer.render(
+						app,
+						message.content,
+						contentEl,
+						sourcePath,
+						component,
+					);
+				} catch (error) {
+					console.error('[MessageRenderer] Markdown 渲染失败:', error);
+					// 降级：直接显示文本
+					contentEl.textContent = message.content;
+				}
 			}
 		}
 
@@ -84,6 +93,134 @@ export class MessageRenderer {
 
 		// 添加消息操作栏（复制按钮）
 		this.addMessageActions(messageEl, message);
+	}
+
+	/**
+	 * 渲染包含图片的内容
+	 *
+	 * @param container - 容器元素
+	 * @param content - 消息内容
+	 * @param app - Obsidian App 实例
+	 * @param sourcePath - Markdown 源路径
+	 * @param component - Obsidian Component
+	 */
+	private static async renderContentWithImages(
+		container: HTMLElement,
+		content: string,
+		app: App,
+		sourcePath: string,
+		component: Component,
+	): Promise<void> {
+		// 分割内容为文本和图片部分
+		const imagePattern = /!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
+		let lastIndex = 0;
+		let match: RegExpExecArray | null;
+
+		while ((match = imagePattern.exec(content)) !== null) {
+			// 渲染之前的文本
+			const textBefore = content.substring(lastIndex, match.index);
+			if (textBefore.trim()) {
+				try {
+					await MarkdownRenderer.render(app, textBefore, container, sourcePath, component);
+				} catch (error) {
+					console.error('[MessageRenderer] Markdown 渲染失败:', error);
+					container.createDiv({ text: textBefore });
+				}
+			}
+
+			// 渲染图片
+			const imageUri = match[1];
+			this.renderImage(container, imageUri, app);
+
+			lastIndex = match.index + match[0].length;
+		}
+
+		// 渲染剩余文本
+		const textAfter = content.substring(lastIndex);
+		if (textAfter.trim()) {
+			try {
+				await MarkdownRenderer.render(app, textAfter, container, sourcePath, component);
+			} catch (error) {
+				console.error('[MessageRenderer] Markdown 渲染失败:', error);
+				container.createDiv({ text: textAfter });
+			}
+		}
+	}
+
+	/**
+	 * 渲染图片（支持 data URI, HTTP/HTTPS URI, file:// URI）
+	 *
+	 * @param container - 容器元素
+	 * @param uri - 图片 URI
+	 * @param app - Obsidian App 实例
+	 */
+	private static renderImage(container: HTMLElement, uri: string, app: App): void {
+		const imageWrapper = container.createDiv({ cls: 'acp-content-image-wrapper' });
+
+		const imgEl = imageWrapper.createEl('img', { cls: 'acp-content-image' });
+		imgEl.alt = '图像';
+
+		// 处理不同类型的 URI
+		if (uri.startsWith('data:')) {
+			// Base64 data URI - 直接使用
+			imgEl.src = uri;
+		} else if (uri.startsWith('http://') || uri.startsWith('https://')) {
+			// HTTP/HTTPS URI - 直接使用
+			imgEl.src = uri;
+		} else if (uri.startsWith('file://')) {
+			// file:// URI - 需要转换为相对路径或使用 Obsidian API
+			const filePath = uri.replace('file://', '');
+
+			// 尝试通过 Obsidian Vault 读取
+			const file = app.vault.getAbstractFileByPath(filePath);
+			if (file && 'path' in file) {
+				// 使用 Obsidian 的资源路径
+				imgEl.src = app.vault.adapter.getResourcePath(file.path);
+			} else {
+				// 降级：直接使用 file URI（可能在某些环境下工作）
+				imgEl.src = uri;
+			}
+		} else {
+			// 其他情况 - 尝试作为相对路径处理
+			imgEl.src = uri;
+		}
+
+		// 添加加载状态
+		imgEl.addClass('acp-image-loading');
+
+		imgEl.addEventListener('load', () => {
+			imgEl.removeClass('acp-image-loading');
+			imgEl.addClass('acp-image-loaded');
+		});
+
+		imgEl.addEventListener('error', () => {
+			imgEl.removeClass('acp-image-loading');
+			imgEl.addClass('acp-image-error');
+
+			// 显示错误占位符
+			imageWrapper.empty();
+			const errorEl = imageWrapper.createDiv({ cls: 'acp-image-error-placeholder' });
+			const iconEl = errorEl.createDiv({ cls: 'acp-image-error-icon' });
+			setIcon(iconEl, 'image-off');
+			errorEl.createDiv({ cls: 'acp-image-error-text', text: '图片加载失败' });
+		});
+
+		// 点击图片预览（使用简单的放大效果）
+		imgEl.addEventListener('click', () => {
+			this.showImagePreview(imgEl.src, app);
+		});
+	}
+
+	/**
+	 * 显示图片预览
+	 *
+	 * @param src - 图片源
+	 * @param app - Obsidian App 实例
+	 */
+	private static showImagePreview(src: string, app: App): void {
+		// 创建简单的模态框显示大图
+		const modal = new ImagePreviewModal(app, src);
+		modal.open();
 	}
 
 	/**
@@ -359,6 +496,11 @@ export class MessageRenderer {
 	 * 渲染工具调用内容（T12 增强）
 	 */
 	private static renderToolCallContent(contentEl: HTMLElement, toolCall: ToolCall, app?: App): void {
+		// 渲染 locations（如果存在）
+		if (toolCall.locations && toolCall.locations.length > 0 && app) {
+			this.renderToolCallLocations(contentEl, toolCall.locations, app);
+		}
+
 		if (!toolCall.content || toolCall.content.length === 0) {
 			contentEl.createDiv({
 				cls: 'acp-tool-call-empty',
@@ -398,6 +540,106 @@ export class MessageRenderer {
 				default:
 					blockEl.textContent = JSON.stringify(content, null, 2);
 			}
+		}
+	}
+
+	/**
+	 * 渲染工具调用位置列表
+	 *
+	 * @param container - 容器元素
+	 * @param locations - 位置列表
+	 * @param app - Obsidian App 实例
+	 */
+	private static renderToolCallLocations(
+		container: HTMLElement,
+		locations: Array<{ path: string; line?: number; column?: number }>,
+		app: App,
+	): void {
+		const locationsContainer = container.createDiv({ cls: 'acp-tool-call-locations' });
+
+		// 标题
+		const headerEl = locationsContainer.createDiv({ cls: 'acp-tool-call-locations-header' });
+		const iconEl = headerEl.createDiv({ cls: 'acp-tool-call-locations-icon' });
+		setIcon(iconEl, 'file-text');
+		headerEl.createDiv({ cls: 'acp-tool-call-locations-title', text: '相关文件' });
+
+		// 位置列表
+		const listEl = locationsContainer.createDiv({ cls: 'acp-tool-call-locations-list' });
+
+		for (const location of locations) {
+			const locationEl = listEl.createDiv({ cls: 'acp-tool-call-location-item' });
+
+			// 文件路径
+			const pathEl = locationEl.createDiv({ cls: 'acp-location-path' });
+			pathEl.textContent = location.path;
+
+			// 行列信息
+			if (location.line !== undefined) {
+				const positionEl = locationEl.createDiv({ cls: 'acp-location-position' });
+				positionEl.textContent = `:${location.line}${location.column !== undefined ? `:${location.column}` : ''}`;
+			}
+
+			// 点击跳转
+			locationEl.addEventListener('click', async () => {
+				try {
+					await this.openFileAtLocation(app, location.path, location.line, location.column);
+				} catch (error) {
+					console.error('[MessageRenderer] 打开文件失败:', error);
+					new Notice(`无法打开文件: ${location.path}`);
+				}
+			});
+		}
+	}
+
+	/**
+	 * 在指定位置打开文件
+	 *
+	 * @param app - Obsidian App 实例
+	 * @param path - 文件路径
+	 * @param line - 行号（可选，从 0 开始）
+	 * @param column - 列号（可选，从 0 开始）
+	 */
+	private static async openFileAtLocation(
+		app: App,
+		path: string,
+		line?: number,
+		column?: number,
+	): Promise<void> {
+		// 尝试在 Obsidian 中打开文件
+		const file = app.vault.getAbstractFileByPath(path);
+
+		if (file && 'path' in file) {
+			// 使用 Obsidian API 打开文件
+			const leaf = app.workspace.getLeaf(false);
+			await leaf.openFile(file as any);
+
+			// 如果指定了行号，跳转到该行
+			if (line !== undefined) {
+				// 等待视图加载
+				await new Promise((resolve) => setTimeout(resolve, 100));
+
+				const view = app.workspace.getActiveViewOfType(MarkdownView);
+				if (view && view.editor) {
+					const editor = view.editor;
+
+					// ACP 协议的行号可能是 1-based 或 0-based，需要检查
+					// 通常 line 和 column 是 1-based
+					const adjustedLine = Math.max(0, (line || 1) - 1);
+					const adjustedColumn = column !== undefined ? Math.max(0, column - 1) : 0;
+
+					// 设置光标位置
+					editor.setCursor({ line: adjustedLine, ch: adjustedColumn });
+
+					// 滚动到该行
+					editor.scrollIntoView({
+						from: { line: adjustedLine, ch: 0 },
+						to: { line: adjustedLine, ch: 0 },
+					}, true);
+				}
+			}
+		} else {
+			// 文件不在 Vault 中
+			new Notice(`文件不存在: ${path}`);
 		}
 	}
 
@@ -860,5 +1102,53 @@ export class MessageRenderer {
 			low: '低',
 		};
 		return priorityMap[priority] || priority;
+	}
+}
+
+// ============================================================================
+// ImagePreviewModal 类
+// ============================================================================
+
+/**
+ * 图片预览模态框
+ */
+class ImagePreviewModal extends Modal {
+	private imageSrc: string;
+
+	constructor(app: App, imageSrc: string) {
+		super(app);
+		this.imageSrc = imageSrc;
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('acp-image-preview-modal');
+
+		// 创建图片元素
+		const imgEl = contentEl.createEl('img', {
+			cls: 'acp-image-preview',
+			attr: {
+				src: this.imageSrc,
+				alt: '图片预览',
+			},
+		});
+
+		// 点击图片关闭模态框
+		imgEl.addEventListener('click', () => {
+			this.close();
+		});
+
+		// 点击背景关闭模态框
+		contentEl.addEventListener('click', (e) => {
+			if (e.target === contentEl) {
+				this.close();
+			}
+		});
+	}
+
+	onClose(): void {
+		const { contentEl } = this;
+		contentEl.empty();
 	}
 }

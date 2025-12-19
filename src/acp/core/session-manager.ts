@@ -84,6 +84,8 @@ export interface ToolCall {
 	status: ToolCallStatus;
 	/** 内容 */
 	content?: ToolCallContent[];
+	/** 相关位置 */
+	locations?: Array<{ path: string; line?: number; column?: number }>;
 	/** 开始时间 */
 	startTime: number;
 	/** 结束时间 */
@@ -622,6 +624,7 @@ export class SessionManager {
 			title: update.title || '工具调用',
 			kind: update.kind || 'other',
 			status: (update.status as ToolCallStatus) || 'pending',
+			locations: update.locations,
 			startTime: Date.now(),
 		};
 

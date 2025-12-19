@@ -168,7 +168,7 @@ export class MessageRenderer {
 
 		// 创建新卡片
 		toolCallEl = container.createDiv({
-			cls: 'acp-tool-call',
+			cls: `acp-tool-call acp-tool-call-status-${toolCall.status}`,
 			attr: { 'data-tool-call-id': toolCall.toolCallId },
 		});
 
@@ -217,6 +217,9 @@ export class MessageRenderer {
 	 * 更新工具调用卡片
 	 */
 	private static updateToolCallCard(toolCallEl: HTMLElement, toolCall: ToolCall): void {
+		// 更新状态类
+		toolCallEl.className = `acp-tool-call acp-tool-call-status-${toolCall.status}`;
+
 		// 更新图标
 		const iconEl = toolCallEl.querySelector('.acp-tool-call-icon');
 		if (iconEl) {
@@ -275,18 +278,23 @@ export class MessageRenderer {
 	}
 
 	/**
-	 * 格式化工具类型
+	 * 格式化工具类型（参考 AionUI）
 	 */
 	private static formatToolKind(kind: string): string {
 		const kindMap: Record<string, string> = {
-			bash: 'Bash',
-			read: '读取',
-			write: '写入',
-			edit: '编辑',
-			grep: '搜索',
-			other: '其他',
+			bash: '🔧 Bash',
+			execute: '🔧 执行',
+			read: '📖 读取',
+			write: '✏️ 写入',
+			edit: '📝 编辑',
+			patch: '📝 编辑',
+			grep: '🔍 搜索',
+			glob: '🔍 搜索',
+			mcp: '🔌 MCP',
+			web_search: '🔍 搜索',
+			other: '⚙️ 其他',
 		};
-		return kindMap[kind] || kind;
+		return kindMap[kind] || `⚙️ ${kind}`;
 	}
 
 	/**

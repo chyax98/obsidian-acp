@@ -28,6 +28,8 @@ import type {
 	PermissionOutcome,
 	PromptResponse,
 	NewSessionResponse,
+	SessionNewMcpServerConfig,
+	SessionNewParams,
 } from '../types';
 import { JSONRPC_VERSION, createRequest, AcpMethod } from '../types';
 import { RequestQueue } from './request-queue';
@@ -70,6 +72,18 @@ export interface ConnectionOptions {
 	permissionSettings?: PermissionSettings;
 	/** 保存设置回调 */
 	saveSettings?: () => Promise<void>;
+	/** MCP 服务器配置 */
+	mcpServers?: Array<{
+		id: string;
+		name: string;
+		type: 'stdio' | 'http' | 'sse';
+		command?: string;
+		args?: string[];
+		url?: string;
+		headers?: Array<{ name: string; value: string }>;
+		env?: Array<{ name: string; value: string }>;
+		enabled: boolean;
+	}>;
 }
 
 /**
@@ -155,6 +169,22 @@ export class AcpConnection {
 	private backend: AcpBackendId | null = null;
 	private initializeResponse: InitializeResponse | null = null;
 	private workingDir: string = process.cwd();
+
+	// MCP 服务器配置
+	private mcpServers: Array<{
+		id: string;
+		name: string;
+		type: 'stdio' | 'http' | 'sse';
+		command?: string;
+		args?: string[];
+		url?: string;
+		headers?: Array<{ name: string; value: string }>;
+		env?: Array<{ name: string; value: string }>;
+		enabled: boolean;
+	}> = [];
+
+	// Obsidian App 实例 (用于获取 Vault 路径)
+	private app: any = null;
 
 	// 消息缓冲
 	private messageBuffer = '';
@@ -409,6 +439,14 @@ export class AcpConnection {
 	async connect(options: ConnectionOptions): Promise<void> {
 		// 保存连接配置用于重连
 		this.lastConnectionOptions = options;
+
+		// 保存 App 实例和 MCP 配置
+		if (options.app) {
+			this.app = options.app;
+		}
+		if (options.mcpServers) {
+			this.mcpServers = options.mcpServers;
+		}
 
 		// 初始化权限管理器
 		if (options.app && options.permissionSettings && options.saveSettings) {
@@ -792,19 +830,109 @@ export class AcpConnection {
 		await this.sendRequest(AcpMethod.AUTHENTICATE, methodId ? { methodId } : undefined);
 	}
 
+	// ========================================================================
+	// MCP 服务器配置
+	// ========================================================================
+
+	/**
+	 * 替换字符串中的变量
+	 */
+	private replaceVariables(value: string): string {
+		if (!value) return value;
+
+		// 获取 Vault 路径
+		const vaultPath = this.app?.vault?.adapter?.basePath || this.workingDir;
+
+		// 获取用户主目录
+		const userHome = process.env.HOME || process.env.USERPROFILE || '';
+
+		return value
+			.replace(/{VAULT_PATH}/g, vaultPath)
+			.replace(/{USER_HOME}/g, userHome);
+	}
+
+	/**
+	 * 获取 MCP 服务器配置
+	 *
+	 * 从 settings 读取已启用的 MCP 服务器，转换为 ACP 协议格式
+	 */
+	private getMcpServersConfig(): SessionNewMcpServerConfig[] {
+		// 过滤启用的服务器
+		const enabledServers = this.mcpServers.filter(server => server.enabled);
+
+		if (enabledServers.length === 0) {
+			console.log('[ACP] 没有启用的 MCP 服务器');
+			return [];
+		}
+
+		console.log(`[ACP] 准备 ${enabledServers.length} 个 MCP 服务器配置`);
+
+		return enabledServers.map(server => {
+			const config: SessionNewMcpServerConfig = {
+				name: server.name,
+				type: server.type,
+			};
+
+			// stdio 类型配置
+			if (server.type === 'stdio') {
+				if (server.command) {
+					config.command = this.replaceVariables(server.command);
+				}
+				if (server.args && server.args.length > 0) {
+					config.args = server.args.map(arg => this.replaceVariables(arg));
+				}
+			}
+
+			// http/sse 类型配置
+			if (server.type === 'http' || server.type === 'sse') {
+				if (server.url) {
+					config.url = this.replaceVariables(server.url);
+				}
+
+				// 转换 headers 数组为对象
+				if (server.headers && server.headers.length > 0) {
+					config.headers = {};
+					for (const header of server.headers) {
+						config.headers[header.name] = this.replaceVariables(header.value);
+					}
+				}
+			}
+
+			// 转换 env 数组为对象
+			if (server.env && server.env.length > 0) {
+				config.env = {};
+				for (const envVar of server.env) {
+					config.env[envVar.name] = this.replaceVariables(envVar.value);
+				}
+			}
+
+			console.log(`[ACP] MCP 服务器配置: ${server.name}`, config);
+			return config;
+		});
+	}
+
 	/**
 	 * 创建新会话
 	 */
 	async newSession(workingDir?: string): Promise<NewSessionResponse> {
 		const cwd = workingDir || this.workingDir;
 
-		// 调试日志
-		console.log('[ACP] session/new 参数:', { cwd, mcpServers: [] });
+		// 获取 MCP 服务器配置
+		const mcpServers = this.getMcpServersConfig();
 
-		const response = await this.sendRequest<NewSessionResponse>(AcpMethod.SESSION_NEW, {
+		// 构建请求参数
+		const params: SessionNewParams = {
 			cwd,
-			mcpServers: [], // ACP 协议要求的字段
-		});
+			mcpServers,
+		};
+
+		// 调试日志
+		console.log('[ACP] session/new 参数:', params);
+
+		const response = await this.sendRequest<NewSessionResponse>(
+			AcpMethod.SESSION_NEW,
+			params as unknown as Record<string, unknown>,
+		);
 
 		this.sessionId = response.sessionId;
 		return response;

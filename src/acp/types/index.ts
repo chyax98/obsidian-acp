@@ -42,6 +42,8 @@ export {
 	type InitializeResponse,
 	type AuthenticateParams,
 	type AuthenticateResponse,
+	type SessionNewMcpServerConfig,
+	type SessionNewParams,
 } from './initialize';
 
 // 会话管理类型

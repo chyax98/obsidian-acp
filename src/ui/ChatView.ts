@@ -398,6 +398,12 @@ export class AcpChatView extends ItemView {
 			cliPath: this.selectedAgent.cliPath, // 使用检测到的 wrapper
 			workingDir: workingDir,
 			acpArgs: this.selectedAgent.acpArgs,
+			app: this.app,
+			permissionSettings: this.plugin.settings.permission,
+			saveSettings: async () => {
+				await this.plugin.saveSettings();
+			},
+			mcpServers: this.plugin.settings.mcpServers,
 		});
 
 		// 创建会话管理器

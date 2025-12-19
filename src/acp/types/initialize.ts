@@ -237,3 +237,41 @@ export const AcpMethod = {
 } as const;
 
 export type AcpMethodType = (typeof AcpMethod)[keyof typeof AcpMethod];
+
+// ============================================================================
+// MCP 服务器配置 (用于 session/new)
+// ============================================================================
+
+/**
+ * MCP 服务器配置
+ *
+ * 在 session/new 时传递给 Agent，Agent 启动时会加载这些 MCP 服务器。
+ */
+export interface SessionNewMcpServerConfig {
+	/** 服务器名称 */
+	name: string;
+	/** 传输类型 */
+	type: 'stdio' | 'http' | 'sse';
+	/** stdio 类型: 命令 */
+	command?: string;
+	/** stdio 类型: 参数 */
+	args?: string[];
+	/** http/sse 类型: URL */
+	url?: string;
+	/** 环境变量 (键值对) */
+	env?: Record<string, string>;
+	/** http/sse 类型: 请求头 (键值对) */
+	headers?: Record<string, string>;
+}
+
+/**
+ * session/new 请求参数
+ */
+export interface SessionNewParams {
+	/** 扩展元数据 */
+	_meta?: MetaData;
+	/** 工作目录 */
+	cwd?: string;
+	/** MCP 服务器配置列表 */
+	mcpServers?: SessionNewMcpServerConfig[];
+}

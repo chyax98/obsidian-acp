@@ -135,13 +135,27 @@ export class AcpCliDetector {
 		whichCommand: string,
 		manualPath?: string,
 	): Promise<DetectedAgent | null> {
-		// 1. 先尝试自动检测
-		try {
-			// 特殊处理：Claude Code 使用 npx 包，需要验证包是否可用
-			if (cli.backendId === 'claude') {
-				return await this.detectClaudeCodeAcp();
+		// 1. 如果有手动配置路径，优先使用
+		if (manualPath) {
+			const validated = await this.validateManualPath(manualPath, cli.cmd);
+			if (validated) {
+				return {
+					backendId: cli.backendId,
+					name: cli.name,
+					cliPath: validated.path,
+					acpArgs: cli.args,
+					version: validated.version,
+				};
 			}
+		}
 
+		// 2. 特殊处理：Claude Code 需要特殊检测
+		if (cli.backendId === 'claude') {
+			return await this.detectClaudeCodeAcp();
+		}
+
+		// 3. 通用检测：尝试 which/where 命令
+		try {
 			const result = execSync(`${whichCommand} ${cli.cmd}`, {
 				encoding: 'utf-8',
 				stdio: 'pipe',
@@ -160,68 +174,83 @@ export class AcpCliDetector {
 				};
 			}
 		} catch {
-			// 自动检测失败，继续尝试手动路径
+			// 自动检测失败
 		}
 
-		// 2. 如果自动检测失败，尝试使用手动配置的路径
-		if (manualPath) {
-			const validated = await this.validateManualPath(manualPath, cli.cmd);
-			if (validated) {
-				return {
-					backendId: cli.backendId,
-					name: cli.name,
-					cliPath: validated.path,
-					acpArgs: cli.args,
-					version: validated.version,
-				};
-			}
-		}
-
-		// 3. 两种方式都失败，返回 null
 		return null;
 	}
 
 	/**
-	 * 检测 Claude Code ACP wrapper（特殊处理）
-	 *
-	 * 尝试两个社区 wrapper：
-	 * 1. @zed-industries/claude-code-acp (Zed 官方)
-	 * 2. acp-claude-code (社区项目)
+	 * 检测 Claude Code ACP wrapper（Zed 版本）
+	 * 直接尝试运行命令，不依赖 which
 	 */
 	private async detectClaudeCodeAcp(): Promise<DetectedAgent | null> {
-		const wrappers = [
-			{ pkg: '@zed-industries/claude-code-acp', name: 'Claude Code (Zed wrapper)' },
-			{ pkg: 'acp-claude-code', name: 'Claude Code (Community wrapper)' },
+		// 方案1：尝试直接运行（依赖 PATH）
+		try {
+			const result = execSync('claude-code-acp --version', {
+				encoding: 'utf-8',
+				stdio: 'pipe',
+				timeout: 3000,
+			});
+
+			if (result) {
+				console.log('[ACP Detector] ✅ 检测到 claude-code-acp');
+				const version = result.trim();
+				return {
+					backendId: 'claude',
+					name: 'Claude Code (Zed)',
+					cliPath: 'claude-code-acp',
+					acpArgs: [],
+					version,
+				};
+			}
+		} catch {
+			// 方案1失败，尝试方案2
+		}
+
+		// 方案2：尝试常见的安装路径
+		const commonPaths = [
+			`${process.env.HOME}/.nvm/versions/node/*/bin/claude-code-acp`,
+			'/usr/local/bin/claude-code-acp',
+			'/opt/homebrew/bin/claude-code-acp',
 		];
 
-		for (const wrapper of wrappers) {
+		for (const pathPattern of commonPaths) {
 			try {
-				// 尝试运行 npx <package> --help 验证包是否可用
-				const testCommand = Platform.isWin ? 'npx.cmd' : 'npx';
-				const result = execSync(`${testCommand} ${wrapper.pkg} --help`, {
+				// 展开 glob 模式
+				const expandedPath = execSync(`ls ${pathPattern} 2>/dev/null | head -1`, {
 					encoding: 'utf-8',
 					stdio: 'pipe',
-					timeout: 5000, // npx 首次可能需要下载
-				});
+					timeout: 1000,
+					shell: '/bin/bash',
+				}).trim();
 
-				// 如果成功，说明包可用
-				if (result) {
-					console.log(`[ACP Detector] 检测到 Claude Code wrapper: ${wrapper.pkg}`);
-					return {
-						backendId: 'claude',
-						name: wrapper.name,
-						cliPath: `npx ${wrapper.pkg}`,
-						acpArgs: [],
-						version: undefined,
-					};
+				if (expandedPath) {
+					// 尝试运行
+					const result = execSync(`${expandedPath} --version`, {
+						encoding: 'utf-8',
+						stdio: 'pipe',
+						timeout: 3000,
+					});
+
+					if (result) {
+						console.log(`[ACP Detector] ✅ 检测到 claude-code-acp: ${expandedPath}`);
+						const version = result.trim();
+						return {
+							backendId: 'claude',
+							name: 'Claude Code (Zed)',
+							cliPath: expandedPath,
+							acpArgs: [],
+							version,
+						};
+					}
 				}
 			} catch {
-				// 这个 wrapper 不可用，尝试下一个
-				console.log(`[ACP Detector] ${wrapper.pkg} 不可用`);
+				// 这个路径不可用，继续
 			}
 		}
 
-		// 所有 wrapper 都不可用
+		console.log('[ACP Detector] claude-code-acp 不可用，请手动配置路径');
 		return null;
 	}
 

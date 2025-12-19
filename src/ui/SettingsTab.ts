@@ -2,20 +2,17 @@
  * ACP 插件设置页面
  *
  * 提供：
+ * - Agent 选择和配置
+ * - 手动路径配置
  * - 工作目录配置
- * - Claude API Key（可选）
  * - UI 偏好设置
- *
- * 专注于 Claude Code SDK 模式，简化配置。
  */
 
 import type { App } from 'obsidian';
-import { PluginSettingTab, Setting } from 'obsidian';
+import { PluginSettingTab, Setting, Notice } from 'obsidian';
 import type AcpPlugin from '../main';
-
-// ============================================================================
-// 设置页面类
-// ============================================================================
+import { getEnabledBackends, ACP_BACKENDS } from '../acp/backends/registry';
+import type { AcpBackendId } from '../acp/backends/types';
 
 /**
  * ACP 插件设置页面
@@ -33,15 +30,15 @@ export class AcpSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		// 标题
-		containerEl.createEl('h2', { text: 'Claude Code 设置' });
+		containerEl.createEl('h2', { text: 'ACP Agent 设置' });
 
 		// 描述
 		const descDiv = containerEl.createDiv({ cls: 'setting-item-description' });
 		descDiv.style.marginBottom = '1.5em';
-		descDiv.setText('通过 Claude Code SDK 连接，无需安装额外的 CLI 工具。');
+		descDiv.setText('配置 ACP 协议的 AI 编程助手（Claude、Codex、Kimi、Qwen 等）');
 
-		// API Key 配置（可选）
-		this.displayApiKeySettings(containerEl);
+		// Agent 检测和配置
+		this.displayAgentSettings(containerEl);
 
 		// 工作目录设置
 		this.displayWorkingDirectorySettings(containerEl);
@@ -54,43 +51,119 @@ export class AcpSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * API Key 设置部分
+	 * Agent 配置部分
 	 */
-	private displayApiKeySettings(containerEl: HTMLElement): void {
-		containerEl.createEl('h3', { text: 'API 认证（可选）' });
+	private displayAgentSettings(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', { text: 'Agent 配置' });
 
-		const desc = containerEl.createDiv({ cls: 'setting-item-description' });
-		desc.style.marginBottom = '1em';
-		desc.setText('默认会使用 Claude Code 的已有认证。如需覆盖，可在此设置自定义配置。');
-
-		// API Key 设置
+		// 检测按钮
 		new Setting(containerEl)
-			.setName('自定义 API Key')
-			.setDesc('留空则使用系统 Claude Code 认证')
-			.addText((text) => {
-				text
-					.setPlaceholder('sk-ant-...')
-					.setValue(this.plugin.settings.apiKey || '')
-					.onChange(async (value) => {
-						this.plugin.settings.apiKey = value || undefined;
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.type = 'password';
-			});
+			.setName('自动检测已安装的 Agent')
+			.setDesc('扫描系统中已安装的 ACP 兼容 Agent')
+			.addButton((button) => {
+				button
+					.setButtonText('重新检测')
+					.setCta()
+					.onClick(async () => {
+						button.setButtonText('检测中...');
+						button.setDisabled(true);
 
-		// API URL 设置
-		new Setting(containerEl)
-			.setName('自定义 API Base URL')
-			.setDesc('留空则使用默认 Anthropic API (用于代理或第三方兼容服务)')
-			.addText((text) => {
-				text
-					.setPlaceholder('https://api.anthropic.com')
-					.setValue(this.plugin.settings.apiUrl || '')
-					.onChange(async (value) => {
-						this.plugin.settings.apiUrl = value || undefined;
-						await this.plugin.saveSettings();
+						try {
+							const result = await this.plugin.detector.detect(true);
+							new Notice(`检测完成：发现 ${result.agents.length} 个 Agent`);
+							this.display(); // 刷新显示
+						} catch (error) {
+							const errMsg = error instanceof Error ? error.message : String(error);
+							new Notice('检测失败：' + errMsg);
+						} finally {
+							button.setButtonText('重新检测');
+							button.setDisabled(false);
+						}
 					});
 			});
+
+		// 显示检测到的 Agent
+		const detectedAgents = this.plugin.detector.getDetectedAgents();
+		if (detectedAgents.length > 0) {
+			const detectedDiv = containerEl.createDiv({ cls: 'setting-item-description' });
+			detectedDiv.style.marginBottom = '1em';
+			detectedDiv.style.padding = '0.5em';
+			detectedDiv.style.backgroundColor = 'var(--background-secondary)';
+			detectedDiv.style.borderRadius = '4px';
+
+			detectedDiv.createEl('strong', { text: '✅ 已检测到的 Agent：' });
+			const list = detectedDiv.createEl('ul');
+			list.style.marginTop = '0.5em';
+			list.style.marginBottom = '0';
+
+			for (const agent of detectedAgents) {
+				const item = list.createEl('li');
+				item.setText(`${agent.name} - ${agent.cliPath}`);
+				if (agent.version) {
+					item.createEl('span', {
+						text: ` (${agent.version})`,
+						cls: 'setting-item-description',
+					});
+				}
+			}
+		}
+
+		// 找出未检测到的 Agent
+		const enabledBackends = getEnabledBackends();
+		const detectedBackendIds = new Set(detectedAgents.map((a) => a.backendId));
+		const missingBackends = enabledBackends.filter((b) => !detectedBackendIds.has(b.id));
+
+		// 只为未检测到的 Agent 显示手动配置
+		if (missingBackends.length > 0) {
+			containerEl.createEl('h4', { text: '⚠️ 未检测到的 Agent（需手动配置）' });
+
+			for (const backend of missingBackends) {
+				new Setting(containerEl)
+					.setName(backend.name)
+					.setDesc(backend.description || `${backend.name} CLI 命令的完整路径`)
+					.addText((text) => {
+						const savedPath = this.plugin.settings.manualAgentPaths?.[backend.id];
+						text
+							.setPlaceholder(backend.defaultCliPath || backend.cliCommand || '例如: /usr/local/bin/agent')
+							.setValue(savedPath || '')
+							.onChange(async (value) => {
+								if (!this.plugin.settings.manualAgentPaths) {
+									this.plugin.settings.manualAgentPaths = {};
+								}
+								if (value) {
+									this.plugin.settings.manualAgentPaths[backend.id] = value;
+								} else {
+									delete this.plugin.settings.manualAgentPaths[backend.id];
+								}
+								await this.plugin.saveSettings();
+							});
+						text.inputEl.style.width = '100%';
+					});
+			}
+
+			// 提示：如何获取路径
+			const tipDiv = containerEl.createDiv({ cls: 'setting-item-description' });
+			tipDiv.style.marginTop = '1em';
+			tipDiv.style.padding = '0.5em';
+			tipDiv.style.backgroundColor = 'var(--background-secondary)';
+			tipDiv.style.borderRadius = '4px';
+			tipDiv.createEl('strong', { text: '💡 提示：' });
+			tipDiv.createEl('br');
+			tipDiv.appendText('在终端运行 ');
+			tipDiv.createEl('code', { text: 'which claude-code-acp' });
+			tipDiv.appendText(' 或 ');
+			tipDiv.createEl('code', { text: 'which codex' });
+			tipDiv.appendText(' 获取完整路径');
+		} else if (detectedAgents.length === 0) {
+			// 如果一个都没检测到，显示警告
+			const noAgentDiv = containerEl.createDiv({ cls: 'setting-item-description' });
+			noAgentDiv.style.marginBottom = '1em';
+			noAgentDiv.style.padding = '0.5em';
+			noAgentDiv.style.backgroundColor = 'var(--background-modifier-error)';
+			noAgentDiv.style.borderRadius = '4px';
+			noAgentDiv.style.color = 'var(--text-error)';
+			noAgentDiv.setText('⚠️ 未检测到任何 Agent，请先安装或手动配置路径');
+		}
 	}
 
 	/**
@@ -186,24 +259,24 @@ export class AcpSettingTab extends PluginSettingTab {
 		const aboutDiv = containerEl.createDiv({ cls: 'acp-about-section' });
 
 		aboutDiv.createEl('p', {
-			text: '此插件通过 Claude Code SDK 连接 Anthropic Claude，为 Obsidian 提供 AI 编程助手功能。',
+			text: '此插件通过 ACP 协议连接各种 AI 编程助手，为 Obsidian 提供智能编码功能。',
 		});
 
 		aboutDiv.createEl('p', {
-			text: '无需安装额外的 CLI 工具，直接使用 Claude Code 的 SDK 进行通信。',
+			text: '支持的 Agent：Claude Code、Codex、Kimi、Qwen、Goose、Augment 等。',
 		});
 
 		const linkDiv = aboutDiv.createDiv({ cls: 'acp-about-links' });
 		linkDiv.style.marginTop = '1em';
 
-		const claudeLink = linkDiv.createEl('a', {
-			text: 'Claude Code 文档',
-			href: 'https://docs.anthropic.com/claude/docs',
+		const acpLink = linkDiv.createEl('a', {
+			text: 'ACP 协议文档',
+			href: 'https://agentclientprotocol.com',
 		});
-		claudeLink.style.marginRight = '1em';
+		acpLink.style.marginRight = '1em';
 
 		linkDiv.createEl('a', {
-			text: 'ACP 协议文档',
+			text: 'GitHub 仓库',
 			href: 'https://github.com/agent-client-protocol/agent-client-protocol',
 		});
 	}

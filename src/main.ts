@@ -27,6 +27,9 @@ export interface AcpPluginSettings {
 	/** 自定义工作目录路径 */
 	customWorkingDir?: string;
 
+	/** 手动配置的 Agent 路径 (backendId -> path) */
+	manualAgentPaths?: Record<string, string>;
+
 	/** 自定义 API Key（留空则使用系统 Claude Code 认证）*/
 	apiKey?: string;
 

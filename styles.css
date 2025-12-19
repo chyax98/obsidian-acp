@@ -285,6 +285,50 @@
 	cursor: pointer;
 }
 
+/* 减小 Markdown 渲染的段落间距 */
+.acp-message-content p {
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+}
+
+.acp-message-content p:first-child {
+	margin-top: 0;
+}
+
+.acp-message-content p:last-child {
+	margin-bottom: 0;
+}
+
+/* 减小列表间距 */
+.acp-message-content ul,
+.acp-message-content ol {
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	padding-left: 1.5em;
+}
+
+.acp-message-content li {
+	margin-top: 0.1em;
+	margin-bottom: 0.1em;
+}
+
+/* 减小代码块间距 */
+.acp-message-content pre {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+/* 减小标题间距 */
+.acp-message-content h1,
+.acp-message-content h2,
+.acp-message-content h3,
+.acp-message-content h4,
+.acp-message-content h5,
+.acp-message-content h6 {
+	margin-top: 0.5em;
+	margin-bottom: 0.3em;
+}
+
 /* 流式输出光标 */
 .acp-message-streaming::after {
 	content: '▊';

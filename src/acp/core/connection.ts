@@ -82,7 +82,9 @@ export function createSpawnConfig(
 	acpArgs?: string[],
 	customEnv?: Record<string, string>,
 ): { command: string; args: string[]; options: SpawnOptions } {
-	const isWindows = Platform.isWin;
+	// 严格检查平台 - 确保 macOS 上绝对不使用 shell
+	const isWindows = Platform.isWin === true;
+	const isMac = Platform.isMacOS === true;
 	const env = { ...process.env, ...customEnv };
 
 	// ACP 参数：如果传入了空数组，表示不需要参数
@@ -102,11 +104,18 @@ export function createSpawnConfig(
 		spawnArgs = effectiveAcpArgs;
 	}
 
+	// 关键修复：macOS 上必须禁用 shell，否则 JSON 消息会被当作命令执行
+	// shell: true 只在 Windows 上需要，用于解析 .cmd/.bat 文件
+	const useShell = isWindows && !isMac;
+
+	console.log(`[ACP] createSpawnConfig: isWindows=${isWindows}, isMac=${isMac}, useShell=${useShell}`);
+	console.log(`[ACP] createSpawnConfig: command=${spawnCommand}, args=${spawnArgs.join(' ')}`);
+
 	const options: SpawnOptions = {
 		cwd: workingDir,
 		stdio: ['pipe', 'pipe', 'pipe'],
 		env,
-		shell: isWindows,
+		shell: useShell,
 	};
 
 	return { command: spawnCommand, args: spawnArgs, options };

@@ -366,9 +366,13 @@ export class AcpChatView extends ItemView {
 
 		// 连接到 Agent
 		const workingDir = this.getWorkingDirectory();
+
+		// 注意：不传入 cliPath，让 connection 使用 registry 中的 defaultCliPath
+		// detector 返回的 cliPath 只是 'which' 命令的结果（如 /opt/homebrew/bin/npx）
+		// 而不是完整的启动命令（如 npx @zed-industries/claude-code-acp）
 		await this.connection.connect({
 			backendId: this.selectedAgent.backendId,
-			cliPath: this.selectedAgent.cliPath,
+			// cliPath 不传，使用 registry 中的 defaultCliPath
 			workingDir: workingDir,
 			acpArgs: this.selectedAgent.acpArgs,
 		});

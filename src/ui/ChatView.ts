@@ -11,7 +11,7 @@ import { SessionManager } from '../acp/core/session-manager';
 import { AcpConnection } from '../acp/core/connection';
 import type { Message, ToolCall, PlanEntry, SessionState } from '../acp/core/session-manager';
 import type { DetectedAgent } from '../acp/detector';
-import { PermissionModal, isReadOperation } from './PermissionModal';
+import { PermissionModal } from './PermissionModal';
 import type { RequestPermissionParams, PermissionOutcome } from '../acp/types/permissions';
 import { MessageRenderer } from './MessageRenderer';
 
@@ -617,38 +617,43 @@ export class AcpChatView extends ItemView {
 	private async handlePermissionRequest(params: RequestPermissionParams): Promise<PermissionOutcome> {
 		console.log('[ChatView] 权限请求:', params);
 
-		// 自动批准读取操作（如果设置启用）
-		if (this.plugin.settings.autoApproveRead && isReadOperation(params)) {
-			// 查找"允许一次"选项
-			const allowOnceOption = params.options.find((opt) => opt.kind === 'allow_once');
-			if (allowOnceOption) {
-				console.log('[ChatView] 自动批准读取操作');
-				this.addSystemMessage(`✓ 自动批准: ${params.toolCall.title || '读取操作'}`);
-				return { type: 'selected', optionId: allowOnceOption.optionId };
-			}
-		}
-
 		// 显示权限弹窗
-		try {
-			const modal = new PermissionModal(this.app, params);
-			const outcome = await modal.show();
+		return new Promise((resolve) => {
+			try {
+				const modal = new PermissionModal(
+					this.app,
+					{
+						toolCallId: params.toolCall?.toolCallId || '',
+						toolName: params.toolCall?.kind || '',
+						title: params.toolCall?.title || '',
+						kind: params.toolCall?.kind || '',
+						rawInput: params.toolCall?.rawInput || {},
+					},
+					(response) => {
+						// 记录用户选择
+						if (response.outcome === 'selected') {
+							const actionText = response.optionId?.includes('reject')
+								? '✗ 已拒绝'
+								: '✓ 已允许';
+							this.addSystemMessage(`${actionText}: ${params.toolCall.title || '操作'}`);
+						} else {
+							this.addSystemMessage(`⚠ 已取消: ${params.toolCall.title || '操作'}`);
+						}
 
-			// 记录用户选择
-			if (outcome.type === 'selected') {
-				const option = params.options.find((opt) => opt.optionId === outcome.optionId);
-				if (option) {
-					const action = option.kind.startsWith('allow') ? '✓ 已允许' : '✗ 已拒绝';
-					this.addSystemMessage(`${action}: ${params.toolCall.title || '操作'}`);
-				}
-			} else {
-				this.addSystemMessage(`⚠ 已取消: ${params.toolCall.title || '操作'}`);
+						// 转换为 ACP 协议格式
+						if (response.outcome === 'cancelled') {
+							resolve({ type: 'cancelled' });
+						} else {
+							resolve({ type: 'selected', optionId: response.optionId || 'reject-once' });
+						}
+					},
+				);
+				modal.open();
+			} catch (error) {
+				console.error('[ChatView] 权限请求处理失败:', error);
+				resolve({ type: 'cancelled' });
 			}
-
-			return outcome;
-		} catch (error) {
-			console.error('[ChatView] 权限请求处理失败:', error);
-			return { type: 'cancelled' };
-		}
+		});
 	}
 
 	// ========================================================================

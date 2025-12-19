@@ -75,6 +75,7 @@ export {
 	type SessionNotificationParams,
 	type TextMessageContent,
 	type ImageMessageContent,
+	type ResourceLinkContent,
 	type MessageContent,
 	type AgentMessageChunkUpdateData,
 	type AgentThoughtChunkUpdateData,

@@ -61,8 +61,14 @@ export interface Message {
 
 /**
  * 工具调用状态
+ *
+ * 符合 ACP 协议规范:
+ * - pending: 等待执行
+ * - in_progress: 执行中
+ * - completed: 执行成功
+ * - failed: 执行失败（协议标准，包含错误和取消场景）
  */
-export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'error';
+export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
 
 /**
  * 工具调用信息
@@ -516,11 +522,11 @@ export class SessionManager {
 				break;
 
 			case 'current_mode_update':
-				this.handleCurrentModeUpdate(update as CurrentModeUpdateData);
+				this.handleCurrentModeUpdate(update);
 				break;
 
 			case 'available_commands_update':
-				this.handleAvailableCommandsUpdate(update as AvailableCommandsUpdateData);
+				this.handleAvailableCommandsUpdate(update);
 				break;
 
 			case 'user_message_chunk':
@@ -542,8 +548,28 @@ export class SessionManager {
 	private handleAgentMessageChunk(update: SessionUpdateData): void {
 		if (!this.currentTurn) return;
 
-		const content = (update as { content?: { text?: string } }).content;
-		const text = content?.text || '';
+		const updateWithContent = update as { content?: { type?: string; text?: string; uri?: string; name?: string; title?: string; description?: string; mimeType?: string } };
+		const content = updateWithContent.content;
+
+		// 处理不同类型的内容
+		let text = '';
+		if (content) {
+			if (content.type === 'text') {
+				// 文本内容
+				text = content.text || '';
+			} else if (content.type === 'resource_link') {
+				// 资源链接内容 - 转换为 Markdown 链接格式
+				const linkName = content.title || content.name || 'Resource';
+				const linkUri = content.uri || '';
+				text = `[${linkName}](${linkUri})`;
+				if (content.description) {
+					text += `\n> ${content.description}`;
+				}
+			} else if (content.type === 'image') {
+				// 图像内容 - 暂时作为文本处理
+				text = content.uri ? `![图像](${content.uri})` : '(图像)';
+			}
+		}
 
 		if (!this.currentTurn.assistantMessage) {
 			// 创建新的 assistant 消息
@@ -623,7 +649,7 @@ export class SessionManager {
 		}
 
 		// 标记结束时间
-		if (toolCall.status === 'completed' || toolCall.status === 'error' || toolCall.status === 'cancelled') {
+		if (toolCall.status === 'completed' || toolCall.status === 'failed') {
 			toolCall.endTime = Date.now();
 		}
 

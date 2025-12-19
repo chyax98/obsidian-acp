@@ -72,9 +72,29 @@ export interface ImageMessageContent {
 }
 
 /**
+ * 资源链接内容
+ *
+ * ACP 协议要求所有 Agent 必须支持 resource_link。
+ * 用于在消息中嵌入文件链接、笔记链接等资源引用。
+ */
+export interface ResourceLinkContent {
+	type: 'resource_link';
+	/** 资源 URI (file://, http://, obsidian:// 等) */
+	uri: string;
+	/** 资源名称 */
+	name: string;
+	/** 资源标题（可选） */
+	title?: string;
+	/** 资源描述（可选） */
+	description?: string;
+	/** MIME 类型（可选） */
+	mimeType?: string;
+}
+
+/**
  * 消息内容联合类型
  */
-export type MessageContent = TextMessageContent | ImageMessageContent;
+export type MessageContent = TextMessageContent | ImageMessageContent | ResourceLinkContent;
 
 // ============================================================================
 // Agent 消息块更新
@@ -110,6 +130,12 @@ export interface AgentThoughtChunkUpdateData {
 
 /**
  * 工具调用状态
+ *
+ * 符合 ACP 协议规范:
+ * - pending: 等待执行
+ * - in_progress: 执行中
+ * - completed: 执行成功
+ * - failed: 执行失败（协议标准，包含错误和取消场景）
  */
 export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
 

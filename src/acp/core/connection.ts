@@ -33,6 +33,8 @@ import { JSONRPC_VERSION, createRequest, AcpMethod } from '../types';
 import { RequestQueue } from './request-queue';
 import type { AcpError } from '../types/errors';
 import { AcpErrorType, createAcpError } from '../types/errors';
+import { PermissionManager } from '../permission-manager';
+import type { PermissionSettings } from '../../main';
 
 // ============================================================================
 // 类型定义
@@ -62,6 +64,12 @@ export interface ConnectionOptions {
 	acpArgs?: string[];
 	/** 自定义环境变量 */
 	env?: Record<string, string>;
+	/** Obsidian App 实例 */
+	app?: any;
+	/** 权限设置 */
+	permissionSettings?: PermissionSettings;
+	/** 保存设置回调 */
+	saveSettings?: () => Promise<void>;
 }
 
 /**
@@ -137,6 +145,9 @@ export class AcpConnection {
 
 	// 请求队列
 	private requestQueue = new RequestQueue();
+
+	// 权限管理器
+	private permissionManager: PermissionManager | null = null;
 
 	// 会话状态
 	private sessionId: string | null = null;
@@ -398,6 +409,15 @@ export class AcpConnection {
 	async connect(options: ConnectionOptions): Promise<void> {
 		// 保存连接配置用于重连
 		this.lastConnectionOptions = options;
+
+		// 初始化权限管理器
+		if (options.app && options.permissionSettings && options.saveSettings) {
+			this.permissionManager = new PermissionManager(
+				options.app,
+				options.permissionSettings,
+				options.saveSettings,
+			);
+		}
 
 		// 断开现有连接
 		if (this.child) {
@@ -876,6 +896,39 @@ export class AcpConnection {
 		this.pausePromptTimeouts();
 
 		try {
+			// 使用 PermissionManager 处理权限请求
+			if (this.permissionManager) {
+				const request = {
+					toolCallId: params.toolCall?.toolCallId || '',
+					toolName: params.toolCall?.kind || '',
+					title: params.toolCall?.title || '',
+					kind: params.toolCall?.kind || '',
+					rawInput: params.toolCall?.rawInput || {},
+				};
+
+				const response = await this.permissionManager.handlePermissionRequest(request);
+
+				console.log('[ACP] PermissionManager 响应:', response);
+
+				// 将 PermissionResponse 转换为 ACP 协议格式
+				if (response.outcome === 'cancelled') {
+					return {
+						outcome: {
+							outcome: 'rejected',
+							optionId: 'reject_once',
+						},
+					};
+				}
+
+				return {
+					outcome: {
+						outcome: 'selected',
+						optionId: response.optionId || 'allow-once',
+					},
+				};
+			}
+
+			// 如果没有 PermissionManager，使用旧的回调方式
 			const userChoice = await this.onPermissionRequest(params);
 			console.log('[ACP] 用户选择:', userChoice);
 

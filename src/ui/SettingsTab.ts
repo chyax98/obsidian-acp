@@ -43,6 +43,9 @@ export class AcpSettingTab extends PluginSettingTab {
 		// 工作目录设置
 		this.displayWorkingDirectorySettings(containerEl);
 
+		// 权限管理
+		this.displayPermissionSettings(containerEl);
+
 		// UI 偏好设置
 		this.displayUiPreferences(containerEl);
 
@@ -211,6 +214,71 @@ export class AcpSettingTab extends PluginSettingTab {
 	}
 
 	/**
+	 * 权限管理设置
+	 */
+	private displayPermissionSettings(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', { text: '权限管理' });
+
+		// 权限模式选择
+		new Setting(containerEl)
+			.setName('权限模式')
+			.setDesc('控制 AI Agent 如何请求文件操作权限')
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption('interactive', '每次询问（推荐新手）')
+					.addOption('trustAll', '完全信任（配合 Git 使用）')
+					.setValue(this.plugin.settings.permission.mode)
+					.onChange(async (value) => {
+						this.plugin.settings.permission.mode = value as 'interactive' | 'trustAll';
+						await this.plugin.saveSettings();
+
+						// 显示提示
+						if (value === 'trustAll') {
+							new Notice('⚠️ 已开启完全信任模式，建议配合 Git 使用');
+						}
+
+						// 重新渲染以显示/隐藏重置按钮
+						this.display();
+					});
+			});
+
+		// 模式说明
+		const modeDescDiv = containerEl.createDiv({ cls: 'setting-item-description' });
+		modeDescDiv.style.marginTop = '0.5em';
+		modeDescDiv.style.marginBottom = '1em';
+		modeDescDiv.style.padding = '0.5em';
+		modeDescDiv.style.backgroundColor = 'var(--background-secondary)';
+		modeDescDiv.style.borderRadius = '4px';
+		modeDescDiv.innerHTML = `
+			<strong>每次询问</strong>：每个操作都弹窗确认，可选择"始终允许"特定工具<br>
+			<strong>完全信任</strong>：自动批准所有操作，配合 Git 回滚保证安全
+		`;
+
+		// 重置"始终允许"记录（仅在 interactive 模式下显示）
+		if (this.plugin.settings.permission.mode === 'interactive') {
+			const allowedTools = this.plugin.settings.permission.alwaysAllowedTools;
+			const allowedCount = Object.keys(allowedTools).length;
+
+			new Setting(containerEl)
+				.setName('重置"始终允许"记录')
+				.setDesc(allowedCount > 0
+					? `当前已记录 ${allowedCount} 个工具：${Object.keys(allowedTools).join(', ')}`
+					: '当前没有记录任何工具')
+				.addButton((button) => {
+					button
+						.setButtonText('清除')
+						.setDisabled(allowedCount === 0)
+						.onClick(async () => {
+							this.plugin.settings.permission.alwaysAllowedTools = {};
+							await this.plugin.saveSettings();
+							new Notice('已清除所有"始终允许"记录');
+							this.display(); // 刷新页面
+						});
+				});
+		}
+	}
+
+	/**
 	 * UI 偏好设置
 	 */
 	private displayUiPreferences(containerEl: HTMLElement): void {
@@ -223,17 +291,6 @@ export class AcpSettingTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.showToolCallDetails).onChange(async (value) => {
 					this.plugin.settings.showToolCallDetails = value;
-					await this.plugin.saveSettings();
-				}),
-			);
-
-		// 自动批准文件读取
-		new Setting(containerEl)
-			.setName('自动批准文件读取')
-			.setDesc('自动批准 Agent 的文件读取请求，不显示权限弹窗（写入仍需确认）')
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.autoApproveRead).onChange(async (value) => {
-					this.plugin.settings.autoApproveRead = value;
 					await this.plugin.saveSettings();
 				}),
 			);

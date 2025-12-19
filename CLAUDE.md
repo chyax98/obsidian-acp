@@ -23,7 +23,7 @@
 ✅ 核心架构      100%  (7800+ 行代码)
 ✅ TypeScript     100%  (0 errors)
 ✅ 构建系统       100%  (main.js 62KB)
-⚠️  功能实现       40%  (2/5 Agent, 基础权限)
+⚠️  功能实现       40%  (5/5 Agent, 基础权限系统)
 ⚠️  测试覆盖       20%  (5/25+ 预期测试)
 🚧 文档完善       60%  (技术文档齐全，用户文档不足)
 ```
@@ -101,10 +101,10 @@
 │  • Markdown 渲染                 │
 ├─────────────────────────────────┤
 │  权限审批系统                    │
-│  • 5 种模式: 完全控制/快速编辑   │
-│    /完全自动/预配置/仅规划       │
-│  • 记忆用户选择                  │
-│  • 工具级别粒度                  │
+│  • 2 种模式: 每次询问/完全信任   │
+│  • 基于 ACP 协议的标准实现       │
+│  • 记忆用户选择（始终允许）      │
+│  • 配合 Git 使用，简单安全       │
 ├─────────────────────────────────┤
 │  文件操作引擎                    │
 │  • Vault API (优先)              │
@@ -194,7 +194,7 @@
 | **消息处理** | 流式实时处理 | 低延迟首字节，更好用户体验 |
 | **UI 更新策略** | 消息缓冲 (300ms) | 减少 95% 渲染开销，防止卡顿 |
 | **文件操作** | Vault API → fs 双降级 | 优先使用 Obsidian API，降级保证兼容性 |
-| **权限管理** | 分层 + 记忆 | 平衡安全性和便利性 |
+| **权限管理** | 2 种模式 + 记忆 | 简单实用，配合 Git 安全 |
 
 ---
 
@@ -464,13 +464,12 @@ Agent 工作流:
 **目标**: 生产就绪，上架社区插件商店
 
 #### 功能完善
-- [ ] 支持 5+ Agent (Claude, Kimi, Codex, Gemini, Qwen)
-- [ ] 完整权限系统 (5 种模式全部实现)
-  - [x] 完全控制 (default)
-  - [ ] 快速编辑 (acceptEdits)
-  - [ ] 完全自动 (bypassPermissions)
-  - [ ] 预配置规则 (dontAsk)
-  - [ ] 仅规划模式 (plan)
+- [x] 支持 5+ Agent (Claude, Kimi, Codex, Gemini, Qwen)
+- [ ] 完整权限系统 (2 种模式 + 记忆功能)
+  - [ ] 每次询问模式 (interactive)
+  - [ ] 完全信任模式 (trustAll)
+  - [ ] 记住用户选择（始终允许特定工具）
+  - [ ] 权限对话框 UI
 - [ ] 会话持久化
   - [ ] 保存会话历史 (JSON 格式)
   - [ ] 恢复中断对话
@@ -501,11 +500,11 @@ Agent 工作流:
   - [ ] 内存泄漏检查
 
 #### 用户体验
-- [ ] 完善用户文档
-  - [ ] 快速开始指南
-  - [ ] 每个 Agent 的配置教程
-  - [ ] 常见问题 FAQ
-  - [ ] 权限系统详解
+- [x] 完善用户文档
+  - [x] 快速开始指南
+  - [x] 每个 Agent 的配置教程
+  - [x] 常见问题 FAQ
+  - [x] 权限系统简化方案
 - [ ] UI 优化
   - [ ] 加载状态动画
   - [ ] 错误提示友好化
@@ -595,7 +594,7 @@ Agent 工作流:
 | **环境** | Obsidian 笔记 | VS Code | 独立编辑器 | 浏览器/App |
 | **知识库访问** | ✅ 直接访问笔记 | ❌ 仅当前文件 | ❌ 仅项目文件 | ❌ 无文件访问 |
 | **多 Agent** | ✅ 自由切换 | ❌ GitHub Copilot 独占 | ❌ Claude 独占 | ❌ GPT 独占 |
-| **权限粒度** | ✅ 5 级细粒度 | ⚠️ 粗粒度 | ⚠️ 粗粒度 | N/A |
+| **权限粒度** | ✅ 2 种模式 + 记忆 | ⚠️ 粗粒度 | ⚠️ 粗粒度 | N/A |
 | **协议标准** | ✅ ACP 开放标准 | ❌ 私有协议 | ❌ 私有协议 | ❌ 私有 API |
 | **数据主权** | ✅ 完全本地 | ⚠️ 云端存储 | ⚠️ 云端存储 | ❌ 完全云端 |
 | **价格** | 免费 (Agent 单独计费) | $10/月 | $20/月 | $20/月 |
@@ -716,17 +715,17 @@ Agent 工作流:
 
 ---
 
-### 挑战 3: 权限管理的复杂性
+### 挑战 3: 权限管理的简洁性
 
-**问题**: 平衡安全性和便利性，过严影响体验，过松有安全风险
+**问题**: 平衡安全性和便利性，避免过度设计
 
 **解决方案**:
-- ✅ 设计 5 种权限模式 (完全控制→完全自动)
-- 🚧 实现权限规则持久化 (记住用户选择)
-- 🚧 工具级别粒度 (fs/read vs fs/write)
-- 🚧 危险操作二次确认 (删除、覆盖重要文件)
+- ✅ 简化为 2 种模式（每次询问 / 完全信任）
+- ✅ 在插件端拦截 ACP 协议请求
+- ✅ 记忆用户选择（始终允许特定工具）
+- ✅ 配合 Git 使用，完全信任模式安全可靠
 
-**状态**: 基础框架完成，细节待完善
+**状态**: 设计完成，待实现
 
 ---
 
@@ -818,14 +817,15 @@ Agent 工作流:
    - 清理 console.log
 
 2. **完善权限系统** (核心功能)
-   - 实现 5 种权限模式
-   - 权限规则持久化
-   - 工具级别粒度
+   - 实现 2 种权限模式（每次询问 / 完全信任）
+   - 实现权限对话框 UI
+   - 记住用户选择（始终允许）
 
-3. **完善用户文档** (可用性)
-   - 快速开始指南
-   - 每个 Agent 配置教程
-   - 常见问题 FAQ
+3. **完善用户文档** (可用性) ✅ 已完成
+   - ✅ 快速开始指南
+   - ✅ 每个 Agent 配置教程
+   - ✅ 常见问题 FAQ
+   - ✅ 权限系统简化方案
 
 4. **增加测试** (稳定性)
    - 单元测试覆盖核心逻辑
@@ -834,10 +834,11 @@ Agent 工作流:
 
 ### 次要任务 (1-2 个月)
 
-5. **支持更多 Agent** (横向扩展)
-   - Gemini CLI
-   - Qwen Code
-   - 自定义 Agent 配置
+5. **支持更多 Agent** (横向扩展) ✅ 已完成
+   - ✅ Gemini CLI
+   - ✅ Qwen Code
+   - ✅ Codex ACP
+   - ⚠️ 自定义 Agent 配置（待完善）
 
 6. **会话持久化** (用户体验)
    - 保存/恢复对话
@@ -872,11 +873,14 @@ Agent 工作流:
 ### V1.0 发布标准
 
 **必须满足**:
-- [ ] 支持 5+ Agent，每个都能正常对话
-- [ ] 完整权限系统，5 种模式全部可用
+- [x] 支持 5+ Agent，每个都能正常对话
+- [ ] 完整权限系统，2 种模式全部可用
+  - [ ] 每次询问模式
+  - [ ] 完全信任模式
+  - [ ] 记住用户选择功能
 - [ ] 测试覆盖 ≥60%，所有核心功能有测试
 - [ ] TypeScript 0 errors，ESLint 0 errors
-- [ ] 用户文档完整 (快速开始 + FAQ + Agent 配置)
+- [x] 用户文档完整 (快速开始 + FAQ + Agent 配置)
 - [ ] 社区插件商店审核通过
 
 **期望满足**:
@@ -1004,3 +1008,353 @@ Agent 支持:
 **最后更新**: 2025-12-19
 **文档版本**: 1.0
 **状态**: 🚧 开发中
+
+---
+
+## 🔧 代码规范与实现标准
+
+**最后更新**: 2025-12-20
+
+### TypeScript 类型规范
+
+1. **严格类型检查**
+   - 0 TypeScript errors (强制要求)
+   - 尽量避免 `any` 类型,使用明确的类型定义
+   - 所有 public 方法需要 JSDoc 注释
+
+2. **ACP 协议类型对齐**
+   - **ToolCallStatus**: 必须使用 `'pending' | 'in_progress' | 'completed' | 'failed'`
+   - **禁止使用**: `'error'`, `'cancelled'` (不符合 ACP 规范)
+   - **MessageContent**: 必须支持 `TextMessageContent | ImageMessageContent | ResourceLinkContent`
+
+3. **命名约定**
+   - 类型定义: PascalCase (`ToolCallStatus`)
+   - 接口: PascalCase (`PermissionRequest`)
+   - 枚举/常量: UPPER_SNAKE_CASE (`SessionUpdateType.AGENT_MESSAGE_CHUNK`)
+   - 私有方法: camelCase with `private` 修饰符
+
+### 架构设计原则
+
+1. **分层架构** (5 层)
+   ```
+   UI Layer (ChatView, MessageRenderer)
+      ↓
+   Session Layer (SessionManager)
+      ↓
+   Protocol Layer (Connection, MessageHandler)
+      ↓
+   Backend Layer (Registry, Detector)
+      ↓
+   Execution Layer (CLI Spawner)
+   ```
+
+2. **单一职责**
+   - `SessionManager`: 会话状态 + 历史管理
+   - `MessageRenderer`: UI 渲染逻辑
+   - `Connection`: 协议通信
+   - `PermissionManager`: 权限控制
+
+3. **依赖注入**
+   - 通过构造函数传递依赖
+   - 避免全局单例
+   - 使用回调而非事件总线
+
+### UI 渲染规范
+
+1. **Markdown 优先**
+   - 所有文本内容使用 Obsidian 的 `MarkdownRenderer.render()`
+   - 支持 Obsidian 语法: `[[双链]]`, `#标签`, 代码块
+
+2. **ContentBlock 渲染**
+   - `text`: 直接 Markdown 渲染
+   - `resource_link`: 转换为 `[Title](URI)` 格式
+   - `image`: 转换为 `![alt](URI)` 格式
+   - `diff`: 自定义渲染(带行号和复制按钮)
+
+3. **性能优化**
+   - 使用 `StreamingMessageBuffer` 批量更新 (300ms 间隔)
+   - 仅在底部时自动滚动
+   - 避免频繁的 DOM 操作
+
+### 文件组织
+
+```
+src/
+├── acp/                    # ACP 协议层
+│   ├── core/              # 核心逻辑
+│   │   ├── connection.ts  # JSON-RPC 通信
+│   │   ├── session-manager.ts  # 会话管理
+│   │   └── message-buffer.ts   # 消息缓冲
+│   ├── backends/          # Agent 后端
+│   │   ├── registry.ts    # Agent 配置
+│   │   └── detector.ts    # CLI 检测
+│   ├── types/             # 类型定义
+│   │   ├── updates.ts     # SessionUpdate 类型
+│   │   ├── initialize.ts  # 初始化类型
+│   │   └── index.ts       # 导出汇总
+│   └── permission-manager.ts  # 权限管理
+├── ui/                    # UI 层
+│   ├── ChatView.ts        # 聊天视图
+│   ├── MessageRenderer.ts # 消息渲染
+│   ├── PermissionModal.ts # 权限对话框
+│   └── SettingsTab.ts     # 设置页面
+└── main.ts                # 插件入口
+```
+
+---
+
+## 📐 ACP 协议符合度评估
+
+**评估日期**: 2025-12-20
+**协议版本**: ACP 1.0
+**官方文档**: https://agentclientprotocol.com
+
+### ✅ 已实现的协议特性
+
+#### 1. 核心协议 (100%)
+
+- **JSON-RPC 2.0**: 完全符合规范
+- **stdio 通信**: 子进程 stdin/stdout 交互
+- **会话管理**: `session/new`, `session/prompt`, `session/cancel`
+- **流式更新**: 8 种 `session/update` 类型全部支持
+  - `agent_message_chunk`
+  - `agent_thought_chunk`
+  - `tool_call`
+  - `tool_call_update`
+  - `plan`
+  - `available_commands_update`
+  - `user_message_chunk`
+  - `current_mode_update`
+
+#### 2. ContentBlock 支持 (60%)
+
+- ✅ **text**: Markdown 渲染 (协议要求必须支持)
+- ✅ **resource_link**: 转换为 Markdown 链接 (协议要求必须支持)
+- ⚠️ **image**: 基础支持 (转换为 Markdown 图片,但无真实显示)
+- ❌ **audio**: 未实现 (笔记场景不需要)
+- ❌ **resource** (嵌入资源): 未实现 (可用 resource_link 替代)
+
+#### 3. ToolCall 渲染 (90%)
+
+- ✅ **ToolCallStatus**: 使用协议标准状态 (`pending`, `in_progress`, `completed`, `failed`)
+- ✅ **content**: 文本内容渲染
+- ✅ **diff**: 带行号的增强渲染
+- ✅ **terminal**: 基础支持 (仅显示 terminalId)
+- ⚠️ **locations**: 定义了类型但未在 UI 显示
+
+#### 4. Client Capabilities (40%)
+
+- ✅ **fs/read_text_file**: 完全实现
+- ✅ **fs/write_text_file**: 完全实现
+- ❌ **terminal/***: 声明为 `false`,未实现任何方法
+  - `terminal/create`
+  - `terminal/output`
+  - `terminal/wait_for_exit`
+  - `terminal/kill`
+  - `terminal/release`
+
+#### 5. 权限系统 (80%)
+
+- ✅ **session/request_permission**: 完全实现
+- ✅ **PermissionOption**: 支持 `allow_once`, `allow_always`, `reject_once`
+- ✅ **记忆功能**: `alwaysAllowedTools` 持久化
+- ⚠️ **简化模式**: 只有 2 种模式 (interactive/trustAll),而非协议定义的 4 种 kind
+
+### ❌ 未实现的协议特性
+
+#### 1. Session Modes (0%)
+- **原因**: 简单笔记场景不需要多模式切换
+- **协议定义**: `session/set_mode`, `current_mode_update`
+- **状态**: 类型定义存在,但无 UI 和逻辑实现
+
+#### 2. Terminal 支持 (0%)
+- **原因**: Obsidian 不是开发 IDE,不需要终端功能
+- **协议定义**: 5 个 `terminal/*` 方法
+- **状态**: 声明 `terminal: false` capability
+
+#### 3. Audio ContentBlock (0%)
+- **原因**: 笔记场景不涉及语音交互
+- **协议定义**: `ContentBlock::Audio`
+- **状态**: 类型定义存在,但无渲染逻辑
+
+#### 4. 高级 MCP 能力 (0%)
+- **原因**: 当前只需要 stdio 类型 MCP 服务器
+- **协议定义**: HTTP, SSE 传输协议
+- **状态**: `mcpCapabilities.http = false`, `mcpCapabilities.sse = false`
+
+### 🎯 针对 Obsidian 笔记场景的优先级
+
+#### 🔴 高优先级 (必须实现)
+
+1. ✅ **text + resource_link ContentBlock** - 已完成
+   - 笔记链接、文件引用是核心需求
+
+2. ✅ **ToolCall diff 渲染** - 已完成
+   - Agent 修改文件后需要展示变更
+
+3. ✅ **权限系统** - 已完成
+   - 2 模式足够 (interactive/trustAll)
+   - 记住"始终允许"的工具
+
+#### 🟡 中优先级 (有价值但非必需)
+
+4. ⚠️ **image ContentBlock 真实渲染**
+   - 当前: 转为 Markdown `![]()`
+   - 改进: 实际显示图片 (Agent 截图、图表)
+
+5. ⚠️ **locations 跟随**
+   - 当前: 类型定义存在
+   - 改进: UI 显示文件路径,可点击跳转
+
+6. ⚠️ **session/load 支持**
+   - 当前: 未声明 `loadSession` capability
+   - 改进: 恢复历史会话
+
+#### 🟢 低优先级 (可忽略)
+
+7. ❌ **Session Modes** - 明确不实现
+   - 理由: 简单场景不需要模式切换
+
+8. ❌ **terminal 支持** - 明确不实现
+   - 理由: Obsidian 不是终端环境
+
+9. ❌ **audio 支持** - 明确不实现
+   - 理由: 笔记场景无需语音
+
+---
+
+## 🚫 明确拒绝的功能 (不要重复实现)
+
+**重要**: 以下功能已由用户明确拒绝,不要在任何情况下再次提出或实现。
+
+### 1. ❌ "始终拒绝" 权限选项
+
+**用户原话**: "我都说了我不需要始终拒绝的按钮,你怎么还给我加上始终拒绝？写个笔记，为什么要始终拒绝？不是我们给他添加工具的，你这个又给他拒绝掉。那我们工具的意义何在呢？"
+
+**拒绝理由**:
+- Obsidian 笔记场景,工具是为了帮助用户,不是限制用户
+- 如果用户不想用某个工具,应该禁用 Agent 或修改权限模式,而非"始终拒绝"
+- "始终拒绝"违背了 AI 辅助的初衷
+
+**当前实现**:
+- PermissionModal 有 3 个按钮: "拒绝"(reject_once), "允许一次"(allow_once), "始终允许此工具"(allow_always)
+- **绝对不要添加** "始终拒绝" / "reject_always" 按钮
+
+### 2. ❌ 复杂的权限规则系统
+
+**用户隐含拒绝**: 用户要求"简单权限系统",只需要 2 模式 (interactive/trustAll)
+
+**拒绝理由**:
+- 笔记场景不需要企业级细粒度权限控制
+- 过度设计会增加用户学习成本
+- 2 模式足够: 完全控制 vs 完全信任
+
+**当前实现**:
+- 简单的 `alwaysAllowedTools` 字典记录用户选择
+- **不要添加**: 基于路径的规则、基于时间的规则、基于操作类型的规则等
+
+### 3. ❌ Session Modes UI
+
+**协议支持**: ACP 定义了 Session Modes 机制
+**拒绝理由**: Obsidian 笔记场景不需要模式切换 (ask/architect/code 等)
+
+**不要实现**:
+- `session/set_mode` UI 控件
+- 模式切换下拉菜单
+- 模式指示器
+
+### 4. ❌ Terminal 相关功能
+
+**协议支持**: ACP 定义了完整的 terminal 支持
+**拒绝理由**: Obsidian 不是开发 IDE,不需要终端
+
+**不要实现**:
+- `terminal/create`, `terminal/output` 等 5 个方法
+- 终端输出真实渲染
+- 终端交互功能
+
+### 5. ❌ Audio ContentBlock
+
+**协议支持**: ACP 定义了 audio 类型
+**拒绝理由**: 笔记场景无需语音交互
+
+**不要实现**:
+- 音频播放控件
+- 语音转文字
+- 音频可视化
+
+---
+
+## 💡 实现优先级 (2025-12-20)
+
+### Phase 1: 协议对齐修复 ✅ (已完成 2025-12-20)
+
+1. ✅ 修正 ToolCallStatus 类型 (`'failed'` 替代 `'error'`/`'cancelled'`)
+2. ✅ 实现 resource_link ContentBlock (转为 Markdown 链接)
+3. ✅ 验证构建无错误 (0 TypeScript errors)
+
+**成果**:
+- 3 个文件修改: `updates.ts`, `session-manager.ts`, `MessageRenderer.ts`
+- 新增 `ResourceLinkContent` 接口
+- resource_link 自动转为 `[Title](URI)` 格式
+
+### Phase 2: UI 体验优化 (计划中)
+
+1. **image ContentBlock 真实渲染**
+   - 当前: `![](URI)` Markdown 占位
+   - 目标: 实际显示图片 (base64 或 URL)
+
+2. **ToolCall locations 显示**
+   - 当前: 类型定义存在但未渲染
+   - 目标: 显示文件路径,点击跳转
+
+3. **权限 Modal 优化**
+   - 当前: 基础功能可用
+   - 目标: 显示工具危险等级,参数预览更友好
+
+4. **错误处理增强**
+   - 当前: 基础 try-catch
+   - 目标: 友好的错误提示,重试机制
+
+### Phase 3: 高级功能 (低优先级)
+
+1. **session/load 支持**
+   - 恢复历史会话
+   - 会话持久化到文件
+
+2. **MCP HTTP/SSE 支持**
+   - 当前: 只支持 stdio
+   - 扩展: 支持 HTTP/SSE 类型 MCP 服务器
+
+3. **Agent 自动升级检测**
+   - 检测 CLI 版本
+   - 提示用户升级
+
+---
+
+## 📚 参考资源
+
+### ACP 协议官方文档
+
+- 官网: https://agentclientprotocol.com
+- GitHub: https://github.com/zed-industries/agent-client-protocol
+- Schema: https://agentclientprotocol.com/protocol/schema
+- Session Setup: https://agentclientprotocol.com/protocol/session-setup
+
+### 实现参考
+
+- Zed Editor: https://zed.dev/acp
+- Goose Blog: https://block.github.io/goose/blog/2025/10/24/intro-to-agent-client-protocol-acp/
+- Gemini CLI: https://github.com/google-gemini/gemini-cli
+
+### Obsidian API
+
+- Plugin API: https://docs.obsidian.md/Plugins/Getting+started/Build+a+plugin
+- MarkdownRenderer: https://docs.obsidian.md/Reference/TypeScript+API/MarkdownRenderer
+
+---
+
+**维护说明**:
+- 本文档是项目的唯一真实来源,所有决策和实现细节都记录于此
+- Claude 在后续对话中应**优先参考此文档**,避免重复提出已拒绝的功能
+- 定期更新 ACP 符合度评估,确保与协议最新版本同步

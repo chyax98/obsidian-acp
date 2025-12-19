@@ -16,6 +16,26 @@ import { cliDetector, type AcpCliDetector } from './acp/detector';
 // ============================================================================
 
 /**
+ * 权限模式
+ */
+export type PermissionMode = 'interactive' | 'trustAll';
+
+/**
+ * 权限设置
+ */
+export interface PermissionSettings {
+	/** 权限模式 */
+	mode: PermissionMode;
+
+	/**
+	 * 用户选择的"始终允许"记录
+	 * 键：工具名称（如 "fs/read"）
+	 * 值：true（始终允许）
+	 */
+	alwaysAllowedTools: Record<string, boolean>;
+}
+
+/**
  * 插件设置接口
  *
  * 专注于 Claude Code SDK 模式，简化配置。
@@ -39,8 +59,8 @@ export interface AcpPluginSettings {
 	/** 是否显示工具调用详情 */
 	showToolCallDetails: boolean;
 
-	/** 是否自动批准文件读取 */
-	autoApproveRead: boolean;
+	/** 权限配置 */
+	permission: PermissionSettings;
 
 	/** 是否启用调试模式 */
 	debugMode: boolean;
@@ -55,7 +75,10 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
 	apiKey: undefined,
 	apiUrl: undefined,
 	showToolCallDetails: true,
-	autoApproveRead: false,
+	permission: {
+		mode: 'interactive',  // 默认每次询问
+		alwaysAllowedTools: {},
+	},
 	debugMode: false,
 };
 

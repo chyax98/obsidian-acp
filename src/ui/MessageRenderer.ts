@@ -294,11 +294,8 @@ export class MessageRenderer {
 			case 'completed':
 				iconName = 'check-circle';
 				break;
-			case 'error':
+			case 'failed':
 				iconName = 'x-circle';
-				break;
-			case 'cancelled':
-				iconName = 'x';
 				break;
 			default:
 				iconName = 'help-circle';
@@ -706,7 +703,7 @@ export class MessageRenderer {
 		for (const toolCall of toolCalls) {
 			if (toolCall.status === 'completed') {
 				stats.completed++;
-			} else if (toolCall.status === 'error') {
+			} else if (toolCall.status === 'failed') {
 				stats.error++;
 			} else if (toolCall.status === 'in_progress') {
 				stats.inProgress++;
@@ -845,9 +842,6 @@ export class MessageRenderer {
 				break;
 			case 'completed':
 				iconName = 'check-circle-2';
-				break;
-			case 'cancelled':
-				iconName = 'x-circle';
 				break;
 			default:
 				iconName = 'circle';

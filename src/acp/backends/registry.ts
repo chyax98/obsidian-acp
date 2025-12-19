@@ -20,124 +20,166 @@ const DEFAULT_ACP_ARGS = ['--experimental-acp'];
 /**
  * 所有 ACP 后端配置
  *
- * 此插件专注于 Claude Code SDK 模式，其他 Agent 已禁用。
- * Claude Code 通过 SDK 直接调用，无需 CLI 检测。
+ * 基于官方文档调研（2025-12-19）确认的 ACP 支持状态。
  */
 export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 	// ========================================
-	// Claude Code - ACP 模式（通过 Zed 桥接）
+	// Claude Code - ✅ 生产就绪
 	// ========================================
 	claude: {
 		id: 'claude',
 		name: 'Claude Code',
-		description: 'Anthropic Claude Code - ACP 协议（通过 Zed 桥接）',
+		description: 'Anthropic Claude Code (通过 Zed 官方 ACP 适配器)',
 		cliCommand: 'npx',
 		defaultCliPath: 'npx @zed-industries/claude-code-acp',
 		authRequired: false,
 		enabled: true,
 		supportsStreaming: false,
-		acpArgs: [], // npx 包已包含参数
+		acpArgs: [], // NPM 包本身就是 ACP 适配器，无需参数
 	},
 
 	// ========================================
-	// Claude Code - SDK 模式（已禁用 - Electron 不兼容）
+	// Claude Code SDK 模式 - ❌ Electron 不兼容
 	// ========================================
 	'claude-sdk': {
 		id: 'claude-sdk',
 		name: 'Claude Code (SDK)',
-		description: 'SDK 模式 - 在 Electron 中不兼容',
+		description: 'SDK 直接调用模式 - Electron 环境不支持 native bindings',
 		cliCommand: undefined,
 		authRequired: false,
-		enabled: false, // 禁用
+		enabled: false,
 		supportsStreaming: false,
 		acpArgs: [],
 	},
 
 	// ========================================
-	// 其他 Agent
+	// Kimi - ✅ 生产就绪
+	// ========================================
+	kimi: {
+		id: 'kimi',
+		name: 'Kimi CLI',
+		description: 'Moonshot AI Kimi (原生 ACP 支持，中文友好)',
+		cliCommand: 'kimi',
+		authRequired: false,
+		enabled: true,
+		supportsStreaming: false,
+		acpArgs: ['--acp'], // 官方参数
+	},
+
+	// ========================================
+	// Codex ACP - ✅ 生产就绪
+	// ========================================
+	'codex-acp': {
+		id: 'codex-acp',
+		name: 'Codex (ACP)',
+		description: 'OpenAI Codex (通过 Zed 官方 ACP 适配器)',
+		cliCommand: 'npx',
+		defaultCliPath: 'npx @zed-industries/codex-acp',
+		authRequired: false, // 支持 OPENAI_API_KEY 或 ChatGPT 登录
+		enabled: true,
+		supportsStreaming: true,
+		acpArgs: [], // NPM 包本身就是 ACP 适配器，无需参数
+		env: {
+			// 用户可以在设置中配置 OPENAI_API_KEY
+		},
+	},
+
+	// ========================================
+	// Goose - ✅ 生产就绪
+	// ========================================
+	goose: {
+		id: 'goose',
+		name: 'Goose',
+		description: 'Block 开源 AI 编程助手 (Linux Foundation 项目)',
+		cliCommand: 'goose',
+		authRequired: false,
+		enabled: false,
+		supportsStreaming: false,
+		acpArgs: ['acp'], // 子命令模式
+	},
+
+	// ========================================
+	// Auggie - ✅ 生产就绪
+	// ========================================
+	auggie: {
+		id: 'auggie',
+		name: 'Augment Code',
+		description: 'Augment Code CLI (v0.7.0+ 完整 ACP 支持)',
+		cliCommand: 'auggie',
+		authRequired: false,
+		enabled: false,
+		supportsStreaming: false,
+		acpArgs: ['--acp'], // 官方参数
+	},
+
+	// ========================================
+	// OpenCode - ✅ 生产就绪
+	// ========================================
+	opencode: {
+		id: 'opencode',
+		name: 'OpenCode',
+		description: 'SST OpenCode (完整 ACP 支持)',
+		cliCommand: 'opencode',
+		authRequired: false,
+		enabled: false,
+		supportsStreaming: false,
+		acpArgs: ['acp'], // 子命令模式
+	},
+
+	// ========================================
+	// Gemini CLI - ✅ 生产就绪（Zed 官方首发）
+	// ========================================
+	gemini: {
+		id: 'gemini',
+		name: 'Gemini CLI',
+		description: 'Google Gemini 2.5 Pro (ACP 参考实现，Google × Zed 联合发布)',
+		cliCommand: 'gemini',
+		defaultCliPath: 'npx @google/gemini-cli',
+		authRequired: true, // 支持 OAuth、API Key、Vertex AI
+		enabled: true, // ✅ 启用 - Zed 官方内置支持
+		supportsStreaming: true,
+		acpArgs: ['--experimental-acp'], // 实验性参数（历史原因保留）
+	},
+
+	// ========================================
+	// Codex 原生 CLI - ❌ 不支持 ACP
 	// ========================================
 	codex: {
 		id: 'codex',
 		name: 'Codex CLI',
-		description: 'OpenAI Codex 命令行工具',
+		description: 'OpenAI Codex 原生 CLI (不支持 ACP，请使用 codex-acp)',
 		cliCommand: 'codex',
 		authRequired: false,
-		enabled: true, // 启用
+		enabled: false, // 禁用 - 官方 CLI 不支持 ACP
 		supportsStreaming: false,
+		acpArgs: [], // 官方 CLI 无 ACP 参数
 	},
 
-	gemini: {
-		id: 'gemini',
-		name: 'Gemini CLI',
-		description: 'Google Gemini 命令行工具',
-		cliCommand: 'gemini',
-		authRequired: true,
-		enabled: false, // 已禁用
-		supportsStreaming: true,
-	},
-
+	// ========================================
+	// Qwen Code - ✅ 完全支持 ACP
+	// ========================================
 	qwen: {
 		id: 'qwen',
 		name: 'Qwen Code',
-		description: '阿里通义千问编程助手',
+		description: '阿里通义千问 (完整 ACP 支持，中文友好，免费)',
 		cliCommand: 'qwen',
-		defaultCliPath: 'npx @qwen-code/qwen-code',
-		authRequired: true,
-		enabled: false, // 已禁用
+		defaultCliPath: 'npx qwen-code',
+		authRequired: false, // 免费使用，无需 API Key
+		enabled: true, // ✅ 启用 - 完整 ACP 支持
 		supportsStreaming: true,
+		acpArgs: ['--experimental-acp'], // 官方 ACP 参数
 	},
 
-	goose: {
-		id: 'goose',
-		name: 'Goose',
-		description: 'Block 开源 AI 编程助手',
-		cliCommand: 'goose',
-		authRequired: false,
-		enabled: false, // 已禁用
-		supportsStreaming: false,
-		acpArgs: ['acp'],
-	},
-
-	auggie: {
-		id: 'auggie',
-		name: 'Augment Code',
-		description: 'Augment 代码助手',
-		cliCommand: 'auggie',
-		authRequired: false,
-		enabled: false, // 已禁用
-		supportsStreaming: false,
-		acpArgs: ['--acp'],
-	},
-
-	kimi: {
-		id: 'kimi',
-		name: 'Kimi CLI',
-		description: 'Moonshot Kimi 命令行工具',
-		cliCommand: 'kimi',
-		authRequired: false,
-		enabled: true, // 重新启用测试 ACP
-		supportsStreaming: false,
-		acpArgs: ['--acp'],
-	},
-
-	opencode: {
-		id: 'opencode',
-		name: 'OpenCode',
-		description: 'OpenCode 开源编程助手',
-		cliCommand: 'opencode',
-		authRequired: false,
-		enabled: false, // 已禁用
-		supportsStreaming: false,
-		acpArgs: ['acp'],
-	},
-
+	// ========================================
+	// 自定义 Agent
+	// ========================================
 	custom: {
 		id: 'custom',
 		name: '自定义 Agent',
 		description: '用户配置的自定义 ACP Agent',
 		cliCommand: undefined,
 		authRequired: false,
-		enabled: false, // 已禁用
+		enabled: false,
 		supportsStreaming: false,
 	},
 };

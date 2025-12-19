@@ -1,12 +1,25 @@
 # 快速使用指南
 
-## 连接 Agent
+> 快速参考手册，常用操作和示例。详细文档请查看 [docs/](./docs/) 目录。
+
+## 📋 支持的 5 个 Agent
+
+| Agent | 特点 | 免费？ |
+|-------|------|--------|
+| **Claude Code** | 编程能力最强 | ❌ 需订阅 |
+| **Kimi** | 中文友好 | ✅ 有免费额度 |
+| **Codex ACP** | OpenAI Codex | ❌ 需订阅 |
+| **Gemini CLI** | Google 官方，ACP 参考实现 | ✅ 有免费额度 |
+| **Qwen Code** | 阿里通义千问，中文优秀 | ✅ 完全免费 |
+
+**推荐新手**：从 Qwen Code（完全免费）或 Gemini CLI（有免费额度）开始。
+
+## 🚀 连接 Agent
 
 1. **选择 Agent**
-   - 在 ChatView 顶部下拉框选择 "Claude Code"
-   - 如果下拉框为空：
-     - 打开终端测试: `npx @anthropic-ai/claude-code --version`
-     - 或在设置中手动配置路径
+   - 在 ChatView 顶部下拉框选择 Agent
+   - 5 个 Agent 都可选择（需先安装对应 CLI）
+   - 如果下拉框为空，查看 [Agent 配置指南](./docs/AGENT_SETUP.md)
 
 2. **点击连接**
    - 点击 "连接" 按钮

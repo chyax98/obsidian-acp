@@ -11,15 +11,22 @@
 /**
  * 所有支持的 ACP 后端 ID
  *
- * - claude: Claude Code (SDK 模式) - 通过 SDK 直接调用
- * - claude-acp: Claude Code (ACP 模式) - 通过 CLI
- * - codex: OpenAI Codex
+ * - claude: Claude Code (ACP 模式) - 通过 @zed-industries/claude-code-acp
+ * - claude-sdk: Claude Code (SDK 模式) - Electron 不兼容
+ * - codex-acp: OpenAI Codex (ACP 模式) - 通过 @zed-industries/codex-acp
+ * - codex: OpenAI Codex 原生 CLI - 不支持 ACP
  * - kimi: Moonshot Kimi
- * - 其他后端保留供未来扩展
+ * - goose: Block Goose
+ * - auggie: Augment Code
+ * - opencode: SST OpenCode
+ * - gemini: Google Gemini CLI
+ * - qwen: 阿里 Qwen Code
+ * - custom: 用户自定义
  */
 export type AcpBackendId =
 	| 'claude'
 	| 'claude-sdk'
+	| 'codex-acp'
 	| 'codex'
 	| 'gemini'
 	| 'qwen'
@@ -71,9 +78,12 @@ export interface AcpBackendConfig {
 	 * ACP 启动参数
 	 *
 	 * 启用 ACP 模式的参数，不同 CLI 有不同约定:
-	 * - ['--experimental-acp'] 用于 claude, qwen (默认)
+	 * - [] (无参数) 用于 claude-code-acp, codex-acp (NPM 包本身就是 ACP 适配器)
+	 * - ['--acp'] 用于 kimi, auggie
+	 * - ['--experimental-acp'] 用于 gemini, qwen (实验性参数，历史原因保留)
 	 * - ['acp'] 用于 goose, opencode (子命令)
-	 * - ['--acp'] 用于 auggie, kimi
+	 *
+	 * 注意: codex 原生 CLI 不支持 ACP，需使用 codex-acp 适配器
 	 */
 	acpArgs?: string[];
 

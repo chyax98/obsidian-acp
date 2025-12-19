@@ -1,16 +1,18 @@
 # Obsidian ACP Plugin
 
-Agent Client Protocol (ACP) 集成插件 - 在 Obsidian 中连接 Claude Code、Kimi、Codex 等 AI 编程助手。
+Agent Client Protocol (ACP) 集成插件 - 在 Obsidian 中连接多个 AI 编程助手，让 AI 理解并操作你的知识库。
 
 ## ✨ 功能特性
 
-- 🤖 **多 Agent 支持**: Claude Code, Kimi, Codex
-- 🔄 **完整 ACP 协议**: 全量事件类型支持
+- 🤖 **多 Agent 支持**: Claude Code, Kimi, Codex ACP, Gemini CLI, Qwen Code
+- 🔄 **完整 ACP 协议**: 基于开放标准，全量事件类型支持
 - ⚡ **高性能流式**: 消息缓冲优化，减少 UI 更新 95%
 - 🛡️ **健壮性**: 自动重连、错误分类、超时管理
-- 💭 **思考过程**: 显示 Agent 内部思考（可折叠）
+- 💭 **思考过程**: 实时显示 Agent 内部思考（可折叠）
 - 📋 **工具调用**: 完整的工具调用展示和权限管理
 - 🎯 **模式指示**: 实时显示当前模式（ask/code/plan）
+- 🔒 **安全可控**: 细粒度权限管理，完全本地运行
+- 📚 **知识库感知**: AI 能理解 `[[双链]]` 语法和 frontmatter
 
 ## 🚀 快速开始
 
@@ -22,21 +24,71 @@ Agent Client Protocol (ACP) 集成插件 - 在 Obsidian 中连接 Claude Code、
 
 ### 配置 Agent
 
-#### Claude Code（推荐）
+插件支持 5 个 AI Agent，根据需求选择安装：
+
+#### 🌟 推荐：Claude Code（编程能力最强）
 
 ```bash
-# 方式 1：全局安装（避免每次下载）
+# 方式 1：使用 npx（推荐，无需安装）
+# 插件会自动调用 npx @zed-industries/claude-code-acp
+
+# 方式 2：全局安装（避免每次下载）
 npm install -g @zed-industries/claude-code-acp
 
-# 方式 2：使用 npx（插件会自动调用）
-# 无需手动操作
+# 需要：ANTHROPIC_API_KEY 环境变量
+export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-#### Kimi
+#### 🇨🇳 推荐：Kimi（中文友好）
 
 ```bash
-# 确保 kimi CLI 已安装
-which kimi
+# 安装 Kimi CLI
+npm install -g @moonshot-ai/kimi-cli
+
+# 验证安装
+kimi --version
+```
+
+#### 🤖 Codex ACP（OpenAI）
+
+```bash
+# 使用 npx（推荐）
+# 插件会自动调用 npx @zed-industries/codex-acp
+
+# 需要：OPENAI_API_KEY 或 ChatGPT 订阅
+export OPENAI_API_KEY="sk-..."
+```
+
+#### 🔹 Gemini CLI（Google，免费额度）
+
+```bash
+# 安装 Gemini CLI
+npm install -g @google/gemini-cli
+
+# 或使用 Homebrew (macOS)
+brew install google-gemini/tap/gemini-cli
+
+# 配置认证（三选一）：
+# 1. Google Account OAuth (推荐)
+gemini auth login
+
+# 2. API Key
+export GOOGLE_API_KEY="..."
+
+# 3. Vertex AI
+export GOOGLE_CLOUD_PROJECT="..."
+```
+
+#### 🇨🇳 Qwen Code（阿里通义千问，完全免费）
+
+```bash
+# 安装 Qwen Code
+npm install -g qwen-code
+
+# 验证安装
+qwen --version
+
+# 无需 API Key，开箱即用！
 ```
 
 ### 使用
@@ -48,11 +100,19 @@ which kimi
 
 ## 📋 支持的 Agent
 
-| Agent | 状态 | 命令 | 说明 |
-|-------|------|------|------|
-| **Claude Code** | ✅ 完全支持 | `npx @zed-industries/claude-code-acp` | Anthropic 官方 |
-| **Kimi** | ✅ 完全支持 | `kimi --acp` | Moonshot AI |
-| **Codex** | 🟡 实验性 | `codex` | OpenAI |
+| Agent | 状态 | 命令 | 说明 | 免费？ |
+|-------|------|------|------|--------|
+| **Claude Code** | ✅ 完全支持 | `npx @zed-industries/claude-code-acp` | Anthropic 官方，编程能力最强 | ❌ 需订阅 |
+| **Kimi** | ✅ 完全支持 | `kimi --acp` | Moonshot AI，中文友好 | ✅ 有免费额度 |
+| **Codex ACP** | ✅ 完全支持 | `npx @zed-industries/codex-acp` | OpenAI Codex，Zed 官方适配器 | ❌ 需订阅 |
+| **Gemini CLI** | ✅ 完全支持 | `npx @google/gemini-cli --experimental-acp` | Google 官方，ACP 参考实现 | ✅ 有免费额度 |
+| **Qwen Code** | ✅ 完全支持 | `qwen --experimental-acp` | 阿里通义千问，中文优秀 | ✅ 完全免费 |
+
+**选择建议**:
+- 💰 **预算充足**：Claude Code（编程能力最强）
+- 🇨🇳 **中文用户**：Kimi 或 Qwen Code（中文友好）
+- 🆓 **免费使用**：Qwen Code（完全免费）或 Gemini CLI（有免费额度）
+- 🔬 **尝鲜**：Gemini CLI（Google × Zed 联合发布，ACP 参考实现）
 
 ## 🎯 测试结果
 
@@ -64,8 +124,17 @@ which kimi
 
 ## 📖 文档
 
-- [TESTING.md](./TESTING.md) - 测试指南
-- [QUALITY_REPORT.md](./QUALITY_REPORT.md) - 质量报告
+**用户文档**:
+- [快速开始](./docs/GETTING_STARTED.md) - 5 分钟上手指南
+- [Agent 配置](./docs/AGENT_SETUP.md) - 每个 Agent 的详细配置教程
+- [常见问题 FAQ](./docs/FAQ.md) - 安装、配置、使用问题解答
+- [权限系统](./docs/PERMISSIONS.md) - 理解和配置权限管理
+- [快速参考](./USAGE.md) - 常用操作和示例
+
+**技术文档**:
+- [产品愿景](./CLAUDE.md) - 完整的产品设计和技术架构
+- [测试指南](./TESTING.md) - 开发者测试说明
+- [质量报告](./QUALITY_REPORT.md) - 代码质量和测试结果
 
 ## 🔧 开发
 

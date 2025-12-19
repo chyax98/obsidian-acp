@@ -22,6 +22,7 @@ import type {
 	CurrentModeUpdateData,
 	AvailableCommandsUpdateData,
 } from '../types';
+import { StreamingMessageBuffer } from './message-buffer';
 
 // ============================================================================
 // 类型定义
@@ -153,6 +154,9 @@ export class SessionManager {
 	private nextMessageId = 1;
 	private nextTurnId = 1;
 
+	// 消息缓冲器
+	private messageBuffer: StreamingMessageBuffer;
+
 	// ========================================================================
 	// 事件回调
 	// ========================================================================
@@ -198,6 +202,12 @@ export class SessionManager {
 	constructor(config: SessionManagerConfig) {
 		this.connection = config.connection;
 		this.workingDir = config.workingDir || process.cwd();
+
+		// 初始化消息缓冲器
+		this.messageBuffer = new StreamingMessageBuffer({
+			updateInterval: 300, // 300ms
+			batchSize: 20, // 20 chunks
+		});
 
 		// 绑定连接回调
 		this.setupConnectionCallbacks();
@@ -399,6 +409,9 @@ export class SessionManager {
 			this.completeTurn('cancelled');
 		}
 
+		// 清空消息缓冲器
+		this.messageBuffer.clear();
+
 		this._sessionId = null;
 		this.setState('idle');
 
@@ -450,6 +463,11 @@ export class SessionManager {
 	 */
 	private completeTurn(stopReason: StopReason): void {
 		if (!this.currentTurn) return;
+
+		// 完成消息缓冲器
+		if (this.currentTurn.assistantMessage) {
+			this.messageBuffer.complete(this.currentTurn.assistantMessage.id);
+		}
 
 		this.currentTurn.stopReason = stopReason;
 		this.currentTurn.endTime = Date.now();
@@ -529,16 +547,25 @@ export class SessionManager {
 
 		if (!this.currentTurn.assistantMessage) {
 			// 创建新的 assistant 消息
-			const message = this.createMessage('assistant', text);
+			const message = this.createMessage('assistant', '');
 			message.isStreaming = true;
 			this.currentTurn.assistantMessage = message;
 			this._messages.push(message);
 			this.onMessage(message, true);
-		} else {
-			// 追加内容
-			this.currentTurn.assistantMessage.content += text;
-			this.onMessage(this.currentTurn.assistantMessage, false);
 		}
+
+		// 使用缓冲器追加内容
+		this.messageBuffer.append(
+			this.currentTurn.assistantMessage.id,
+			text,
+			(content: string, isFinal: boolean) => {
+				if (this.currentTurn?.assistantMessage) {
+					this.currentTurn.assistantMessage.content = content;
+					this.onMessage(this.currentTurn.assistantMessage, false);
+				}
+			},
+			'accumulate',
+		);
 	}
 
 	/**

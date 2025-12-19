@@ -47,6 +47,10 @@ export class AcpChatView extends ItemView {
 	private availableAgents: DetectedAgent[] = [];
 	private selectedAgent: DetectedAgent | null = null;
 
+	// 会话状态
+	private currentMode: string | null = null;
+	private availableCommands: any[] = [];
+
 	// Obsidian Component（用于 MarkdownRenderer 生命周期管理）
 	private markdownComponent: Component = new Component();
 
@@ -60,6 +64,7 @@ export class AcpChatView extends ItemView {
 	private agentSelectEl!: HTMLSelectElement;
 	private connectButtonEl!: HTMLButtonElement;
 	private statusEl!: HTMLElement;
+	private modeIndicatorEl!: HTMLElement;
 
 	// ========================================================================
 	// 构造函数
@@ -170,6 +175,10 @@ export class AcpChatView extends ItemView {
 		// 状态指示器
 		this.statusEl = this.headerEl.createDiv({ cls: 'acp-status' });
 		this.updateStatus('未连接', 'idle');
+
+		// 模式指示器
+		this.modeIndicatorEl = this.headerEl.createDiv({ cls: 'acp-mode-indicator' });
+		this.modeIndicatorEl.style.display = 'none'; // 初始隐藏
 	}
 
 	/**
@@ -424,6 +433,11 @@ export class AcpChatView extends ItemView {
 			this.handlePlan(plan);
 		};
 
+		// 思考块更新
+		this.sessionManager.onThought = (thought: string) => {
+			this.handleThought(thought);
+		};
+
 		// 状态变更
 		this.sessionManager.onStateChange = (state: SessionState) => {
 			this.handleStateChange(state);
@@ -442,6 +456,16 @@ export class AcpChatView extends ItemView {
 		// 错误
 		this.sessionManager.onError = (error: Error) => {
 			this.handleError(error);
+		};
+
+		// 当前模式更新
+		this.sessionManager.onCurrentModeUpdate = (mode: string, description?: string) => {
+			this.handleCurrentModeUpdate(mode, description);
+		};
+
+		// 可用命令更新
+		this.sessionManager.onAvailableCommandsUpdate = (commands: any[]) => {
+			this.handleAvailableCommandsUpdate(commands);
 		};
 	}
 
@@ -471,6 +495,20 @@ export class AcpChatView extends ItemView {
 	private handlePlan(plan: PlanEntry[]): void {
 		// 使用 MessageRenderer 渲染计划
 		MessageRenderer.renderPlan(this.messagesEl, plan);
+		this.scrollToBottom();
+	}
+
+	/**
+	 * 处理思考块
+	 */
+	private handleThought(thought: string): void {
+		if (!this.sessionManager) return;
+
+		const turn = this.sessionManager.activeTurn;
+		if (!turn) return;
+
+		// 使用 MessageRenderer 渲染思考块（渲染整个思考列表）
+		MessageRenderer.renderThoughts(this.messagesEl, turn.thoughts);
 		this.scrollToBottom();
 	}
 
@@ -658,5 +696,48 @@ export class AcpChatView extends ItemView {
 	 */
 	private scrollToBottom(): void {
 		this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+	}
+
+	/**
+	 * 处理当前模式更新
+	 */
+	private handleCurrentModeUpdate(mode: string, description?: string): void {
+		console.log('[ChatView] 模式更新:', mode, description);
+		this.currentMode = mode;
+
+		// 更新模式指示器
+		this.modeIndicatorEl.style.display = 'block';
+		this.modeIndicatorEl.textContent = description ? `${mode}: ${description}` : mode;
+
+		// 根据模式设置不同颜色
+		this.modeIndicatorEl.className = 'acp-mode-indicator';
+		if (mode === 'ask') {
+			this.modeIndicatorEl.classList.add('acp-mode-ask');
+		} else if (mode === 'code') {
+			this.modeIndicatorEl.classList.add('acp-mode-code');
+		} else if (mode === 'plan') {
+			this.modeIndicatorEl.classList.add('acp-mode-plan');
+		} else {
+			this.modeIndicatorEl.classList.add('acp-mode-default');
+		}
+	}
+
+	/**
+	 * 处理可用命令更新
+	 */
+	private handleAvailableCommandsUpdate(commands: any[]): void {
+		console.log('[ChatView] 可用命令更新:', commands.length, '个命令');
+		this.availableCommands = commands;
+
+		// 在输入框下方显示可用命令提示
+		if (commands.length > 0) {
+			// 移除旧的命令提示
+			const oldHint = this.inputContainerEl.querySelector('.acp-commands-hint');
+			if (oldHint) oldHint.remove();
+
+			// 创建新的命令提示
+			const hintEl = this.inputContainerEl.createDiv({ cls: 'acp-commands-hint' });
+			hintEl.textContent = `可用命令: ${commands.map((c) => c.name).join(', ')}`;
+		}
 	}
 }

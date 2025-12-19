@@ -18,6 +18,9 @@ import type {
 	ToolCallUpdateData,
 	ToolCallStatusUpdateData,
 	ToolCallContent,
+	AvailableCommand,
+	CurrentModeUpdateData,
+	AvailableCommandsUpdateData,
 } from '../types';
 
 // ============================================================================
@@ -101,6 +104,8 @@ export interface Turn {
 	assistantMessage?: Message;
 	/** 工具调用列表 */
 	toolCalls: ToolCall[];
+	/** 思考内容列表 */
+	thoughts: string[];
 	/** 计划 */
 	plan?: PlanEntry[];
 	/** 停止原因 */
@@ -161,6 +166,9 @@ export class SessionManager {
 	/** 计划更新回调 */
 	public onPlan: (plan: PlanEntry[]) => void = () => {};
 
+	/** 思考块更新回调 */
+	public onThought: (thought: string) => void = () => {};
+
 	/** 状态变更回调 */
 	public onStateChange: (state: SessionState, previousState: SessionState) => void = () => {};
 
@@ -176,6 +184,12 @@ export class SessionManager {
 
 	/** 错误回调 */
 	public onError: (error: Error) => void = () => {};
+
+	/** 当前模式更新回调 */
+	public onCurrentModeUpdate: (mode: string, description?: string) => void = () => {};
+
+	/** 可用命令更新回调 */
+	public onAvailableCommandsUpdate: (commands: AvailableCommand[]) => void = () => {};
 
 	// ========================================================================
 	// 构造函数
@@ -334,6 +348,7 @@ export class SessionManager {
 			id: `turn_${this.nextTurnId++}`,
 			userMessage,
 			toolCalls: [],
+			thoughts: [],
 			startTime: Date.now(),
 		};
 
@@ -466,6 +481,10 @@ export class SessionManager {
 				this.handleAgentMessageChunk(update);
 				break;
 
+			case 'agent_thought_chunk':
+				this.handleAgentThoughtChunk(update);
+				break;
+
 			case 'tool_call':
 				this.handleToolCall(update);
 				break;
@@ -478,12 +497,24 @@ export class SessionManager {
 				this.handlePlan(update as { sessionUpdate: 'plan'; entries: PlanEntry[] });
 				break;
 
+			case 'current_mode_update':
+				this.handleCurrentModeUpdate(update as CurrentModeUpdateData);
+				break;
+
+			case 'available_commands_update':
+				this.handleAvailableCommandsUpdate(update as AvailableCommandsUpdateData);
+				break;
+
 			case 'user_message_chunk':
 				// 通常在 session/load 时收到，暂不处理
 				break;
 
-			default:
-				console.log('[SessionManager] 未处理的更新类型:', update.sessionUpdate);
+			default: {
+				// 处理未识别的更新类型
+				const unknownUpdate = update as any;
+				console.log('[SessionManager] 未处理的更新类型:', unknownUpdate.sessionUpdate);
+				break;
+			}
 		}
 	}
 
@@ -507,6 +538,23 @@ export class SessionManager {
 			// 追加内容
 			this.currentTurn.assistantMessage.content += text;
 			this.onMessage(this.currentTurn.assistantMessage, false);
+		}
+	}
+
+	/**
+	 * 处理 Agent 思考块
+	 */
+	private handleAgentThoughtChunk(update: SessionUpdateData): void {
+		if (!this.currentTurn) return;
+
+		const content = (update as { content?: { text?: string } }).content;
+		const text = content?.text || '';
+
+		if (text) {
+			// 添加到思考列表
+			this.currentTurn.thoughts.push(text);
+			// 触发回调
+			this.onThought(text);
 		}
 	}
 
@@ -584,5 +632,21 @@ export class SessionManager {
 		}
 		this._sessionId = null;
 		this.setState('idle');
+	}
+
+	/**
+	 * 处理当前模式更新
+	 */
+	private handleCurrentModeUpdate(update: CurrentModeUpdateData): void {
+		console.log('[SessionManager] 模式更新:', update.mode, update.description);
+		this.onCurrentModeUpdate(update.mode, update.description);
+	}
+
+	/**
+	 * 处理可用命令更新
+	 */
+	private handleAvailableCommandsUpdate(update: AvailableCommandsUpdateData): void {
+		console.log('[SessionManager] 可用命令更新:', update.availableCommands.length, '个命令');
+		this.onAvailableCommandsUpdate(update.availableCommands);
 	}
 }

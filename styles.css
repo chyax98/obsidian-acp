@@ -96,12 +96,44 @@
 }
 
 @keyframes pulse {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 1;
 	}
 	50% {
 		opacity: 0.7;
 	}
+}
+
+/* 模式指示器 */
+.acp-mode-indicator {
+	margin-top: 8px;
+	padding: 6px 12px;
+	font-size: 0.85em;
+	border-radius: 4px;
+	text-align: center;
+	font-weight: 500;
+	transition: all 0.3s ease;
+}
+
+.acp-mode-ask {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.acp-mode-code {
+	background-color: var(--color-green);
+	color: var(--text-on-accent);
+}
+
+.acp-mode-plan {
+	background-color: var(--color-yellow);
+	color: var(--text-on-accent);
+}
+
+.acp-mode-default {
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
 }
 
 /* ============================================================================
@@ -273,6 +305,20 @@
 	background-color: var(--color-red);
 	transform: translateY(-1px);
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 命令提示 */
+.acp-commands-hint {
+	margin-top: 8px;
+	padding: 6px 10px;
+	background-color: var(--background-secondary-alt);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	font-size: 0.8em;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	overflow-x: auto;
+	white-space: nowrap;
 }
 
 /* ============================================================================
@@ -664,6 +710,92 @@
    计划显示
    ============================================================================ */
 
+/* 思考块 */
+.acp-thoughts {
+	margin: 12px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background-color: var(--background-secondary);
+	overflow: hidden;
+}
+
+.acp-thoughts-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	cursor: pointer;
+	user-select: none;
+	background-color: var(--background-secondary-alt);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.acp-thoughts-header:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.acp-thoughts-toggle {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform 0.2s;
+}
+
+.acp-thoughts-toggle .svg-icon {
+	color: var(--text-muted);
+}
+
+.acp-thoughts-title {
+	flex: 1;
+	font-weight: 600;
+	font-size: 0.95em;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.acp-thoughts-icon {
+	font-size: 1.1em;
+}
+
+.acp-thoughts-content {
+	max-height: 0;
+	overflow: hidden;
+	transition: max-height 0.3s ease;
+	padding: 0;
+}
+
+.acp-thoughts-content-expanded {
+	max-height: 400px;
+	overflow-y: auto;
+	padding: 8px 12px;
+}
+
+.acp-thought-item {
+	padding: 8px 12px;
+	margin: 4px 0;
+	background-color: var(--background-primary);
+	border-left: 3px solid var(--text-muted);
+	border-radius: 4px;
+	font-style: italic;
+	color: var(--text-muted);
+	line-height: 1.6;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+}
+
+.acp-thought-item:first-child {
+	margin-top: 0;
+}
+
+.acp-thought-item:last-child {
+	margin-bottom: 0;
+}
+
+/* 计划 */
 .acp-plan {
 	margin: 12px 0;
 	border: 1px solid var(--background-modifier-border);

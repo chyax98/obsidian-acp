@@ -50,17 +50,13 @@ export class MessageRenderer {
 	): Promise<void> {
 		// 不清空容器！直接添加新消息
 
-		// 创建消息结构
+		// 创建消息结构（包装容器）
 		const messageEl = container.createDiv({
 			cls: `acp-message acp-message-${message.role}`,
 			attr: { 'data-message-id': message.id },
 		});
 
-		// 消息头部（显示角色）
-		const headerEl = messageEl.createDiv({ cls: 'acp-message-header' });
-		headerEl.textContent = message.role === 'user' ? '你' : 'Agent';
-
-		// 消息内容容器
+		// 消息内容容器（不显示发送者,通过位置区分）
 		const contentEl = messageEl.createDiv({ cls: 'acp-message-content' });
 
 		// 判断是否为 Markdown 内容
@@ -85,6 +81,9 @@ export class MessageRenderer {
 		if (message.isStreaming) {
 			contentEl.addClass('acp-message-streaming');
 		}
+
+		// 添加消息操作栏（复制按钮）
+		this.addMessageActions(messageEl, message);
 	}
 
 	/**
@@ -139,6 +138,38 @@ export class MessageRenderer {
 		} else {
 			contentEl.removeClass('acp-message-streaming');
 		}
+	}
+
+	/**
+	 * 添加消息操作按钮（复制等）
+	 */
+	private static addMessageActions(messageEl: HTMLElement, message: Message): void {
+		// 创建操作栏容器
+		const actionsEl = messageEl.createDiv({ cls: 'acp-message-actions' });
+
+		// 复制按钮
+		const copyBtn = actionsEl.createDiv({
+			cls: 'acp-message-copy-btn',
+			attr: { 'aria-label': '复制消息' },
+		});
+		setIcon(copyBtn, 'copy');
+
+		copyBtn.addEventListener('click', async (e) => {
+			e.stopPropagation();
+			const text = message.content || '';
+			if (text) {
+				await navigator.clipboard.writeText(text);
+				new Notice('已复制消息');
+
+				// 临时切换图标
+				copyBtn.empty();
+				setIcon(copyBtn, 'check');
+				setTimeout(() => {
+					copyBtn.empty();
+					setIcon(copyBtn, 'copy');
+				}, 1500);
+			}
+		});
 	}
 
 	// ========================================================================

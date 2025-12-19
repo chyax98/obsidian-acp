@@ -137,6 +137,11 @@ export class AcpCliDetector {
 	): Promise<DetectedAgent | null> {
 		// 1. 先尝试自动检测
 		try {
+			// 特殊处理：Claude Code 使用 npx 包，需要验证包是否可用
+			if (cli.backendId === 'claude') {
+				return await this.detectClaudeCodeAcp();
+			}
+
 			const result = execSync(`${whichCommand} ${cli.cmd}`, {
 				encoding: 'utf-8',
 				stdio: 'pipe',
@@ -173,6 +178,50 @@ export class AcpCliDetector {
 		}
 
 		// 3. 两种方式都失败，返回 null
+		return null;
+	}
+
+	/**
+	 * 检测 Claude Code ACP wrapper（特殊处理）
+	 *
+	 * 尝试两个社区 wrapper：
+	 * 1. @zed-industries/claude-code-acp (Zed 官方)
+	 * 2. acp-claude-code (社区项目)
+	 */
+	private async detectClaudeCodeAcp(): Promise<DetectedAgent | null> {
+		const wrappers = [
+			{ pkg: '@zed-industries/claude-code-acp', name: 'Claude Code (Zed wrapper)' },
+			{ pkg: 'acp-claude-code', name: 'Claude Code (Community wrapper)' },
+		];
+
+		for (const wrapper of wrappers) {
+			try {
+				// 尝试运行 npx <package> --help 验证包是否可用
+				const testCommand = Platform.isWin ? 'npx.cmd' : 'npx';
+				const result = execSync(`${testCommand} ${wrapper.pkg} --help`, {
+					encoding: 'utf-8',
+					stdio: 'pipe',
+					timeout: 5000, // npx 首次可能需要下载
+				});
+
+				// 如果成功，说明包可用
+				if (result) {
+					console.log(`[ACP Detector] 检测到 Claude Code wrapper: ${wrapper.pkg}`);
+					return {
+						backendId: 'claude',
+						name: wrapper.name,
+						cliPath: `npx ${wrapper.pkg}`,
+						acpArgs: [],
+						version: undefined,
+					};
+				}
+			} catch {
+				// 这个 wrapper 不可用，尝试下一个
+				console.log(`[ACP Detector] ${wrapper.pkg} 不可用`);
+			}
+		}
+
+		// 所有 wrapper 都不可用
 		return null;
 	}
 

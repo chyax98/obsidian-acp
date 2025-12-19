@@ -324,10 +324,29 @@ export class AcpConnection {
 	 * 连接 Claude Code - 直接使用 npx @zed-industries/claude-code-acp
 	 * 参考 AionUI 的 connectClaude 实现
 	 */
-	private connectClaude(workingDir: string, customEnv?: Record<string, string>): void {
+	private connectClaude(workingDir: string, cliPath?: string, customEnv?: Record<string, string>): void {
 		const isWindows = Platform.isWin === true;
-		const spawnCommand = isWindows ? 'npx.cmd' : 'npx';
-		const spawnArgs = ['@zed-industries/claude-code-acp'];
+
+		// 如果提供了 cliPath（从检测或手动配置），解析它
+		let spawnCommand: string;
+		let spawnArgs: string[];
+
+		if (cliPath) {
+			// 解析 "npx @zed-industries/claude-code-acp" 或 "npx acp-claude-code"
+			const parts = cliPath.split(' ');
+			if (parts[0] === 'npx') {
+				spawnCommand = isWindows ? 'npx.cmd' : 'npx';
+				spawnArgs = parts.slice(1); // 包名
+			} else {
+				// 其他格式，直接使用
+				spawnCommand = parts[0];
+				spawnArgs = parts.slice(1);
+			}
+		} else {
+			// 默认使用 Zed wrapper（向后兼容）
+			spawnCommand = isWindows ? 'npx.cmd' : 'npx';
+			spawnArgs = ['@zed-industries/claude-code-acp'];
+		}
 
 		const env = { ...process.env, ...customEnv };
 
@@ -396,8 +415,8 @@ export class AcpConnection {
 			// 根据后端类型选择连接方式（参考 AionUI 实现）
 			switch (options.backendId) {
 				case 'claude':
-					// Claude Code 单独处理，直接使用 npx @zed-industries/claude-code-acp
-					this.connectClaude(this.workingDir, options.env);
+					// Claude Code 单独处理，使用检测到的或配置的 cliPath
+					this.connectClaude(this.workingDir, options.cliPath, options.env);
 					break;
 				default:
 					// 其他后端使用通用连接方式

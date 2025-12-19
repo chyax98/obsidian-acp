@@ -71,7 +71,6 @@ export class AcpChatView extends ItemView {
 
 	// 智能滚动
 	private scrollToBottomButton: HTMLElement | null = null;
-	private isUserScrolling = false;
 
 	// ========================================================================
 	// 构造函数
@@ -202,7 +201,7 @@ export class AcpChatView extends ItemView {
 		// "跳到最新"按钮
 		this.scrollToBottomButton = messagesContainer.createDiv({
 			cls: 'acp-scroll-to-bottom',
-			attr: { 'aria-label': '跳到最新' }
+			attr: { 'aria-label': '跳到最新' },
 		});
 		this.scrollToBottomButton.style.display = 'none';
 		setIcon(this.scrollToBottomButton, 'arrow-down');
@@ -393,12 +392,10 @@ export class AcpChatView extends ItemView {
 		// 连接到 Agent
 		const workingDir = this.getWorkingDirectory();
 
-		// 注意：不传入 cliPath，让 connection 使用 registry 中的 defaultCliPath
-		// detector 返回的 cliPath 只是 'which' 命令的结果（如 /opt/homebrew/bin/npx）
-		// 而不是完整的启动命令（如 npx @zed-industries/claude-code-acp）
+		// 注意：传入检测到的 cliPath，让 connection 使用正确的 wrapper
 		await this.connection.connect({
 			backendId: this.selectedAgent.backendId,
-			// cliPath 不传，使用 registry 中的 defaultCliPath
+			cliPath: this.selectedAgent.cliPath, // 使用检测到的 wrapper
 			workingDir: workingDir,
 			acpArgs: this.selectedAgent.acpArgs,
 		});
@@ -506,7 +503,7 @@ export class AcpChatView extends ItemView {
 		if (!this.currentTurnContainer) {
 			this.currentTurnContainer = this.messagesEl.createDiv({
 				cls: 'acp-turn-container',
-				attr: { 'data-turn-id': `turn-${Date.now()}` }
+				attr: { 'data-turn-id': `turn-${Date.now()}` },
 			});
 		}
 		return this.currentTurnContainer;

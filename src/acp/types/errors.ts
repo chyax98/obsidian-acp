@@ -163,10 +163,45 @@ export function connectionNotReadyError(message = '连接尚未就绪'): AcpErro
 }
 
 /**
+ * 连接已关闭错误
+ */
+export function connectionClosedError(message = '连接已关闭'): AcpError {
+	return createAcpError(AcpErrorType.CONNECTION_CLOSED, message, { retryable: true });
+}
+
+/**
+ * 网络错误
+ */
+export function networkError(message: string, cause?: Error): AcpError {
+	return createAcpError(AcpErrorType.NETWORK_ERROR, message, { retryable: true, cause });
+}
+
+/**
  * 超时错误
  */
 export function timeoutError(operation: string, timeoutMs: number): AcpError {
 	return createAcpError(AcpErrorType.TIMEOUT, `${operation} 超时 (${timeoutMs}ms)`, { retryable: true });
+}
+
+/**
+ * 会话过期错误
+ */
+export function sessionExpiredError(message = '会话已过期'): AcpError {
+	return createAcpError(AcpErrorType.SESSION_EXPIRED, message, { retryable: false });
+}
+
+/**
+ * 会话未找到错误
+ */
+export function sessionNotFoundError(sessionId: string): AcpError {
+	return createAcpError(AcpErrorType.SESSION_NOT_FOUND, `会话未找到: ${sessionId}`, { retryable: false });
+}
+
+/**
+ * 认证失败错误
+ */
+export function authenticationFailedError(message = '认证失败'): AcpError {
+	return createAcpError(AcpErrorType.AUTHENTICATION_FAILED, message, { retryable: false });
 }
 
 /**

@@ -277,23 +277,23 @@ export class MessageRenderer {
 	}
 
 	/**
-	 * 格式化工具类型（参考 AionUI）
+	 * 格式化工具类型
 	 */
 	private static formatToolKind(kind: string): string {
 		const kindMap: Record<string, string> = {
-			bash: '🔧 Bash',
-			execute: '🔧 执行',
-			read: '📖 读取',
-			write: '✏️ 写入',
-			edit: '📝 编辑',
-			patch: '📝 编辑',
-			grep: '🔍 搜索',
-			glob: '🔍 搜索',
-			mcp: '🔌 MCP',
-			web_search: '🔍 搜索',
-			other: '⚙️ 其他',
+			bash: 'Bash',
+			execute: '执行',
+			read: '读取',
+			write: '写入',
+			edit: '编辑',
+			patch: '编辑',
+			grep: '搜索',
+			glob: '搜索',
+			mcp: 'MCP',
+			web_search: '搜索',
+			other: '其他',
 		};
-		return kindMap[kind] || `⚙️ ${kind}`;
+		return kindMap[kind] || kind;
 	}
 
 	/**
@@ -692,12 +692,12 @@ export class MessageRenderer {
 	/**
 	 * 渲染思考块
 	 *
-	 * @param container - 容器元素
+	 * @param container - 容器元素（应该是 turn 容器）
 	 * @param thoughts - 思考内容列表
 	 * @returns 思考块元素
 	 */
 	static renderThoughts(container: HTMLElement, thoughts: string[]): HTMLElement {
-		// 查找是否已存在
+		// 在当前容器内查找是否已存在（限定在 turn 内）
 		let thoughtsEl = container.querySelector('.acp-thoughts') as HTMLElement;
 
 		if (thoughtsEl) {
@@ -717,7 +717,7 @@ export class MessageRenderer {
 
 		// 标题
 		const titleEl = headerEl.createDiv({ cls: 'acp-thoughts-title' });
-		titleEl.innerHTML = '<span class="acp-thoughts-icon">💭</span> 思考过程';
+		titleEl.textContent = '思考过程';
 
 		// 内容区域（默认折叠）
 		const contentEl = thoughtsEl.createDiv({
@@ -748,12 +748,12 @@ export class MessageRenderer {
 	/**
 	 * 渲染计划
 	 *
-	 * @param container - 容器元素
+	 * @param container - 容器元素（应该是 turn 容器）
 	 * @param plan - 计划条目列表
 	 * @returns 计划元素
 	 */
 	static renderPlan(container: HTMLElement, plan: PlanEntry[]): HTMLElement {
-		// 查找是否已存在
+		// 在当前容器内查找是否已存在（限定在 turn 内）
 		let planEl = container.querySelector('.acp-plan') as HTMLElement;
 
 		if (planEl) {

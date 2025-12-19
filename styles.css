@@ -1106,3 +1106,64 @@
 	}
 }
 
+/* ============================================================================
+   Turn 容器和智能滚动
+   ============================================================================ */
+
+/* 消息容器包装器（包含消息区和滚动按钮） */
+.acp-messages-container {
+	flex: 1;
+	position: relative;
+	overflow: hidden;
+}
+
+/* Turn 容器 */
+.acp-turn-container {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-bottom: 12px;
+	padding: 8px;
+	border-radius: 8px;
+	background-color: var(--background-primary-alt);
+	border: 1px solid var(--background-modifier-border-hover);
+}
+
+/* Turn 内的工具调用组 */
+.acp-turn-tools {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 6px;
+}
+
+/* 跳到最新按钮 */
+.acp-scroll-to-bottom {
+	position: absolute;
+	bottom: 16px;
+	right: 16px;
+	width: 40px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--interactive-accent);
+	border-radius: 50%;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	cursor: pointer;
+	z-index: 10;
+	transition: all 0.2s ease;
+}
+
+.acp-scroll-to-bottom:hover {
+	background-color: var(--interactive-accent-hover);
+	transform: translateY(-2px);
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.acp-scroll-to-bottom .svg-icon {
+	width: 20px;
+	height: 20px;
+	color: var(--text-on-accent);
+}
+

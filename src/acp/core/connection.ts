@@ -581,6 +581,8 @@ export class AcpConnection {
 	 */
 	private async handleIncomingRequest(message: AcpRequest | AcpNotification): Promise<void> {
 		const { method, params } = message;
+		const messageId = 'id' in message ? message.id : undefined;
+		console.log(`[ACP] 收到请求: method=${method}, id=${messageId}`);
 
 		try {
 			let result: unknown = null;
@@ -658,7 +660,10 @@ export class AcpConnection {
 	 * 发送响应
 	 */
 	private sendResponse(id: RequestId, result: unknown): void {
-		if (!this.child?.stdin) return;
+		if (!this.child?.stdin) {
+			console.error('[ACP] 无法发送响应: 子进程不可用');
+			return;
+		}
 
 		const response: AcpResponse = {
 			jsonrpc: JSONRPC_VERSION,
@@ -667,6 +672,7 @@ export class AcpConnection {
 		};
 
 		const json = JSON.stringify(response);
+		console.log('[ACP] 发送响应:', json);
 		const lineEnding = Platform.isWin ? '\r\n' : '\n';
 		this.child.stdin.write(json + lineEnding);
 	}
@@ -844,32 +850,44 @@ export class AcpConnection {
 	 */
 	private async handlePermissionRequest(
 		params: RequestPermissionParams,
-	): Promise<{ outcome: { type: string; optionId?: string } }> {
+	): Promise<{ outcome: { outcome: string; optionId: string } }> {
+		console.log('[ACP] 收到权限请求:', params.toolCall?.title);
+
 		// 暂停 prompt 超时
 		this.pausePromptTimeouts();
 
 		try {
-			const outcome = await this.onPermissionRequest(params);
+			const userChoice = await this.onPermissionRequest(params);
+			console.log('[ACP] 用户选择:', userChoice);
 
-			if (outcome.type === 'selected') {
+			// 处理用户取消的情况
+			if (userChoice.type === 'cancelled') {
 				return {
 					outcome: {
-						type: 'selected',
-						optionId: outcome.optionId,
-					},
-				};
-			} else {
-				return {
-					outcome: {
-						type: 'cancelled',
+						outcome: 'rejected',
+						optionId: 'reject_once',
 					},
 				};
 			}
+
+			// 根据 optionId 判断是 selected 还是 rejected（参考 AionUI）
+			const optionId = userChoice.optionId;
+			const outcome = optionId.includes('reject') ? 'rejected' : 'selected';
+
+			const result = {
+				outcome: {
+					outcome,
+					optionId,
+				},
+			};
+			console.log('[ACP] 发送权限响应:', JSON.stringify(result));
+			return result;
 		} catch (error) {
 			console.error('[ACP] 权限请求处理失败:', error);
 			return {
 				outcome: {
-					type: 'cancelled',
+					outcome: 'rejected',
+					optionId: 'reject_once',
 				},
 			};
 		} finally {

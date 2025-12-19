@@ -5,7 +5,7 @@
  */
 
 import type { WorkspaceLeaf } from 'obsidian';
-import { ItemView, Notice, Component } from 'obsidian';
+import { ItemView, Notice, Component, setIcon } from 'obsidian';
 import type AcpPlugin from '../main';
 import { SessionManager } from '../acp/core/session-manager';
 import { AcpConnection } from '../acp/core/connection';
@@ -65,6 +65,13 @@ export class AcpChatView extends ItemView {
 	private connectButtonEl!: HTMLButtonElement;
 	private statusEl!: HTMLElement;
 	private modeIndicatorEl!: HTMLElement;
+
+	// Turn 容器管理
+	private currentTurnContainer: HTMLElement | null = null;
+
+	// 智能滚动
+	private scrollToBottomButton: HTMLElement | null = null;
+	private isUserScrolling = false;
 
 	// ========================================================================
 	// 构造函数
@@ -185,10 +192,29 @@ export class AcpChatView extends ItemView {
 	 * 创建消息区域
 	 */
 	private createMessagesArea(container: HTMLElement): void {
-		this.messagesEl = container.createDiv({ cls: 'acp-chat-messages' });
+		const messagesContainer = container.createDiv({ cls: 'acp-messages-container' });
+
+		this.messagesEl = messagesContainer.createDiv({ cls: 'acp-chat-messages' });
 
 		// 欢迎消息
 		this.addSystemMessage('欢迎使用 ACP Agent Client!\n请选择一个 Agent 并连接。');
+
+		// "跳到最新"按钮
+		this.scrollToBottomButton = messagesContainer.createDiv({
+			cls: 'acp-scroll-to-bottom',
+			attr: { 'aria-label': '跳到最新' }
+		});
+		this.scrollToBottomButton.style.display = 'none';
+		setIcon(this.scrollToBottomButton, 'arrow-down');
+
+		this.scrollToBottomButton.addEventListener('click', () => {
+			this.forceScrollToBottom();
+		});
+
+		// 滚动监听
+		this.messagesEl.addEventListener('scroll', () => {
+			this.updateScrollButton();
+		});
 	}
 
 	/**
@@ -474,13 +500,28 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
+	 * 获取或创建当前 turn 的容器
+	 */
+	private getTurnContainer(): HTMLElement {
+		if (!this.currentTurnContainer) {
+			this.currentTurnContainer = this.messagesEl.createDiv({
+				cls: 'acp-turn-container',
+				attr: { 'data-turn-id': `turn-${Date.now()}` }
+			});
+		}
+		return this.currentTurnContainer;
+	}
+
+	/**
 	 * 处理消息
 	 */
 	private handleMessage(message: Message, isNew: boolean): void {
+		const container = this.getTurnContainer();
+
 		if (isNew) {
-			this.addMessage(message);
+			this.addMessage(message, container);
 		} else {
-			this.updateMessage(message);
+			this.updateMessage(message, container);
 		}
 	}
 
@@ -488,18 +529,28 @@ export class AcpChatView extends ItemView {
 	 * 处理工具调用
 	 */
 	private handleToolCall(toolCall: ToolCall): void {
+		const container = this.getTurnContainer();
+
+		// 获取或创建工具调用组容器
+		let toolsContainer = container.querySelector('.acp-turn-tools') as HTMLElement;
+		if (!toolsContainer) {
+			toolsContainer = container.createDiv({ cls: 'acp-turn-tools' });
+		}
+
 		// 使用 MessageRenderer 渲染工具调用卡片
-		MessageRenderer.renderToolCall(this.messagesEl, toolCall);
-		this.scrollToBottom();
+		MessageRenderer.renderToolCall(toolsContainer, toolCall, this.app);
+		this.smartScroll();
 	}
 
 	/**
 	 * 处理计划更新
 	 */
 	private handlePlan(plan: PlanEntry[]): void {
-		// 使用 MessageRenderer 渲染计划
-		MessageRenderer.renderPlan(this.messagesEl, plan);
-		this.scrollToBottom();
+		const container = this.getTurnContainer();
+
+		// 使用 MessageRenderer 渲染计划（在 turn 容器内）
+		MessageRenderer.renderPlan(container, plan);
+		this.smartScroll();
 	}
 
 	/**
@@ -511,9 +562,11 @@ export class AcpChatView extends ItemView {
 		const turn = this.sessionManager.activeTurn;
 		if (!turn) return;
 
-		// 使用 MessageRenderer 渲染思考块（渲染整个思考列表）
-		MessageRenderer.renderThoughts(this.messagesEl, turn.thoughts);
-		this.scrollToBottom();
+		const container = this.getTurnContainer();
+
+		// 使用 MessageRenderer 渲染思考块（在 turn 容器内）
+		MessageRenderer.renderThoughts(container, turn.thoughts);
+		this.smartScroll();
 	}
 
 	/**
@@ -545,8 +598,11 @@ export class AcpChatView extends ItemView {
 	 * 处理回合结束
 	 */
 	private handleTurnEnd(): void {
+		// 重置 turn 容器，为下一个回合准备
+		this.currentTurnContainer = null;
+
 		// 自动滚动到底部
-		this.scrollToBottom();
+		this.smartScroll();
 	}
 
 	/**
@@ -654,25 +710,27 @@ export class AcpChatView extends ItemView {
 		const contentEl = messageEl.createDiv({ cls: 'acp-message-content' });
 		contentEl.textContent = text;
 
-		this.scrollToBottom();
+		this.smartScroll();
 	}
 
 	/**
 	 * 添加消息
 	 */
-	private async addMessage(message: Message): Promise<void> {
+	private async addMessage(message: Message, container?: HTMLElement): Promise<void> {
+		const target = container || this.messagesEl;
 		// 使用 MessageRenderer 渲染
-		await MessageRenderer.renderMessage(this.messagesEl, message, this.markdownComponent, this.app);
-		this.scrollToBottom();
+		await MessageRenderer.renderMessage(target, message, this.markdownComponent, this.app);
+		this.smartScroll();
 	}
 
 	/**
 	 * 更新消息
 	 */
-	private async updateMessage(message: Message): Promise<void> {
+	private async updateMessage(message: Message, container?: HTMLElement): Promise<void> {
+		const target = container || this.messagesEl;
 		// 使用 MessageRenderer 更新
-		await MessageRenderer.updateMessage(this.messagesEl, message, this.markdownComponent, this.app);
-		this.scrollToBottom();
+		await MessageRenderer.updateMessage(target, message, this.markdownComponent, this.app);
+		this.smartScroll();
 	}
 
 	// ========================================================================
@@ -696,10 +754,42 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
-	 * 滚动到底部
+	 * 判断是否接近底部
 	 */
-	private scrollToBottom(): void {
+	private isNearBottom(threshold: number = 100): boolean {
+		const { scrollTop, scrollHeight, clientHeight } = this.messagesEl;
+		return scrollTop + clientHeight >= scrollHeight - threshold;
+	}
+
+	/**
+	 * 智能滚动（仅在用户接近底部时自动滚动）
+	 */
+	private smartScroll(): void {
+		if (this.isNearBottom()) {
+			this.forceScrollToBottom();
+		}
+		this.updateScrollButton();
+	}
+
+	/**
+	 * 强制滚动到底部
+	 */
+	private forceScrollToBottom(): void {
 		this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+		this.updateScrollButton();
+	}
+
+	/**
+	 * 更新"跳到最新"按钮的显示状态
+	 */
+	private updateScrollButton(): void {
+		if (!this.scrollToBottomButton) return;
+
+		if (this.isNearBottom(50)) {
+			this.scrollToBottomButton.style.display = 'none';
+		} else {
+			this.scrollToBottomButton.style.display = 'flex';
+		}
 	}
 
 	/**

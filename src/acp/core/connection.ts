@@ -85,8 +85,8 @@ export function createSpawnConfig(
 	const isWindows = Platform.isWin;
 	const env = { ...process.env, ...customEnv };
 
-	// 默认 ACP 参数
-	const effectiveAcpArgs = acpArgs && acpArgs.length > 0 ? acpArgs : ['--experimental-acp'];
+	// ACP 参数：如果传入了空数组，表示不需要参数
+	const effectiveAcpArgs = acpArgs !== undefined ? acpArgs : ['--experimental-acp'];
 
 	let spawnCommand: string;
 	let spawnArgs: string[];

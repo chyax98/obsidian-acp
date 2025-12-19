@@ -48,8 +48,7 @@ export class MessageRenderer {
 		app: App,
 		sourcePath: string = '',
 	): Promise<void> {
-		// 清空容器
-		container.empty();
+		// 不清空容器！直接添加新消息
 
 		// 创建消息结构
 		const messageEl = container.createDiv({

@@ -2,17 +2,19 @@
  * ACP 插件设置页面
  *
  * 提供：
- * - Agent 选择和配置
- * - 手动路径配置
+ * - Agent 自动检测和状态显示
+ * - MCP 服务器管理
  * - 工作目录配置
- * - UI 偏好设置
+ * - 权限管理
  */
 
 import type { App } from 'obsidian';
 import { PluginSettingTab, Setting, Notice } from 'obsidian';
 import type AcpPlugin from '../main';
-import { getEnabledBackends, ACP_BACKENDS } from '../acp/backends/registry';
-import type { AcpBackendId } from '../acp/backends/types';
+import type { McpServerConfig } from '../main';
+import { ACP_BACKENDS } from '../acp/backends/registry';
+import type { AcpBackendId, AcpBackendConfig } from '../acp/backends/types';
+import { McpServerModal } from './McpServerModal';
 
 /**
  * ACP 插件设置页面
@@ -35,10 +37,15 @@ export class AcpSettingTab extends PluginSettingTab {
 		// 描述
 		const descDiv = containerEl.createDiv({ cls: 'setting-item-description' });
 		descDiv.style.marginBottom = '1.5em';
-		descDiv.setText('配置 ACP 协议的 AI 编程助手（Claude、Codex、Kimi、Qwen 等）');
+		descDiv.setText(
+			'配置 ACP 协议的 AI 编程助手（Claude、Codex、Kimi、Qwen 等）',
+		);
 
-		// Agent 检测和配置
-		this.displayAgentSettings(containerEl);
+		// Agent 配置
+		this.renderAgentSection(containerEl);
+
+		// MCP 服务器配置
+		this.renderMcpSection(containerEl);
 
 		// 工作目录设置
 		this.displayWorkingDirectorySettings(containerEl);
@@ -54,16 +61,16 @@ export class AcpSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Agent 配置部分
+	 * Agent 配置部分 - 完全重构
 	 */
-	private displayAgentSettings(containerEl: HTMLElement): void {
+	private renderAgentSection(containerEl: HTMLElement): void {
 		containerEl.createEl('h3', { text: 'Agent 配置' });
 
-		// 检测按钮
+		// 全局检测按钮
 		new Setting(containerEl)
 			.setName('自动检测已安装的 Agent')
 			.setDesc('扫描系统中已安装的 ACP 兼容 Agent')
-			.addButton((button) => {
+			.addButton(button => {
 				button
 					.setButtonText('重新检测')
 					.setCta()
@@ -72,11 +79,17 @@ export class AcpSettingTab extends PluginSettingTab {
 						button.setDisabled(true);
 
 						try {
-							const result = await this.plugin.detector.detect(true);
-							new Notice(`检测完成：发现 ${result.agents.length} 个 Agent`);
+							const result = await this.plugin.detector.detect(
+								true,
+								this.plugin.settings.manualAgentPaths,
+							);
+							new Notice(
+								`检测完成：发现 ${result.agents.length} 个 Agent`,
+							);
 							this.display(); // 刷新显示
 						} catch (error) {
-							const errMsg = error instanceof Error ? error.message : String(error);
+							const errMsg =
+								error instanceof Error ? error.message : String(error);
 							new Notice('检测失败：' + errMsg);
 						} finally {
 							button.setButtonText('重新检测');
@@ -85,88 +98,266 @@ export class AcpSettingTab extends PluginSettingTab {
 					});
 			});
 
-		// 显示检测到的 Agent
-		const detectedAgents = this.plugin.detector.getDetectedAgents();
-		if (detectedAgents.length > 0) {
-			const detectedDiv = containerEl.createDiv({ cls: 'setting-item-description' });
-			detectedDiv.style.marginBottom = '1em';
-			detectedDiv.style.padding = '0.5em';
-			detectedDiv.style.backgroundColor = 'var(--background-secondary)';
-			detectedDiv.style.borderRadius = '4px';
+		// Agent 列表容器
+		const agentListEl = containerEl.createDiv({ cls: 'acp-agent-list' });
 
-			detectedDiv.createEl('strong', { text: '✅ 已检测到的 Agent：' });
-			const list = detectedDiv.createEl('ul');
-			list.style.marginTop = '0.5em';
-			list.style.marginBottom = '0';
+		// 遍历所有 Agent 配置
+		for (const [agentId, config] of Object.entries(ACP_BACKENDS)) {
+			if (!config.enabled) continue; // 跳过禁用的
 
-			for (const agent of detectedAgents) {
-				const item = list.createEl('li');
-				item.setText(`${agent.name} - ${agent.cliPath}`);
-				if (agent.version) {
-					item.createEl('span', {
-						text: ` (${agent.version})`,
-						cls: 'setting-item-description',
+			const agentItemEl = agentListEl.createDiv({ cls: 'acp-agent-item' });
+
+			// Agent 名称和状态
+			const headerEl = agentItemEl.createDiv({ cls: 'acp-agent-header' });
+
+			const nameEl = headerEl.createDiv({
+				cls: 'acp-agent-name',
+				text: config.name,
+			});
+
+			const statusEl = headerEl.createDiv({ cls: 'acp-agent-status' });
+
+			// 异步检测状态
+			this.detectAgentStatus(agentId as AcpBackendId, config).then(status => {
+				if (status.installed) {
+					statusEl.textContent = `✅ 已安装${status.version ? ` (${status.version})` : ''}`;
+					statusEl.style.color = 'var(--color-green)';
+
+					// 添加测试按钮
+					const testBtn = agentItemEl.createEl('button', {
+						cls: 'mod-cta',
+						text: '测试连接',
+					});
+					testBtn.style.marginTop = '8px';
+
+					testBtn.addEventListener('click', async () => {
+						testBtn.disabled = true;
+						testBtn.textContent = '测试中...';
+
+						const success = await this.testAgentConnection(
+							agentId as AcpBackendId,
+						);
+
+						testBtn.disabled = false;
+						testBtn.textContent = success ? '✅ 连接成功' : '❌ 连接失败';
+
+						setTimeout(() => {
+							testBtn.textContent = '测试连接';
+						}, 2000);
+					});
+				} else {
+					statusEl.textContent = '⚠️ 未安装';
+					statusEl.style.color = 'var(--text-muted)';
+
+					// 显示安装命令
+					const installEl = agentItemEl.createDiv({
+						cls: 'acp-agent-install',
+					});
+					installEl.createEl('div', {
+						text: '安装命令:',
+						cls: 'acp-install-label',
+					});
+
+					const cmdEl = installEl.createEl('code', {
+						text: this.getInstallCommand(config),
+						cls: 'acp-install-command',
+					});
+
+					const copyBtn = installEl.createEl('button', { text: '复制' });
+					copyBtn.addEventListener('click', () => {
+						navigator.clipboard.writeText(this.getInstallCommand(config));
+						new Notice('已复制安装命令');
 					});
 				}
+			});
+
+			// Agent 描述
+			if (config.description) {
+				agentItemEl.createDiv({
+					cls: 'acp-agent-description',
+					text: config.description,
+				});
+			}
+		}
+	}
+
+	/**
+	 * 检测单个 Agent 的安装状态
+	 */
+	private async detectAgentStatus(
+		agentId: AcpBackendId,
+		config: AcpBackendConfig,
+	): Promise<{
+		installed: boolean;
+		version?: string;
+		path?: string;
+	}> {
+		// 从 detector 获取状态
+		const detectedInfo = this.plugin.detector.getBackendInfo(agentId);
+
+		if (detectedInfo) {
+			return {
+				installed: true,
+				version: detectedInfo.version,
+				path: detectedInfo.cliPath,
+			};
+		}
+
+		// 检查手动配置
+		const manualPath = this.plugin.settings.manualAgentPaths?.[agentId];
+		if (manualPath) {
+			return {
+				installed: true,
+				path: manualPath,
+			};
+		}
+
+		return { installed: false };
+	}
+
+	/**
+	 * 测试 Agent 连接
+	 */
+	private async testAgentConnection(agentId: AcpBackendId): Promise<boolean> {
+		try {
+			// 简化版测试：尝试检测 CLI 是否可用
+			const detectedInfo = this.plugin.detector.getBackendInfo(agentId);
+			return detectedInfo !== undefined;
+		} catch (error) {
+			console.error('[Test Connection]', error);
+			return false;
+		}
+	}
+
+	/**
+	 * 获取安装命令
+	 */
+	private getInstallCommand(config: AcpBackendConfig): string {
+		// 根据 command 生成安装指令
+		if (config.defaultCliPath?.startsWith('npx @')) {
+			return `npm install -g ${config.defaultCliPath.replace('npx ', '')}`;
+		}
+
+		switch (config.id) {
+			case 'kimi':
+				return 'npm install -g @moonshot-ai/kimi-cli';
+			case 'qwen':
+				return 'npm install -g qwen-code';
+			case 'gemini':
+				return 'npm install -g @google/gemini-cli';
+			case 'goose':
+				return 'brew install goose';
+			case 'auggie':
+				return 'npm install -g auggie';
+			case 'opencode':
+				return 'npm install -g opencode';
+			default:
+				return `# 请手动安装 ${config.name}`;
+		}
+	}
+
+	/**
+	 * MCP 服务器管理部分
+	 */
+	private renderMcpSection(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', { text: 'MCP 服务器 (工具扩展)' });
+
+		const mcpDescDiv = containerEl.createDiv({ cls: 'setting-item-description' });
+		mcpDescDiv.style.marginBottom = '1em';
+		mcpDescDiv.setText(
+			'MCP (Model Context Protocol) 服务器为 Agent 提供额外的工具能力，如文件系统访问、网络搜索等。',
+		);
+
+		const mcpListEl = containerEl.createDiv({ cls: 'acp-mcp-list' });
+
+		for (const server of this.plugin.settings.mcpServers) {
+			const serverItemEl = mcpListEl.createDiv({ cls: 'acp-mcp-item' });
+
+			// 启用/禁用开关
+			new Setting(serverItemEl)
+				.setName(server.name)
+				.setDesc(this.getMcpServerDesc(server))
+				.addToggle(toggle =>
+					toggle.setValue(server.enabled).onChange(async value => {
+						server.enabled = value;
+						await this.plugin.saveSettings();
+					}),
+				);
+
+			// 编辑和删除按钮
+			const actionsEl = serverItemEl.createDiv({ cls: 'acp-mcp-actions' });
+
+			const editBtn = actionsEl.createEl('button', { text: '编辑' });
+			editBtn.addEventListener('click', () => {
+				this.openMcpServerModal(server);
+			});
+
+			if (server.id !== 'filesystem') {
+				// 内置 filesystem 不允许删除
+				const deleteBtn = actionsEl.createEl('button', {
+					text: '删除',
+					cls: 'mod-warning',
+				});
+				deleteBtn.addEventListener('click', async () => {
+					this.plugin.settings.mcpServers =
+						this.plugin.settings.mcpServers.filter(s => s.id !== server.id);
+					await this.plugin.saveSettings();
+					this.display(); // 重新渲染
+				});
 			}
 		}
 
-		// 找出未检测到的 Agent
-		const enabledBackends = getEnabledBackends();
-		const detectedBackendIds = new Set(detectedAgents.map((a) => a.backendId));
-		const missingBackends = enabledBackends.filter((b) => !detectedBackendIds.has(b.id));
+		// 添加 MCP server 按钮
+		const addBtn = containerEl.createEl('button', {
+			cls: 'mod-cta',
+			text: '+ 添加 MCP 服务器',
+		});
+		addBtn.style.marginTop = '1em';
 
-		// 只为未检测到的 Agent 显示手动配置
-		if (missingBackends.length > 0) {
-			containerEl.createEl('h4', { text: '⚠️ 未检测到的 Agent（需手动配置）' });
+		addBtn.addEventListener('click', () => {
+			this.openMcpServerModal();
+		});
+	}
 
-			for (const backend of missingBackends) {
-				new Setting(containerEl)
-					.setName(backend.name)
-					.setDesc(backend.description || `${backend.name} CLI 命令的完整路径`)
-					.addText((text) => {
-						const savedPath = this.plugin.settings.manualAgentPaths?.[backend.id];
-						text
-							.setPlaceholder(backend.defaultCliPath || backend.cliCommand || '例如: /usr/local/bin/agent')
-							.setValue(savedPath || '')
-							.onChange(async (value) => {
-								if (!this.plugin.settings.manualAgentPaths) {
-									this.plugin.settings.manualAgentPaths = {};
-								}
-								if (value) {
-									this.plugin.settings.manualAgentPaths[backend.id] = value;
-								} else {
-									delete this.plugin.settings.manualAgentPaths[backend.id];
-								}
-								await this.plugin.saveSettings();
-							});
-						text.inputEl.style.width = '100%';
-					});
-			}
-
-			// 提示：如何获取路径
-			const tipDiv = containerEl.createDiv({ cls: 'setting-item-description' });
-			tipDiv.style.marginTop = '1em';
-			tipDiv.style.padding = '0.5em';
-			tipDiv.style.backgroundColor = 'var(--background-secondary)';
-			tipDiv.style.borderRadius = '4px';
-			tipDiv.createEl('strong', { text: '💡 提示：' });
-			tipDiv.createEl('br');
-			tipDiv.appendText('在终端运行 ');
-			tipDiv.createEl('code', { text: 'which claude-code-acp' });
-			tipDiv.appendText(' 或 ');
-			tipDiv.createEl('code', { text: 'which codex' });
-			tipDiv.appendText(' 获取完整路径');
-		} else if (detectedAgents.length === 0) {
-			// 如果一个都没检测到，显示警告
-			const noAgentDiv = containerEl.createDiv({ cls: 'setting-item-description' });
-			noAgentDiv.style.marginBottom = '1em';
-			noAgentDiv.style.padding = '0.5em';
-			noAgentDiv.style.backgroundColor = 'var(--background-modifier-error)';
-			noAgentDiv.style.borderRadius = '4px';
-			noAgentDiv.style.color = 'var(--text-error)';
-			noAgentDiv.setText('⚠️ 未检测到任何 Agent，请先安装或手动配置路径');
+	/**
+	 * 获取 MCP 服务器描述
+	 */
+	private getMcpServerDesc(server: McpServerConfig): string {
+		if (server.type === 'stdio') {
+			return `命令: ${server.command} ${(server.args || []).join(' ')}`;
+		} else {
+			return `URL: ${server.url}`;
 		}
+	}
+
+	/**
+	 * 打开 MCP 服务器配置弹窗
+	 */
+	private openMcpServerModal(server?: McpServerConfig): void {
+		const modal = new McpServerModal(
+			this.app,
+			server || null,
+			async (updatedServer: McpServerConfig) => {
+				if (server) {
+					// 编辑现有服务器
+					const index = this.plugin.settings.mcpServers.findIndex(
+						s => s.id === server.id,
+					);
+					if (index !== -1) {
+						this.plugin.settings.mcpServers[index] = updatedServer;
+					}
+				} else {
+					// 添加新服务器
+					this.plugin.settings.mcpServers.push(updatedServer);
+				}
+
+				await this.plugin.saveSettings();
+				this.display(); // 重新渲染
+				new Notice('MCP 服务器配置已保存');
+			},
+		);
+
+		modal.open();
 	}
 
 	/**
@@ -175,21 +366,26 @@ export class AcpSettingTab extends PluginSettingTab {
 	private displayWorkingDirectorySettings(containerEl: HTMLElement): void {
 		containerEl.createEl('h3', { text: '工作目录设置' });
 
-		const workingDirDesc = containerEl.createDiv({ cls: 'setting-item-description' });
+		const workingDirDesc = containerEl.createDiv({
+			cls: 'setting-item-description',
+		});
 		workingDirDesc.setText('Agent 运行的工作目录，影响文件操作的根路径。');
 
 		// 工作目录模式选择
 		new Setting(containerEl)
 			.setName('工作目录模式')
 			.setDesc('选择 Agent 的工作目录')
-			.addDropdown((dropdown) => {
+			.addDropdown(dropdown => {
 				dropdown
 					.addOption('vault', 'Vault 根目录')
 					.addOption('current-note-folder', '当前笔记所在文件夹')
 					.addOption('custom', '自定义路径')
 					.setValue(this.plugin.settings.workingDir)
-					.onChange(async (value) => {
-						this.plugin.settings.workingDir = value as 'vault' | 'current-note-folder' | 'custom';
+					.onChange(async value => {
+						this.plugin.settings.workingDir = value as
+							| 'vault'
+							| 'current-note-folder'
+							| 'custom';
 						await this.plugin.saveSettings();
 						// 重新渲染以显示/隐藏自定义路径输入
 						this.display();
@@ -201,11 +397,11 @@ export class AcpSettingTab extends PluginSettingTab {
 			new Setting(containerEl)
 				.setName('自定义工作目录')
 				.setDesc('Agent 的工作目录绝对路径')
-				.addText((text) =>
+				.addText(text =>
 					text
 						.setPlaceholder('例如: /Users/username/projects/myproject')
 						.setValue(this.plugin.settings.customWorkingDir || '')
-						.onChange(async (value) => {
+						.onChange(async value => {
 							this.plugin.settings.customWorkingDir = value;
 							await this.plugin.saveSettings();
 						}),
@@ -223,13 +419,15 @@ export class AcpSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('权限模式')
 			.setDesc('控制 AI Agent 如何请求文件操作权限')
-			.addDropdown((dropdown) => {
+			.addDropdown(dropdown => {
 				dropdown
 					.addOption('interactive', '每次询问（推荐新手）')
 					.addOption('trustAll', '完全信任（配合 Git 使用）')
 					.setValue(this.plugin.settings.permission.mode)
-					.onChange(async (value) => {
-						this.plugin.settings.permission.mode = value as 'interactive' | 'trustAll';
+					.onChange(async value => {
+						this.plugin.settings.permission.mode = value as
+							| 'interactive'
+							| 'trustAll';
 						await this.plugin.saveSettings();
 
 						// 显示提示
@@ -261,10 +459,12 @@ export class AcpSettingTab extends PluginSettingTab {
 
 			new Setting(containerEl)
 				.setName('重置"始终允许"记录')
-				.setDesc(allowedCount > 0
-					? `当前已记录 ${allowedCount} 个工具：${Object.keys(allowedTools).join(', ')}`
-					: '当前没有记录任何工具')
-				.addButton((button) => {
+				.setDesc(
+					allowedCount > 0
+						? `当前已记录 ${allowedCount} 个工具：${Object.keys(allowedTools).join(', ')}`
+						: '当前没有记录任何工具',
+				)
+				.addButton(button => {
 					button
 						.setButtonText('清除')
 						.setDisabled(allowedCount === 0)
@@ -288,19 +488,21 @@ export class AcpSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('显示工具调用详情')
 			.setDesc('在聊天界面中显示 Agent 使用的工具调用详细信息')
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.showToolCallDetails).onChange(async (value) => {
-					this.plugin.settings.showToolCallDetails = value;
-					await this.plugin.saveSettings();
-				}),
+			.addToggle(toggle =>
+				toggle
+					.setValue(this.plugin.settings.showToolCallDetails)
+					.onChange(async value => {
+						this.plugin.settings.showToolCallDetails = value;
+						await this.plugin.saveSettings();
+					}),
 			);
 
 		// 调试模式
 		new Setting(containerEl)
 			.setName('调试模式')
 			.setDesc('在控制台输出详细的 ACP 通信日志')
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.debugMode).onChange(async (value) => {
+			.addToggle(toggle =>
+				toggle.setValue(this.plugin.settings.debugMode).onChange(async value => {
 					this.plugin.settings.debugMode = value;
 					await this.plugin.saveSettings();
 				}),

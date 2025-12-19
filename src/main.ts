@@ -36,6 +36,30 @@ export interface PermissionSettings {
 }
 
 /**
+ * MCP 服务器配置
+ */
+export interface McpServerConfig {
+	/** 唯一 ID */
+	id: string;
+	/** 服务器名称 */
+	name: string;
+	/** 传输类型 */
+	type: 'stdio' | 'http' | 'sse';
+	/** stdio: 命令 */
+	command?: string;
+	/** stdio: 参数 */
+	args?: string[];
+	/** http/sse: 服务器 URL */
+	url?: string;
+	/** http/sse: 请求头 */
+	headers?: Array<{ name: string; value: string }>;
+	/** 环境变量 */
+	env?: Array<{ name: string; value: string }>;
+	/** 是否启用 */
+	enabled: boolean;
+}
+
+/**
  * 插件设置接口
  *
  * 专注于 Claude Code SDK 模式，简化配置。
@@ -64,6 +88,9 @@ export interface AcpPluginSettings {
 
 	/** 是否启用调试模式 */
 	debugMode: boolean;
+
+	/** MCP 服务器配置 */
+	mcpServers: McpServerConfig[];
 }
 
 /**
@@ -80,6 +107,20 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
 		alwaysAllowedTools: {},
 	},
 	debugMode: false,
+	mcpServers: [
+		{
+			id: 'filesystem',
+			name: 'Obsidian Filesystem',
+			type: 'stdio',
+			command: 'npx',
+			args: [
+				'@modelcontextprotocol/server-filesystem',
+				'--root',
+				'{VAULT_PATH}',
+			],
+			enabled: true,
+		},
+	],
 };
 
 // ============================================================================

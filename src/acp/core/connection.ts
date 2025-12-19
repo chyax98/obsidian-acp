@@ -317,6 +317,59 @@ export class AcpConnection {
 	}
 
 	// ========================================================================
+	// 连接方法 (AionUI 模式)
+	// ========================================================================
+
+	/**
+	 * 连接 Claude Code - 直接使用 npx @zed-industries/claude-code-acp
+	 * 参考 AionUI 的 connectClaude 实现
+	 */
+	private connectClaude(workingDir: string, customEnv?: Record<string, string>): void {
+		const isWindows = Platform.isWin === true;
+		const spawnCommand = isWindows ? 'npx.cmd' : 'npx';
+		const spawnArgs = ['@zed-industries/claude-code-acp'];
+
+		const env = { ...process.env, ...customEnv };
+
+		console.log(`[ACP] connectClaude: command=${spawnCommand}, args=${spawnArgs.join(' ')}, cwd=${workingDir}`);
+
+		this.child = spawn(spawnCommand, spawnArgs, {
+			cwd: workingDir,
+			stdio: ['pipe', 'pipe', 'pipe'],
+			env,
+			shell: false, // macOS 上必须是 false
+		});
+	}
+
+	/**
+	 * 通用连接方式 - 用于其他后端
+	 */
+	private connectGeneric(options: ConnectionOptions): void {
+		// 获取后端配置
+		const config = getBackendConfig(options.backendId);
+		const cliPath = options.cliPath || config?.defaultCliPath;
+
+		if (!cliPath) {
+			throw new Error(`后端 ${options.backendId} 没有配置 CLI 路径`);
+		}
+
+		// 获取 ACP 参数
+		const acpArgs = options.acpArgs !== undefined ? options.acpArgs : getBackendAcpArgs(options.backendId);
+
+		// 创建 spawn 配置
+		const { command, args, options: spawnOptions } = createSpawnConfig(
+			cliPath,
+			this.workingDir,
+			acpArgs,
+			options.env,
+		);
+
+		console.log(`[ACP] connectGeneric: command=${command}, args=${args.join(' ')}, cwd=${this.workingDir}`);
+
+		this.child = spawn(command, args, spawnOptions);
+	}
+
+	// ========================================================================
 	// 连接管理
 	// ========================================================================
 
@@ -340,50 +393,17 @@ export class AcpConnection {
 		}
 
 		try {
-			// 获取后端配置
-			const config = getBackendConfig(options.backendId);
-
-			// 确定 CLI 路径
-			let cliPath: string;
-
-			if (options.backendId === 'custom') {
-				if (!options.cliPath) {
-					throw new Error('自定义 Agent 需要指定 CLI 路径');
-				}
-				cliPath = options.cliPath;
-			} else {
-				cliPath = options.cliPath || config?.defaultCliPath || config?.cliCommand || '';
-				if (!cliPath) {
-					throw new Error(`后端 ${options.backendId} 需要指定 CLI 路径`);
-				}
+			// 根据后端类型选择连接方式（参考 AionUI 实现）
+			switch (options.backendId) {
+				case 'claude':
+					// Claude Code 单独处理，直接使用 npx @zed-industries/claude-code-acp
+					this.connectClaude(this.workingDir, options.env);
+					break;
+				default:
+					// 其他后端使用通用连接方式
+					this.connectGeneric(options);
+					break;
 			}
-
-			// 获取 ACP 参数
-			const acpArgs = options.acpArgs || getBackendAcpArgs(options.backendId);
-
-			// 清理环境变量（避免干扰子进程）
-			const cleanEnv: Record<string, string> = {};
-			for (const [key, value] of Object.entries(process.env)) {
-				if (value !== undefined) {
-					cleanEnv[key] = value;
-				}
-			}
-			// 添加自定义环境变量
-			if (options.env) {
-				Object.assign(cleanEnv, options.env);
-			}
-			// 删除可能干扰的变量
-			delete cleanEnv.NODE_OPTIONS;
-			delete cleanEnv.NODE_INSPECT;
-			delete cleanEnv.NODE_DEBUG;
-
-			// 创建 spawn 配置
-			const spawnConfig = createSpawnConfig(cliPath, this.workingDir, acpArgs, cleanEnv);
-
-			console.log(`[ACP] 启动 ${options.backendId}: ${spawnConfig.command} ${spawnConfig.args.join(' ')}`);
-
-			// 启动子进程
-			this.child = spawn(spawnConfig.command, spawnConfig.args, spawnConfig.options);
 
 			// 设置进程处理器
 			await this.setupProcessHandlers();

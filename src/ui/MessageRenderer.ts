@@ -171,27 +171,101 @@ export class MessageRenderer {
 		if (uri.startsWith('data:')) {
 			// Base64 data URI - 直接使用
 			imgEl.src = uri;
+			this.setupImageEvents(imgEl, imageWrapper, app);
 		} else if (uri.startsWith('http://') || uri.startsWith('https://')) {
 			// HTTP/HTTPS URI - 直接使用
 			imgEl.src = uri;
+			this.setupImageEvents(imgEl, imageWrapper, app);
 		} else if (uri.startsWith('file://')) {
-			// file:// URI - 需要转换为相对路径或使用 Obsidian API
-			const filePath = uri.replace('file://', '');
-
-			// 尝试通过 Obsidian Vault 读取
-			const file = app.vault.getAbstractFileByPath(filePath);
-			if (file && 'path' in file) {
-				// 使用 Obsidian 的资源路径
-				imgEl.src = app.vault.adapter.getResourcePath(file.path);
-			} else {
-				// 降级：直接使用 file URI（可能在某些环境下工作）
-				imgEl.src = uri;
-			}
+			// file:// URI - 需要完整处理
+			this.handleFileUri(uri, imgEl, imageWrapper, app);
 		} else {
 			// 其他情况 - 尝试作为相对路径处理
 			imgEl.src = uri;
+			this.setupImageEvents(imgEl, imageWrapper, app);
 		}
+	}
 
+	/**
+	 * 处理 file:// URI
+	 */
+	private static async handleFileUri(
+		uri: string,
+		imgEl: HTMLImageElement,
+		imageWrapper: HTMLElement,
+		app: App,
+	): Promise<void> {
+		try {
+			// 1. 解析 file:// URI（处理 file:/// 和 file://localhost/）
+			let filePath = uri;
+
+			// 移除 file:// 或 file:/// 前缀
+			if (filePath.startsWith('file:///')) {
+				filePath = filePath.substring(7); // 移除 'file://'
+			} else if (filePath.startsWith('file://localhost/')) {
+				filePath = filePath.substring(16); // 移除 'file://localhost'
+			} else if (filePath.startsWith('file://')) {
+				filePath = filePath.substring(7); // 移除 'file://'
+			}
+
+			// URL 解码（处理特殊字符）
+			filePath = decodeURIComponent(filePath);
+
+			// 2. 先尝试通过 Obsidian Vault 读取（Vault 内文件）
+			const vaultFile = app.vault.getAbstractFileByPath(filePath);
+			if (vaultFile && 'path' in vaultFile) {
+				imgEl.src = app.vault.adapter.getResourcePath(vaultFile.path);
+				this.setupImageEvents(imgEl, imageWrapper, app);
+				return;
+			}
+
+			// 3. Vault 外文件：使用 Node.js fs 读取并转换为 data URI
+			const { promises: fs } = await import('fs');
+			const path = await import('path');
+
+			// 检查文件是否存在
+			await fs.access(filePath);
+
+			// 读取二进制数据
+			const imageData = await fs.readFile(filePath);
+
+			// 根据扩展名判断 MIME 类型
+			const ext = path.extname(filePath).toLowerCase();
+			const mimeTypes: Record<string, string> = {
+				'.png': 'image/png',
+				'.jpg': 'image/jpeg',
+				'.jpeg': 'image/jpeg',
+				'.gif': 'image/gif',
+				'.webp': 'image/webp',
+				'.svg': 'image/svg+xml',
+				'.bmp': 'image/bmp',
+			};
+			const mimeType = mimeTypes[ext] || 'image/png';
+
+			// 转换为 Base64
+			const base64 = imageData.toString('base64');
+
+			// 构建 data URI
+			const dataUri = `data:${mimeType};base64,${base64}`;
+
+			// 设置图片源
+			imgEl.src = dataUri;
+			this.setupImageEvents(imgEl, imageWrapper, app);
+		} catch (error) {
+			console.error('[MessageRenderer] file:// URI 处理失败:', error);
+			// 显示错误
+			this.showImageError(imageWrapper);
+		}
+	}
+
+	/**
+	 * 设置图片事件监听器
+	 */
+	private static setupImageEvents(
+		imgEl: HTMLImageElement,
+		imageWrapper: HTMLElement,
+		app: App,
+	): void {
 		// 添加加载状态
 		imgEl.addClass('acp-image-loading');
 
@@ -201,21 +275,24 @@ export class MessageRenderer {
 		});
 
 		imgEl.addEventListener('error', () => {
-			imgEl.removeClass('acp-image-loading');
-			imgEl.addClass('acp-image-error');
-
-			// 显示错误占位符
-			imageWrapper.empty();
-			const errorEl = imageWrapper.createDiv({ cls: 'acp-image-error-placeholder' });
-			const iconEl = errorEl.createDiv({ cls: 'acp-image-error-icon' });
-			setIcon(iconEl, 'image-off');
-			errorEl.createDiv({ cls: 'acp-image-error-text', text: '图片加载失败' });
+			this.showImageError(imageWrapper);
 		});
 
-		// 点击图片预览（使用简单的放大效果）
+		// 点击图片预览
 		imgEl.addEventListener('click', () => {
 			this.showImagePreview(imgEl.src, app);
 		});
+	}
+
+	/**
+	 * 显示图片错误占位符
+	 */
+	private static showImageError(imageWrapper: HTMLElement): void {
+		imageWrapper.empty();
+		const errorEl = imageWrapper.createDiv({ cls: 'acp-image-error-placeholder' });
+		const iconEl = errorEl.createDiv({ cls: 'acp-image-error-icon' });
+		setIcon(iconEl, 'image-off');
+		errorEl.createDiv({ cls: 'acp-image-error-text', text: '图片加载失败' });
 	}
 
 	/**

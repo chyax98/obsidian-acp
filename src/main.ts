@@ -5,10 +5,9 @@
  */
 
 import type { WorkspaceLeaf } from 'obsidian';
-import { App, Plugin } from 'obsidian';
+import { Plugin } from 'obsidian';
 import { AcpSettingTab } from './ui/SettingsTab';
 import { AcpChatView, ACP_CHAT_VIEW_TYPE } from './ui/ChatView';
-import type { AcpBackendId } from './acp/backends/types';
 import { cliDetector, type AcpCliDetector } from './acp/detector';
 
 // ============================================================================

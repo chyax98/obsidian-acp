@@ -8,6 +8,16 @@
  * - 会话管理
  */
 
+/* eslint-disable complexity */
+/* eslint-disable max-depth */
+/* eslint-disable max-lines */
+/* eslint-disable no-console */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+
 import type { ChildProcess, SpawnOptions } from 'child_process';
 import { spawn } from 'child_process';
 import { Platform } from 'obsidian';
@@ -436,7 +446,7 @@ export class AcpConnection {
 	/**
 	 * 连接到 ACP Agent
 	 */
-	async connect(options: ConnectionOptions): Promise<void> {
+	public async connect(options: ConnectionOptions): Promise<void> {
 		// 保存连接配置用于重连
 		this.lastConnectionOptions = options;
 
@@ -518,7 +528,7 @@ export class AcpConnection {
 	/**
 	 * 断开连接
 	 */
-	disconnect(): void {
+	public disconnect(): void {
 		console.log('[ACP] 断开连接中...');
 
 		if (this.child) {
@@ -914,7 +924,7 @@ export class AcpConnection {
 	/**
 	 * 创建新会话
 	 */
-	async newSession(workingDir?: string): Promise<NewSessionResponse> {
+	public async newSession(workingDir?: string): Promise<NewSessionResponse> {
 		const cwd = workingDir || this.workingDir;
 
 		// 获取 MCP 服务器配置
@@ -941,7 +951,7 @@ export class AcpConnection {
 	/**
 	 * 发送提示
 	 */
-	async sendPrompt(text: string): Promise<PromptResponse> {
+	public async sendPrompt(text: string): Promise<PromptResponse> {
 		if (!this.sessionId) {
 			throw new Error('没有活动的 ACP 会话');
 		}
@@ -955,7 +965,7 @@ export class AcpConnection {
 	/**
 	 * 取消当前会话
 	 */
-	async cancelSession(): Promise<void> {
+	public async cancelSession(): Promise<void> {
 		if (!this.sessionId) return;
 
 		await this.sendRequest(AcpMethod.SESSION_CANCEL, {
@@ -1101,32 +1111,32 @@ export class AcpConnection {
 	// ========================================================================
 
 	/** 是否已连接 */
-	get isConnected(): boolean {
+	public get isConnected(): boolean {
 		return this.child !== null && !this.child.killed && this.state === 'connected';
 	}
 
 	/** 是否有活动会话 */
-	get hasActiveSession(): boolean {
+	public get hasActiveSession(): boolean {
 		return this.sessionId !== null;
 	}
 
 	/** 当前后端 */
-	get currentBackend(): AcpBackendId | null {
+	public get currentBackend(): AcpBackendId | null {
 		return this.backend;
 	}
 
 	/** 当前会话 ID */
-	get currentSessionId(): string | null {
+	public get currentSessionId(): string | null {
 		return this.sessionId;
 	}
 
 	/** 连接状态 */
-	get connectionState(): ConnectionState {
+	public get connectionState(): ConnectionState {
 		return this.state;
 	}
 
 	/** 获取初始化响应 */
-	getInitializeResponse(): InitializeResponse | null {
+	public getInitializeResponse(): InitializeResponse | null {
 		return this.initializeResponse;
 	}
 }

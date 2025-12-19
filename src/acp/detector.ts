@@ -8,7 +8,7 @@
 import { execSync } from 'child_process';
 import { Platform } from 'obsidian';
 import type { AcpBackendId, BackendRuntimeState, DetectableAcpCli } from './backends';
-import { getDetectableClis, getBackendConfig } from './backends';
+import { getDetectableClis } from './backends';
 
 // ============================================================================
 // 类型定义

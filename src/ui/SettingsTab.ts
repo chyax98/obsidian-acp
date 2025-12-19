@@ -186,7 +186,7 @@ export class AcpSettingTab extends PluginSettingTab {
 	 */
 	private async detectAgentStatus(
 		agentId: AcpBackendId,
-		config: AcpBackendConfig,
+		_config: AcpBackendConfig,
 	): Promise<{
 		installed: boolean;
 		version?: string;
@@ -206,10 +206,18 @@ export class AcpSettingTab extends PluginSettingTab {
 		// 检查手动配置
 		const manualPath = this.plugin.settings.manualAgentPaths?.[agentId];
 		if (manualPath) {
-			return {
-				installed: true,
-				path: manualPath,
-			};
+			// 验证手动路径是否有效
+			try {
+				const { promises: fs, constants } = await import('fs');
+				await fs.access(manualPath, constants.X_OK);
+				return {
+					installed: true,
+					path: manualPath,
+				};
+			} catch {
+				// 手动路径无效
+				return { installed: false };
+			}
 		}
 
 		return { installed: false };
@@ -220,11 +228,60 @@ export class AcpSettingTab extends PluginSettingTab {
 	 */
 	private async testAgentConnection(agentId: AcpBackendId): Promise<boolean> {
 		try {
-			// 简化版测试：尝试检测 CLI 是否可用
+			// 获取 Agent 信息
 			const detectedInfo = this.plugin.detector.getBackendInfo(agentId);
-			return detectedInfo !== undefined;
+			if (!detectedInfo) {
+				new Notice('Agent 未安装');
+				return false;
+			}
+
+			// 实际测试：尝试运行 --version 命令
+			const { spawn } = await import('child_process');
+
+			return new Promise((resolve) => {
+				const timeout = setTimeout(() => {
+					proc.kill();
+					new Notice(`测试超时: ${agentId}`);
+					resolve(false);
+				}, 10000); // 10 秒超时
+
+				const proc = spawn(detectedInfo.cliPath, ['--version'], {
+					stdio: 'pipe',
+					timeout: 10000,
+				});
+
+				let stdout = '';
+				let stderr = '';
+
+				proc.stdout?.on('data', (data: Buffer) => {
+					stdout += data.toString();
+				});
+
+				proc.stderr?.on('data', (data: Buffer) => {
+					stderr += data.toString();
+				});
+
+				proc.on('close', (code: number) => {
+					clearTimeout(timeout);
+					if (code === 0 || stdout || stderr) {
+						new Notice(`✅ ${detectedInfo.name} 可用${detectedInfo.version ? ` (${detectedInfo.version})` : ''}`);
+						resolve(true);
+					} else {
+						new Notice(`❌ ${detectedInfo.name} 测试失败 (退出码: ${code})`);
+						resolve(false);
+					}
+				});
+
+				proc.on('error', (error: Error) => {
+					clearTimeout(timeout);
+					new Notice(`❌ 启动失败: ${error.message}`);
+					resolve(false);
+				});
+			});
 		} catch (error) {
 			console.error('[Test Connection]', error);
+			const errMsg = error instanceof Error ? error.message : String(error);
+			new Notice(`测试失败: ${errMsg}`);
 			return false;
 		}
 	}
@@ -233,16 +290,22 @@ export class AcpSettingTab extends PluginSettingTab {
 	 * 获取安装命令
 	 */
 	private getInstallCommand(config: AcpBackendConfig): string {
-		// 根据 command 生成安装指令
+		// 1. 优先使用 registry 中的 installCommand（如果存在）
+		if ('installCommand' in config && typeof (config as any).installCommand === 'string') {
+			return (config as any).installCommand;
+		}
+
+		// 2. 根据 command 生成安装指令
 		if (config.defaultCliPath?.startsWith('npx @')) {
 			return `npm install -g ${config.defaultCliPath.replace('npx ', '')}`;
 		}
 
+		// 3. Fallback: 特定 Agent 的安装命令
 		switch (config.id) {
 			case 'kimi':
 				return 'npm install -g @moonshot-ai/kimi-cli';
 			case 'qwen':
-				return 'npm install -g qwen-code';
+				return 'npm install -g @qwenlm/qwen-code'; // ✅ 修正包名
 			case 'gemini':
 				return 'npm install -g @google/gemini-cli';
 			case 'goose':

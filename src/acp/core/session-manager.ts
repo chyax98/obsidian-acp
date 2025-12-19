@@ -8,7 +8,7 @@
  * - UI 事件回调
  */
 
-import type { AcpConnection, ConnectionOptions, FileOperation } from './connection';
+import type { AcpConnection, FileOperation } from './connection';
 import type {
 	SessionNotificationParams,
 	RequestPermissionParams,

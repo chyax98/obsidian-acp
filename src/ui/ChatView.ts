@@ -593,14 +593,14 @@ export class AcpChatView extends ItemView {
 	private handleStateChange(state: SessionState): void {
 		switch (state) {
 			case 'processing':
-				this.updateStatus('处理中...', 'processing');
+				this.updateConnectionStatus('connected', this.selectedAgent?.name);
 				this.sendButtonEl.style.display = 'none';
 				this.cancelButtonEl.style.display = 'inline-block';
 				this.inputEl.disabled = true;
 				break;
 
 			case 'idle':
-				this.updateStatus('已连接', 'connected');
+				this.updateConnectionStatus('connected', this.selectedAgent?.name);
 				this.sendButtonEl.style.display = 'inline-block';
 				this.cancelButtonEl.style.display = 'none';
 				this.inputEl.disabled = false;
@@ -828,20 +828,6 @@ export class AcpChatView extends ItemView {
 		});
 	}
 
-	/**
-	 * 更新状态指示器（保留向后兼容）
-	 */
-	private updateStatus(text: string, state: 'idle' | 'connecting' | 'connected' | 'processing' | 'error'): void {
-		// 映射到新的状态系统
-		const stateMap: Record<string, 'disconnected' | 'connecting' | 'connected' | 'error'> = {
-			'idle': 'disconnected',
-			'connecting': 'connecting',
-			'connected': 'connected',
-			'processing': 'connected',
-			'error': 'error',
-		};
-		this.updateConnectionStatus(stateMap[state] || 'disconnected', this.selectedAgent?.name);
-	}
 
 	/**
 	 * 设置输入区域启用状态

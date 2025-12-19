@@ -14,9 +14,6 @@ import type { DetectedAgent } from '../acp/detector';
 import { PermissionModal, isReadOperation } from './PermissionModal';
 import type { RequestPermissionParams, PermissionOutcome } from '../acp/types/permissions';
 import { MessageRenderer } from './MessageRenderer';
-import { ClaudeSdkConnection, type ClaudeCallbacks } from '../claude/sdk-connection';
-import { resolve, isAbsolute } from 'path';
-import { existsSync, statSync, realpathSync } from 'fs';
 
 // ============================================================================
 // 常量
@@ -42,20 +39,17 @@ export class AcpChatView extends ItemView {
 	// 插件引用
 	private plugin: AcpPlugin;
 
-	// ACP 核心（用于非 Claude Agent）
+	// ACP 核心
 	private connection: AcpConnection | null = null;
 	private sessionManager: SessionManager | null = null;
-
-	// Claude SDK 连接（用于 Claude Agent）
-	private sdkConnection: ClaudeSdkConnection | null = null;
-	private isSdkMode = false; // 标志当前是否使用 SDK 模式
-
-	// 当前流式消息（用于 SDK 模式）
-	private currentStreamingMessageId: string | null = null;
 
 	// Agent 信息
 	private availableAgents: DetectedAgent[] = [];
 	private selectedAgent: DetectedAgent | null = null;
+
+	// 会话状态
+	private currentMode: string | null = null;
+	private availableCommands: any[] = [];
 
 	// Obsidian Component（用于 MarkdownRenderer 生命周期管理）
 	private markdownComponent: Component = new Component();
@@ -70,6 +64,7 @@ export class AcpChatView extends ItemView {
 	private agentSelectEl!: HTMLSelectElement;
 	private connectButtonEl!: HTMLButtonElement;
 	private statusEl!: HTMLElement;
+	private modeIndicatorEl!: HTMLElement;
 
 	// ========================================================================
 	// 构造函数
@@ -146,11 +141,6 @@ export class AcpChatView extends ItemView {
 			this.connection.disconnect();
 		}
 
-		// 断开 SDK 连接
-		if (this.sdkConnection) {
-			this.sdkConnection.disconnect();
-		}
-
 		// 卸载 Markdown 组件
 		this.markdownComponent.unload();
 	}
@@ -185,6 +175,10 @@ export class AcpChatView extends ItemView {
 		// 状态指示器
 		this.statusEl = this.headerEl.createDiv({ cls: 'acp-status' });
 		this.updateStatus('未连接', 'idle');
+
+		// 模式指示器
+		this.modeIndicatorEl = this.headerEl.createDiv({ cls: 'acp-mode-indicator' });
+		this.modeIndicatorEl.style.display = 'none'; // 初始隐藏
 	}
 
 	/**
@@ -251,25 +245,34 @@ export class AcpChatView extends ItemView {
 	 */
 	private async loadAvailableAgents(): Promise<void> {
 		try {
-			// Claude SDK 模式不需要检测，直接显示可用
-			this.availableAgents = [{
-				backendId: 'claude',
-				name: 'Claude Code',
-				cliPath: 'claude-sdk',
-				acpArgs: [],
-			}];
+			// 使用 detector 检测可用的 Agent
+			await this.plugin.detector.detect();
+			this.availableAgents = this.plugin.detector.getDetectedAgents();
 
 			// 更新下拉框
 			this.agentSelectEl.empty();
-			this.agentSelectEl.createEl('option', {
-				text: 'Claude Code',
-				value: 'claude',
-			});
 
-			// 默认选中
-			this.agentSelectEl.value = 'claude';
+			if (this.availableAgents.length === 0) {
+				this.agentSelectEl.createEl('option', {
+					text: '未找到可用 Agent',
+					value: '',
+				});
+				this.addSystemMessage('⚠️ 未找到可用 Agent，请检查配置');
+			} else {
+				this.agentSelectEl.createEl('option', {
+					text: '选择 Agent...',
+					value: '',
+				});
 
-			this.addSystemMessage('✓ Claude Code SDK 已就绪');
+				for (const agent of this.availableAgents) {
+					this.agentSelectEl.createEl('option', {
+						text: agent.name,
+						value: agent.backendId,
+					});
+				}
+
+				this.addSystemMessage(`✓ 找到 ${this.availableAgents.length} 个可用 Agent`);
+			}
 		} catch (error) {
 			console.error('[ChatView] 加载 Agent 失败:', error);
 			new Notice('加载 Agent 失败');
@@ -277,49 +280,33 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
-	 * 获取工作目录（硬编码测试版本）
+	 * 获取工作目录
 	 */
 	private getWorkingDirectory(): string {
-		// 临时硬编码测试 - 验证是否是 API 问题
-		const HARDCODED_PATH = '/Users/Apple/note-vsc';
-		console.log('[ChatView] 🔴 使用硬编码路径测试:', HARDCODED_PATH);
-		new Notice(`测试：硬编码路径 ${HARDCODED_PATH}`);
-		return HARDCODED_PATH;
-	}
-
-	/**
-	 * 验证并解析路径（确保绝对路径）
-	 */
-	private validatePath(inputPath: string): string {
-		// 1. 转换为绝对路径
-		const absolutePath = isAbsolute(inputPath) ? inputPath : resolve(inputPath);
-
-		// 2. 验证目录存在
-		if (!existsSync(absolutePath)) {
-			throw new Error(`目录不存在: ${absolutePath}`);
-		}
-
-		// 3. 验证是目录（不是文件）
+		// 使用官方 API
 		try {
-			const stats = statSync(absolutePath);
-			if (!stats.isDirectory()) {
-				throw new Error(`路径不是目录: ${absolutePath}`);
+			const adapter = this.plugin.app.vault.adapter;
+			if ('getBasePath' in adapter && typeof adapter.getBasePath === 'function') {
+				const basePath = adapter.getBasePath();
+				if (basePath) {
+					return basePath;
+				}
 			}
 		} catch (error) {
-			throw new Error(`无法访问目录: ${absolutePath}`);
+			console.warn('[ChatView] Vault API 失败:', error);
 		}
 
-		// 4. 解析符号链接（与 SDK 内部行为一致）
-		try {
-			const realPath = realpathSync(absolutePath);
-			if (realPath !== absolutePath) {
-				console.log(`[ChatView] 符号链接: ${absolutePath} → ${realPath}`);
-			}
-			return realPath;
-		} catch (error) {
-			console.warn(`[ChatView] 无法解析符号链接: ${error}`);
-			return absolutePath;
+		// Fallback
+		if (this.plugin.settings.customWorkingDir) {
+			return this.plugin.settings.customWorkingDir;
 		}
+
+		const cwd = process.cwd();
+		if (cwd && cwd !== '/') {
+			return cwd;
+		}
+
+		throw new Error('无法获取工作目录');
 	}
 
 	/**
@@ -327,13 +314,13 @@ export class AcpChatView extends ItemView {
 	 */
 	private async handleConnect(): Promise<void> {
 		// 如果已连接，则断开
-		if (this.connection?.isConnected || this.sdkConnection?.connected) {
+		if (this.connection?.isConnected) {
 			this.handleDisconnect();
 			return;
 		}
 
-		// 使用 Claude SDK（固定为 claude）
-		const agentId = 'claude';
+		// 获取选中的 Agent
+		const agentId = this.agentSelectEl.value;
 		if (!agentId) {
 			new Notice('请先选择一个 Agent');
 			return;
@@ -349,16 +336,8 @@ export class AcpChatView extends ItemView {
 			this.updateStatus('连接中...', 'connecting');
 			this.connectButtonEl.disabled = true;
 
-			// 判断是否使用 SDK 模式（目前只支持 claude）
-			this.isSdkMode = this.selectedAgent.backendId === 'claude';
-
-			if (this.isSdkMode) {
-				// Claude SDK 模式
-				await this.connectWithSdk();
-			} else {
-				// ACP 模式（其他 Agent）
-				await this.connectWithAcp();
-			}
+			// 使用 ACP 模式连接
+			await this.connectWithAcp();
 
 			this.updateStatus('已连接', 'connected');
 			this.connectButtonEl.textContent = '断开';
@@ -408,23 +387,6 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
-	 * 使用 Claude SDK 模式连接
-	 */
-	private async connectWithSdk(): Promise<void> {
-		if (!this.selectedAgent) return;
-
-		// 创建 SDK 连接
-		this.sdkConnection = new ClaudeSdkConnection();
-
-		// 连接（仅验证）
-		const workingDir = this.getWorkingDirectory();
-		await this.sdkConnection.connect({
-			cwd: workingDir,
-			model: 'claude-sonnet-4-5-20250929',
-		});
-	}
-
-	/**
 	 * 断开连接
 	 */
 	private handleDisconnect(): void {
@@ -438,16 +400,6 @@ export class AcpChatView extends ItemView {
 			this.connection.disconnect();
 			this.connection = null;
 		}
-
-		// 断开 SDK 连接
-		if (this.sdkConnection) {
-			this.sdkConnection.disconnect();
-			this.sdkConnection = null;
-		}
-
-		// 重置状态
-		this.isSdkMode = false;
-		this.currentStreamingMessageId = null;
 
 		this.updateStatus('未连接', 'idle');
 		this.connectButtonEl.textContent = '连接';
@@ -481,6 +433,11 @@ export class AcpChatView extends ItemView {
 			this.handlePlan(plan);
 		};
 
+		// 思考块更新
+		this.sessionManager.onThought = (thought: string) => {
+			this.handleThought(thought);
+		};
+
 		// 状态变更
 		this.sessionManager.onStateChange = (state: SessionState) => {
 			this.handleStateChange(state);
@@ -499,6 +456,16 @@ export class AcpChatView extends ItemView {
 		// 错误
 		this.sessionManager.onError = (error: Error) => {
 			this.handleError(error);
+		};
+
+		// 当前模式更新
+		this.sessionManager.onCurrentModeUpdate = (mode: string, description?: string) => {
+			this.handleCurrentModeUpdate(mode, description);
+		};
+
+		// 可用命令更新
+		this.sessionManager.onAvailableCommandsUpdate = (commands: any[]) => {
+			this.handleAvailableCommandsUpdate(commands);
 		};
 	}
 
@@ -528,6 +495,20 @@ export class AcpChatView extends ItemView {
 	private handlePlan(plan: PlanEntry[]): void {
 		// 使用 MessageRenderer 渲染计划
 		MessageRenderer.renderPlan(this.messagesEl, plan);
+		this.scrollToBottom();
+	}
+
+	/**
+	 * 处理思考块
+	 */
+	private handleThought(thought: string): void {
+		if (!this.sessionManager) return;
+
+		const turn = this.sessionManager.activeTurn;
+		if (!turn) return;
+
+		// 使用 MessageRenderer 渲染思考块（渲染整个思考列表）
+		MessageRenderer.renderThoughts(this.messagesEl, turn.thoughts);
 		this.scrollToBottom();
 	}
 
@@ -627,13 +608,8 @@ export class AcpChatView extends ItemView {
 		}
 
 		// 检查连接状态
-		if (!this.isSdkMode && !this.sessionManager) {
+		if (!this.sessionManager) {
 			new Notice('未连接到 Agent');
-			return;
-		}
-
-		if (this.isSdkMode && !this.sdkConnection) {
-			new Notice('未连接到 Claude SDK');
 			return;
 		}
 
@@ -641,13 +617,8 @@ export class AcpChatView extends ItemView {
 		this.inputEl.value = '';
 
 		try {
-			if (this.isSdkMode) {
-				// SDK 模式：使用 SDK 发送
-				await this.sendWithSdk(text);
-			} else {
-				// ACP 模式：使用 SessionManager 发送
-				await this.sessionManager!.sendPrompt(text);
-			}
+			// 使用 SessionManager 发送
+			await this.sessionManager.sendPrompt(text);
 		} catch (error) {
 			console.error('[ChatView] 发送失败:', error);
 			new Notice('发送失败');
@@ -658,249 +629,13 @@ export class AcpChatView extends ItemView {
 	 * 处理取消
 	 */
 	private async handleCancel(): Promise<void> {
-		if (this.isSdkMode && this.sdkConnection) {
-			// SDK 模式：取消 SDK 查询
-			try {
-				await this.sdkConnection.cancel();
-			} catch (error) {
-				console.error('[ChatView] SDK 取消失败:', error);
-			}
-		} else if (this.sessionManager) {
-			// ACP 模式：取消会话
+		if (this.sessionManager) {
 			try {
 				await this.sessionManager.cancel();
 			} catch (error) {
 				console.error('[ChatView] 取消失败:', error);
 			}
 		}
-	}
-
-	// ========================================================================
-	// SDK 模式专用方法
-	// ========================================================================
-
-	/**
-	 * 使用 SDK 发送消息
-	 */
-	private async sendWithSdk(text: string): Promise<void> {
-		if (!this.sdkConnection) return;
-
-		// 添加用户消息
-		this.addUserMessage(text);
-
-		// 创建新的助手消息（流式）
-		const messageId = `assistant-${Date.now()}`;
-		this.currentStreamingMessageId = messageId;
-		this.addAssistantMessagePlaceholder(messageId);
-
-		// 更新状态
-		this.updateStatus('处理中...', 'processing');
-		this.sendButtonEl.style.display = 'none';
-		this.cancelButtonEl.style.display = 'inline-block';
-		this.inputEl.disabled = true;
-
-		// 获取工作目录（完整错误处理）
-		let workingDir: string;
-		try {
-			workingDir = this.getWorkingDirectory();
-			console.log('[ChatView] 最终工作目录:', workingDir);
-		} catch (error) {
-			const errorMsg = `无法获取工作目录: ${error}`;
-			console.error('[ChatView]', errorMsg);
-			this.handleSdkError(new Error(errorMsg));
-			new Notice(errorMsg);
-			this.updateStatus('错误', 'error');
-			this.sendButtonEl.style.display = 'inline-block';
-			this.cancelButtonEl.style.display = 'none';
-			this.inputEl.disabled = false;
-			return;
-		}
-
-		// 构建 SDK 回调
-		const callbacks: ClaudeCallbacks = {
-			onText: (text: string, isStreaming: boolean) => {
-				this.handleSdkText(messageId, text, isStreaming);
-			},
-			onToolUse: (toolName: string, input: any, toolUseId: string) => {
-				this.handleSdkToolUse(toolName, input, toolUseId);
-			},
-			onToolResult: (toolUseId: string, result: any, isError: boolean) => {
-				this.handleSdkToolResult(toolUseId, result, isError);
-			},
-			onError: (error: Error) => {
-				this.handleSdkError(error);
-			},
-			onComplete: (result: string, cost: number) => {
-				this.handleSdkComplete(result, cost);
-			},
-			onPermissionRequest: async (toolName: string, input: any) => {
-				return await this.handleSdkPermissionRequest(toolName, input);
-			},
-		};
-
-		// 发送提示
-		try {
-			await this.sdkConnection.sendPrompt(
-				text,
-				{
-					cwd: workingDir,
-					model: 'claude-sonnet-4-5-20250929',
-					apiKey: this.plugin.settings.apiKey, // 自定义 API Key
-					apiUrl: this.plugin.settings.apiUrl, // 自定义 API URL
-				},
-				callbacks,
-			);
-		} catch (error) {
-			console.error('[ChatView] SDK 发送失败:', error);
-			this.handleSdkError(error as Error);
-		}
-	}
-
-	/**
-	 * 处理 SDK 文本消息
-	 */
-	private handleSdkText(messageId: string, text: string, isStreaming: boolean): void {
-		const messageEl = this.messagesEl.querySelector(`[data-message-id="${messageId}"]`);
-		if (!messageEl) return;
-
-		const contentEl = messageEl.querySelector('.acp-message-content') as HTMLElement;
-		if (!contentEl) return;
-
-		if (isStreaming && text) {
-			// 流式更新：追加文本
-			contentEl.textContent = (contentEl.textContent || '') + text;
-		}
-
-		this.scrollToBottom();
-	}
-
-	/**
-	 * 处理 SDK 工具调用
-	 */
-	private handleSdkToolUse(toolName: string, input: any, toolUseId: string): void {
-		// 创建类似 ACP 的 ToolCall 结构
-		const toolCall: ToolCall = {
-			toolCallId: toolUseId,
-			title: `工具调用: ${toolName}`,
-			kind: toolName,
-			status: 'in_progress',
-			startTime: Date.now(),
-		};
-
-		MessageRenderer.renderToolCall(this.messagesEl, toolCall);
-		this.scrollToBottom();
-	}
-
-	/**
-	 * 处理 SDK 工具结果
-	 */
-	private handleSdkToolResult(toolUseId: string, result: any, isError: boolean): void {
-		// 查找对应的工具调用卡片，更新状态
-		const toolCard = this.messagesEl.querySelector(`[data-tool-id="${toolUseId}"]`);
-		if (toolCard) {
-			toolCard.classList.remove('acp-tool-pending');
-			if (isError) {
-				toolCard.classList.add('acp-tool-error');
-			} else {
-				toolCard.classList.add('acp-tool-completed');
-			}
-		}
-		this.scrollToBottom();
-	}
-
-	/**
-	 * 处理 SDK 错误
-	 */
-	private handleSdkError(error: Error): void {
-		console.error('[ChatView] SDK 错误:', error);
-		this.addSystemMessage(`❌ 错误: ${error.message}`);
-		new Notice(`错误: ${error.message}`);
-
-		// 恢复 UI 状态
-		this.updateStatus('已连接', 'connected');
-		this.sendButtonEl.style.display = 'inline-block';
-		this.cancelButtonEl.style.display = 'none';
-		this.inputEl.disabled = false;
-	}
-
-	/**
-	 * 处理 SDK 完成
-	 */
-	private handleSdkComplete(result: string, cost: number): void {
-		console.log(`[ChatView] SDK 完成 (费用: $${cost.toFixed(4)})`);
-
-		// 恢复 UI 状态
-		this.updateStatus('已连接', 'connected');
-		this.sendButtonEl.style.display = 'inline-block';
-		this.cancelButtonEl.style.display = 'none';
-		this.inputEl.disabled = false;
-		this.currentStreamingMessageId = null;
-
-		this.scrollToBottom();
-	}
-
-	/**
-	 * 处理 SDK 权限请求
-	 */
-	private async handleSdkPermissionRequest(toolName: string, input: any): Promise<any> {
-		// 将 SDK 权限请求转换为 ACP 格式
-		const params: RequestPermissionParams = {
-			sessionId: 'sdk-session',
-			toolCall: {
-				toolCallId: `sdk-${Date.now()}`,
-				title: `工具调用: ${toolName}`,
-				kind: 'execute', // 或根据工具名映射到正确的类型
-				rawInput: input,
-			},
-			options: [
-				{
-					optionId: 'allow-once',
-					name: '允许一次',
-					kind: 'allow_once',
-				},
-				{
-					optionId: 'reject',
-					name: '拒绝',
-					kind: 'reject_once',
-				},
-			],
-		};
-
-		// 使用现有的权限处理逻辑
-		const outcome = await this.handlePermissionRequest(params);
-
-		// 转换为 SDK 格式
-		if (outcome.type === 'selected' && outcome.optionId === 'allow-once') {
-			return {
-				behavior: 'allow',
-				updatedInput: input,
-			};
-		} else {
-			return {
-				behavior: 'deny',
-			};
-		}
-	}
-
-	/**
-	 * 添加用户消息（SDK 模式专用）
-	 */
-	private addUserMessage(text: string): void {
-		const messageEl = this.messagesEl.createDiv({ cls: 'acp-message acp-message-user' });
-		const contentEl = messageEl.createDiv({ cls: 'acp-message-content' });
-		contentEl.textContent = text;
-		this.scrollToBottom();
-	}
-
-	/**
-	 * 添加助手消息占位符（SDK 模式专用）
-	 */
-	private addAssistantMessagePlaceholder(messageId: string): void {
-		const messageEl = this.messagesEl.createDiv({ cls: 'acp-message acp-message-assistant' });
-		messageEl.setAttribute('data-message-id', messageId);
-		const contentEl = messageEl.createDiv({ cls: 'acp-message-content' });
-		contentEl.textContent = ''; // 空内容，等待流式更新
-		this.scrollToBottom();
 	}
 
 	// ========================================================================
@@ -961,5 +696,48 @@ export class AcpChatView extends ItemView {
 	 */
 	private scrollToBottom(): void {
 		this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+	}
+
+	/**
+	 * 处理当前模式更新
+	 */
+	private handleCurrentModeUpdate(mode: string, description?: string): void {
+		console.log('[ChatView] 模式更新:', mode, description);
+		this.currentMode = mode;
+
+		// 更新模式指示器
+		this.modeIndicatorEl.style.display = 'block';
+		this.modeIndicatorEl.textContent = description ? `${mode}: ${description}` : mode;
+
+		// 根据模式设置不同颜色
+		this.modeIndicatorEl.className = 'acp-mode-indicator';
+		if (mode === 'ask') {
+			this.modeIndicatorEl.classList.add('acp-mode-ask');
+		} else if (mode === 'code') {
+			this.modeIndicatorEl.classList.add('acp-mode-code');
+		} else if (mode === 'plan') {
+			this.modeIndicatorEl.classList.add('acp-mode-plan');
+		} else {
+			this.modeIndicatorEl.classList.add('acp-mode-default');
+		}
+	}
+
+	/**
+	 * 处理可用命令更新
+	 */
+	private handleAvailableCommandsUpdate(commands: any[]): void {
+		console.log('[ChatView] 可用命令更新:', commands.length, '个命令');
+		this.availableCommands = commands;
+
+		// 在输入框下方显示可用命令提示
+		if (commands.length > 0) {
+			// 移除旧的命令提示
+			const oldHint = this.inputContainerEl.querySelector('.acp-commands-hint');
+			if (oldHint) oldHint.remove();
+
+			// 创建新的命令提示
+			const hintEl = this.inputContainerEl.createDiv({ cls: 'acp-commands-hint' });
+			hintEl.textContent = `可用命令: ${commands.map((c) => c.name).join(', ')}`;
+		}
 	}
 }

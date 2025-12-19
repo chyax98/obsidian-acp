@@ -31,6 +31,8 @@ import type {
 } from '../types';
 import { JSONRPC_VERSION, createRequest, AcpMethod } from '../types';
 import { RequestQueue } from './request-queue';
+import type { AcpError } from '../types/errors';
+import { AcpErrorType, createAcpError } from '../types/errors';
 
 // ============================================================================
 // 类型定义
@@ -137,6 +139,11 @@ export class AcpConnection {
 	// 消息缓冲
 	private messageBuffer = '';
 
+	// 重连机制
+	private retryCount: number = 0;
+	private readonly maxRetries: number = 3;
+	private lastConnectionOptions: ConnectionOptions | null = null;
+
 	// ========================================================================
 	// 事件回调
 	// ========================================================================
@@ -161,6 +168,146 @@ export class AcpConnection {
 	public onDisconnect: (code: number | null, signal: string | null) => void = () => {};
 
 	// ========================================================================
+	// 错误分类
+	// ========================================================================
+
+	/**
+	 * 动态错误分类 - 根据错误消息和后端类型启发式匹配错误类型
+	 */
+	private classifyError(errorMsg: string, backend: AcpBackendId | null): AcpError {
+		const msgLower = errorMsg.toLowerCase();
+		console.log(`[ACP] 错误分类: 原始消息="${errorMsg}", 后端=${backend}`);
+
+		// 超时错误
+		if (msgLower.includes('timeout') || msgLower.includes('超时') || msgLower.includes('timed out')) {
+			console.log('[ACP] 分类结果: TIMEOUT (可重试)');
+			return createAcpError(AcpErrorType.TIMEOUT, errorMsg, { retryable: true });
+		}
+
+		// 网络错误
+		if (
+			msgLower.includes('network') ||
+			msgLower.includes('网络') ||
+			msgLower.includes('connection refused') ||
+			msgLower.includes('econnrefused') ||
+			msgLower.includes('enotfound') ||
+			msgLower.includes('enetunreach')
+		) {
+			console.log('[ACP] 分类结果: NETWORK_ERROR (可重试)');
+			return createAcpError(AcpErrorType.NETWORK_ERROR, errorMsg, { retryable: true });
+		}
+
+		// 认证失败
+		if (
+			msgLower.includes('auth') ||
+			msgLower.includes('认证') ||
+			msgLower.includes('unauthorized') ||
+			msgLower.includes('401') ||
+			msgLower.includes('forbidden') ||
+			msgLower.includes('403')
+		) {
+			console.log('[ACP] 分类结果: AUTHENTICATION_FAILED (不可重试)');
+			return createAcpError(AcpErrorType.AUTHENTICATION_FAILED, errorMsg, { retryable: false });
+		}
+
+		// 会话相关错误
+		if (msgLower.includes('session expired') || msgLower.includes('会话过期')) {
+			console.log('[ACP] 分类结果: SESSION_EXPIRED (不可重试)');
+			return createAcpError(AcpErrorType.SESSION_EXPIRED, errorMsg, { retryable: false });
+		}
+
+		if (
+			msgLower.includes('session not found') ||
+			msgLower.includes('会话未找到') ||
+			msgLower.includes('session does not exist')
+		) {
+			console.log('[ACP] 分类结果: SESSION_NOT_FOUND (不可重试)');
+			return createAcpError(AcpErrorType.SESSION_NOT_FOUND, errorMsg, { retryable: false });
+		}
+
+		// 权限错误
+		if (msgLower.includes('permission denied') || msgLower.includes('权限拒绝') || msgLower.includes('eacces')) {
+			console.log('[ACP] 分类结果: PERMISSION_DENIED (不可重试)');
+			return createAcpError(AcpErrorType.PERMISSION_DENIED, errorMsg, { retryable: false });
+		}
+
+		// 进程启动错误
+		if (msgLower.includes('spawn') || msgLower.includes('enoent') || msgLower.includes('启动失败')) {
+			console.log('[ACP] 分类结果: SPAWN_FAILED (不可重试)');
+			return createAcpError(AcpErrorType.SPAWN_FAILED, errorMsg, { retryable: false });
+		}
+
+		// 连接错误
+		if (
+			msgLower.includes('connection closed') ||
+			msgLower.includes('连接已关闭') ||
+			msgLower.includes('disconnected')
+		) {
+			console.log('[ACP] 分类结果: CONNECTION_CLOSED (可重试)');
+			return createAcpError(AcpErrorType.CONNECTION_CLOSED, errorMsg, { retryable: true });
+		}
+
+		// 后端特定错误处理
+		if (backend === 'qwen') {
+			// Qwen 后端: "Internal error" 通常是认证问题
+			if (msgLower.includes('internal error') || msgLower.includes('内部错误')) {
+				console.log('[ACP] 分类结果: Qwen AUTHENTICATION_FAILED (不可重试)');
+				return createAcpError(AcpErrorType.AUTHENTICATION_FAILED, `Qwen 认证失败: ${errorMsg}`, {
+					retryable: false,
+				});
+			}
+		}
+
+		if (backend === 'claude') {
+			// Claude 后端的特殊错误模式
+			if (msgLower.includes('rate limit') || msgLower.includes('速率限制')) {
+				console.log('[ACP] 分类结果: Claude TIMEOUT (速率限制, 可重试)');
+				return createAcpError(AcpErrorType.TIMEOUT, `Claude API 速率限制: ${errorMsg}`, { retryable: true });
+			}
+		}
+
+		// 协议错误
+		if (msgLower.includes('protocol') || msgLower.includes('协议') || msgLower.includes('invalid response')) {
+			console.log('[ACP] 分类结果: PROTOCOL_ERROR (不可重试)');
+			return createAcpError(AcpErrorType.PROTOCOL_ERROR, errorMsg, { retryable: false });
+		}
+
+		// 默认: 未知错误 (不可重试)
+		console.log('[ACP] 分类结果: UNKNOWN (不可重试)');
+		return createAcpError(AcpErrorType.UNKNOWN, errorMsg, { retryable: false });
+	}
+
+	// ========================================================================
+	// 重连机制
+	// ========================================================================
+
+	/**
+	 * 重连逻辑 - 指数退避重试
+	 */
+	private async reconnect(): Promise<void> {
+		if (!this.lastConnectionOptions) {
+			throw new Error('无法重连: 缺少连接配置');
+		}
+
+		if (this.retryCount >= this.maxRetries) {
+			console.error(`[ACP] 重连失败: 已达到最大重试次数 (${this.maxRetries})`);
+			throw new Error(`连接失败: 已重试 ${this.maxRetries} 次`);
+		}
+
+		// 计算指数退避延迟: 1s, 2s, 4s, 最大 10s
+		const delay = Math.min(1000 * Math.pow(2, this.retryCount), 10000);
+		this.retryCount++;
+
+		console.log(`[ACP] 重连中... (第 ${this.retryCount}/${this.maxRetries} 次，延迟 ${delay}ms)`);
+
+		// 等待延迟
+		await new Promise((resolve) => setTimeout(resolve, delay));
+
+		// 尝试重连
+		await this.connect(this.lastConnectionOptions);
+	}
+
+	// ========================================================================
 	// 连接管理
 	// ========================================================================
 
@@ -168,6 +315,9 @@ export class AcpConnection {
 	 * 连接到 ACP Agent
 	 */
 	async connect(options: ConnectionOptions): Promise<void> {
+		// 保存连接配置用于重连
+		this.lastConnectionOptions = options;
+
 		// 断开现有连接
 		if (this.child) {
 			this.disconnect();
@@ -233,11 +383,29 @@ export class AcpConnection {
 			await this.initialize();
 
 			this.state = 'connected';
+			// 连接成功后重置重试计数
+			this.retryCount = 0;
 			console.log(`[ACP] 连接成功: ${options.backendId}`);
 		} catch (error) {
 			this.state = 'error';
 			this.disconnect();
-			throw error;
+
+			// 错误分类
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			const classifiedError = this.classifyError(errorMsg, this.backend);
+
+			console.error(
+				`[ACP] 连接失败: ${classifiedError.type} - ${classifiedError.message} (可重试: ${classifiedError.retryable})`,
+			);
+
+			// 如果错误可重试且未达到最大重试次数,尝试重连
+			if (classifiedError.retryable && this.retryCount < this.maxRetries) {
+				await this.reconnect();
+				return; // 重连成功,直接返回
+			}
+
+			// 不可重试或已达到最大重试次数,直接抛出
+			throw new Error(`${classifiedError.type}: ${classifiedError.message}`);
 		}
 	}
 
@@ -245,13 +413,17 @@ export class AcpConnection {
 	 * 断开连接
 	 */
 	disconnect(): void {
+		console.log('[ACP] 断开连接中...');
+
 		if (this.child) {
 			this.child.kill();
 			this.child = null;
+			console.log('[ACP] 子进程已终止');
 		}
 
 		// 清空请求队列
 		this.requestQueue.clear('连接已断开');
+		console.log('[ACP] 请求队列已清空');
 
 		// 重置状态
 		this.sessionId = null;
@@ -260,6 +432,7 @@ export class AcpConnection {
 		this.initializeResponse = null;
 		this.messageBuffer = '';
 		this.state = 'disconnected';
+		console.log('[ACP] 连接已断开，状态已重置');
 	}
 
 	/**

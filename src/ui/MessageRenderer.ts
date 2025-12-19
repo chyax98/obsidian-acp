@@ -683,6 +683,62 @@ export class MessageRenderer {
 	// ========================================================================
 
 	/**
+	 * 渲染思考块
+	 *
+	 * @param container - 容器元素
+	 * @param thoughts - 思考内容列表
+	 * @returns 思考块元素
+	 */
+	static renderThoughts(container: HTMLElement, thoughts: string[]): HTMLElement {
+		// 查找是否已存在
+		let thoughtsEl = container.querySelector('.acp-thoughts') as HTMLElement;
+
+		if (thoughtsEl) {
+			// 清空并重新渲染
+			thoughtsEl.empty();
+		} else {
+			// 创建新元素
+			thoughtsEl = container.createDiv({ cls: 'acp-thoughts' });
+		}
+
+		// 头部（可点击折叠/展开）
+		const headerEl = thoughtsEl.createDiv({ cls: 'acp-thoughts-header' });
+
+		// 展开/折叠图标
+		const toggleIcon = headerEl.createDiv({ cls: 'acp-thoughts-toggle' });
+		setIcon(toggleIcon, 'chevron-right'); // 默认折叠
+
+		// 标题
+		const titleEl = headerEl.createDiv({ cls: 'acp-thoughts-title' });
+		titleEl.innerHTML = '<span class="acp-thoughts-icon">💭</span> 思考过程';
+
+		// 内容区域（默认折叠）
+		const contentEl = thoughtsEl.createDiv({
+			cls: 'acp-thoughts-content',
+			attr: { 'data-expanded': 'false' },
+		});
+
+		// 渲染每条思考
+		for (const thought of thoughts) {
+			const thoughtEl = contentEl.createDiv({ cls: 'acp-thought-item' });
+			thoughtEl.textContent = thought;
+		}
+
+		// 点击头部切换展开/折叠
+		headerEl.addEventListener('click', () => {
+			const expanded = contentEl.getAttribute('data-expanded') === 'true';
+			contentEl.setAttribute('data-expanded', expanded ? 'false' : 'true');
+			contentEl.toggleClass('acp-thoughts-content-expanded', !expanded);
+
+			// 切换图标
+			toggleIcon.empty();
+			setIcon(toggleIcon, expanded ? 'chevron-right' : 'chevron-down');
+		});
+
+		return thoughtsEl;
+	}
+
+	/**
 	 * 渲染计划
 	 *
 	 * @param container - 容器元素

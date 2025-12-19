@@ -32,6 +32,10 @@ interface PendingRequest<T = unknown> {
 	startTime: number;
 	/** 超时时长 (ms) */
 	timeoutDuration: number;
+	/** 暂停时的时间戳 */
+	pauseTime?: number;
+	/** 已消耗的时间 (ms) */
+	elapsedTime: number;
 }
 
 /**
@@ -106,6 +110,7 @@ export class RequestQueue {
 				isPaused: false,
 				startTime,
 				timeoutDuration: timeoutMs,
+				elapsedTime: 0,
 			};
 
 			this.requests.set(id, pending as PendingRequest<unknown>);
@@ -183,11 +188,15 @@ export class RequestQueue {
 		const request = this.requests.get(id);
 		if (!request || request.isPaused) return false;
 
+		// 清除定时器
 		if (request.timeoutId) {
 			clearTimeout(request.timeoutId);
 			request.timeoutId = undefined;
 		}
 
+		// 累加已消耗时间
+		request.elapsedTime += Date.now() - request.startTime;
+		request.pauseTime = Date.now();
 		request.isPaused = true;
 		return true;
 	}
@@ -204,10 +213,15 @@ export class RequestQueue {
 		const request = this.requests.get(id);
 		if (!request || !request.isPaused) return false;
 
-		const elapsed = Date.now() - request.startTime;
-		const remaining = Math.max(0, request.timeoutDuration - elapsed);
+		// 计算剩余时间
+		const remaining = Math.max(0, request.timeoutDuration - request.elapsedTime);
 
 		if (remaining > 0) {
+			// 更新开始时间
+			request.startTime = Date.now();
+			request.isPaused = false;
+
+			// 创建新的超时定时器
 			request.timeoutId = setTimeout(() => {
 				const req = this.requests.get(id);
 				if (req && !req.isPaused) {
@@ -215,7 +229,6 @@ export class RequestQueue {
 					req.reject(new Error(`请求 ${req.method} 超时`));
 				}
 			}, remaining);
-			request.isPaused = false;
 			return true;
 		} else {
 			// 剩余时间已耗尽，直接超时

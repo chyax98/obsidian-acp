@@ -18,7 +18,11 @@ import type {
 	ToolCallUpdateData,
 	ToolCallStatusUpdateData,
 	ToolCallContent,
+	AvailableCommand,
+	CurrentModeUpdateData,
+	AvailableCommandsUpdateData,
 } from '../types';
+import { StreamingMessageBuffer } from './message-buffer';
 
 // ============================================================================
 // 类型定义
@@ -101,6 +105,8 @@ export interface Turn {
 	assistantMessage?: Message;
 	/** 工具调用列表 */
 	toolCalls: ToolCall[];
+	/** 思考内容列表 */
+	thoughts: string[];
 	/** 计划 */
 	plan?: PlanEntry[];
 	/** 停止原因 */
@@ -148,6 +154,9 @@ export class SessionManager {
 	private nextMessageId = 1;
 	private nextTurnId = 1;
 
+	// 消息缓冲器
+	private messageBuffer: StreamingMessageBuffer;
+
 	// ========================================================================
 	// 事件回调
 	// ========================================================================
@@ -160,6 +169,9 @@ export class SessionManager {
 
 	/** 计划更新回调 */
 	public onPlan: (plan: PlanEntry[]) => void = () => {};
+
+	/** 思考块更新回调 */
+	public onThought: (thought: string) => void = () => {};
 
 	/** 状态变更回调 */
 	public onStateChange: (state: SessionState, previousState: SessionState) => void = () => {};
@@ -177,6 +189,12 @@ export class SessionManager {
 	/** 错误回调 */
 	public onError: (error: Error) => void = () => {};
 
+	/** 当前模式更新回调 */
+	public onCurrentModeUpdate: (mode: string, description?: string) => void = () => {};
+
+	/** 可用命令更新回调 */
+	public onAvailableCommandsUpdate: (commands: AvailableCommand[]) => void = () => {};
+
 	// ========================================================================
 	// 构造函数
 	// ========================================================================
@@ -184,6 +202,12 @@ export class SessionManager {
 	constructor(config: SessionManagerConfig) {
 		this.connection = config.connection;
 		this.workingDir = config.workingDir || process.cwd();
+
+		// 初始化消息缓冲器
+		this.messageBuffer = new StreamingMessageBuffer({
+			updateInterval: 300, // 300ms
+			batchSize: 20, // 20 chunks
+		});
 
 		// 绑定连接回调
 		this.setupConnectionCallbacks();
@@ -334,6 +358,7 @@ export class SessionManager {
 			id: `turn_${this.nextTurnId++}`,
 			userMessage,
 			toolCalls: [],
+			thoughts: [],
 			startTime: Date.now(),
 		};
 
@@ -383,6 +408,9 @@ export class SessionManager {
 		if (this.currentTurn) {
 			this.completeTurn('cancelled');
 		}
+
+		// 清空消息缓冲器
+		this.messageBuffer.clear();
 
 		this._sessionId = null;
 		this.setState('idle');
@@ -436,6 +464,11 @@ export class SessionManager {
 	private completeTurn(stopReason: StopReason): void {
 		if (!this.currentTurn) return;
 
+		// 完成消息缓冲器
+		if (this.currentTurn.assistantMessage) {
+			this.messageBuffer.complete(this.currentTurn.assistantMessage.id);
+		}
+
 		this.currentTurn.stopReason = stopReason;
 		this.currentTurn.endTime = Date.now();
 
@@ -466,6 +499,10 @@ export class SessionManager {
 				this.handleAgentMessageChunk(update);
 				break;
 
+			case 'agent_thought_chunk':
+				this.handleAgentThoughtChunk(update);
+				break;
+
 			case 'tool_call':
 				this.handleToolCall(update);
 				break;
@@ -478,12 +515,24 @@ export class SessionManager {
 				this.handlePlan(update as { sessionUpdate: 'plan'; entries: PlanEntry[] });
 				break;
 
+			case 'current_mode_update':
+				this.handleCurrentModeUpdate(update as CurrentModeUpdateData);
+				break;
+
+			case 'available_commands_update':
+				this.handleAvailableCommandsUpdate(update as AvailableCommandsUpdateData);
+				break;
+
 			case 'user_message_chunk':
 				// 通常在 session/load 时收到，暂不处理
 				break;
 
-			default:
-				console.log('[SessionManager] 未处理的更新类型:', update.sessionUpdate);
+			default: {
+				// 处理未识别的更新类型
+				const unknownUpdate = update as any;
+				console.log('[SessionManager] 未处理的更新类型:', unknownUpdate.sessionUpdate);
+				break;
+			}
 		}
 	}
 
@@ -498,15 +547,41 @@ export class SessionManager {
 
 		if (!this.currentTurn.assistantMessage) {
 			// 创建新的 assistant 消息
-			const message = this.createMessage('assistant', text);
+			const message = this.createMessage('assistant', '');
 			message.isStreaming = true;
 			this.currentTurn.assistantMessage = message;
 			this._messages.push(message);
 			this.onMessage(message, true);
-		} else {
-			// 追加内容
-			this.currentTurn.assistantMessage.content += text;
-			this.onMessage(this.currentTurn.assistantMessage, false);
+		}
+
+		// 使用缓冲器追加内容
+		this.messageBuffer.append(
+			this.currentTurn.assistantMessage.id,
+			text,
+			(content: string, isFinal: boolean) => {
+				if (this.currentTurn?.assistantMessage) {
+					this.currentTurn.assistantMessage.content = content;
+					this.onMessage(this.currentTurn.assistantMessage, false);
+				}
+			},
+			'accumulate',
+		);
+	}
+
+	/**
+	 * 处理 Agent 思考块
+	 */
+	private handleAgentThoughtChunk(update: SessionUpdateData): void {
+		if (!this.currentTurn) return;
+
+		const content = (update as { content?: { text?: string } }).content;
+		const text = content?.text || '';
+
+		if (text) {
+			// 添加到思考列表
+			this.currentTurn.thoughts.push(text);
+			// 触发回调
+			this.onThought(text);
 		}
 	}
 
@@ -584,5 +659,21 @@ export class SessionManager {
 		}
 		this._sessionId = null;
 		this.setState('idle');
+	}
+
+	/**
+	 * 处理当前模式更新
+	 */
+	private handleCurrentModeUpdate(update: CurrentModeUpdateData): void {
+		console.log('[SessionManager] 模式更新:', update.mode, update.description);
+		this.onCurrentModeUpdate(update.mode, update.description);
+	}
+
+	/**
+	 * 处理可用命令更新
+	 */
+	private handleAvailableCommandsUpdate(update: AvailableCommandsUpdateData): void {
+		console.log('[SessionManager] 可用命令更新:', update.availableCommands.length, '个命令');
+		this.onAvailableCommandsUpdate(update.availableCommands);
 	}
 }

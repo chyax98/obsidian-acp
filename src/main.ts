@@ -9,6 +9,7 @@ import { App, Plugin } from 'obsidian';
 import { AcpSettingTab } from './ui/SettingsTab';
 import { AcpChatView, ACP_CHAT_VIEW_TYPE } from './ui/ChatView';
 import type { AcpBackendId } from './acp/backends/types';
+import { cliDetector, type AcpCliDetector } from './acp/detector';
 
 // ============================================================================
 // 类型定义
@@ -70,6 +71,7 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
  */
 export default class AcpPlugin extends Plugin {
 	settings: AcpPluginSettings = DEFAULT_SETTINGS;
+	detector: AcpCliDetector = cliDetector;
 
 	async onload(): Promise<void> {
 		console.log('ACP Plugin: 加载中...');

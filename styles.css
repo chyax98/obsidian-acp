@@ -1338,6 +1338,196 @@
 }
 
 /* ============================================================================
+   Phase 4: 连接状态栏
+   ============================================================================ */
+
+/* 连接状态栏 */
+.acp-connection-status {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 8px;
+	padding: 8px 12px;
+	border-radius: 6px;
+	font-size: 0.9em;
+	transition: all 0.3s ease;
+}
+
+.acp-connection-status-icon {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.acp-connection-status-text {
+	flex: 1;
+	font-weight: 500;
+}
+
+/* 未连接状态 */
+.acp-connection-status-disconnected {
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.acp-connection-status-disconnected .acp-connection-status-icon .svg-icon {
+	color: var(--text-muted);
+}
+
+/* 连接中状态 */
+.acp-connection-status-connecting {
+	background-color: var(--color-yellow);
+	color: var(--text-on-accent);
+}
+
+.acp-connection-status-connecting .acp-connection-status-icon .svg-icon {
+	color: var(--text-on-accent);
+}
+
+/* 已连接状态 */
+.acp-connection-status-connected {
+	background-color: var(--color-green);
+	color: var(--text-on-accent);
+}
+
+.acp-connection-status-connected .acp-connection-status-icon .svg-icon {
+	color: var(--text-on-accent);
+}
+
+/* 错误状态 */
+.acp-connection-status-error {
+	background-color: var(--color-red);
+	color: var(--text-on-accent);
+}
+
+.acp-connection-status-error .acp-connection-status-icon .svg-icon {
+	color: var(--text-on-accent);
+}
+
+/* Spinner 动画 */
+.acp-spinner .svg-icon {
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* ============================================================================
+   Phase 4: 错误卡片
+   ============================================================================ */
+
+.acp-error-card {
+	margin: 8px 0;
+	padding: 16px;
+	border-radius: 8px;
+	background-color: rgba(248, 81, 73, 0.1);
+	border: 1px solid rgba(248, 81, 73, 0.3);
+	animation: errorSlideIn 0.3s ease-out;
+}
+
+@keyframes errorSlideIn {
+	from {
+		opacity: 0;
+		transform: translateY(-10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.acp-error-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.acp-error-icon {
+	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
+	color: var(--color-red);
+}
+
+.acp-error-title {
+	flex: 1;
+	font-weight: 600;
+	font-size: 1.05em;
+	color: var(--color-red);
+}
+
+.acp-error-detail {
+	margin-bottom: 12px;
+}
+
+.acp-error-message {
+	padding: 10px;
+	background-color: var(--background-secondary);
+	border-left: 3px solid var(--color-red);
+	border-radius: 4px;
+	font-family: var(--font-monospace);
+	font-size: 0.9em;
+	color: var(--text-muted);
+	word-break: break-word;
+}
+
+.acp-error-solutions {
+	margin-top: 12px;
+}
+
+.acp-error-solutions-title {
+	font-weight: 600;
+	margin-bottom: 6px;
+	color: var(--text-normal);
+	font-size: 0.95em;
+}
+
+.acp-error-solutions ul {
+	margin: 0;
+	padding-left: 20px;
+	list-style: disc;
+}
+
+.acp-error-solutions li {
+	margin: 4px 0;
+	font-size: 0.9em;
+	color: var(--text-muted);
+	line-height: 1.4;
+}
+
+/* ============================================================================
+   Phase 4: 消息时间戳
+   ============================================================================ */
+
+.acp-message-timestamp {
+	font-size: 0.75em;
+	color: var(--text-faint);
+	margin-bottom: 4px;
+	opacity: 0.7;
+	transition: opacity 0.2s;
+}
+
+.acp-message:hover .acp-message-timestamp {
+	opacity: 1;
+}
+
+/* 用户消息时间戳 */
+.acp-message-user .acp-message-timestamp {
+	text-align: right;
+	color: rgba(255, 255, 255, 0.7);
+}
+
+/* ============================================================================
    Phase 2: 图片渲染
    ============================================================================ */
 

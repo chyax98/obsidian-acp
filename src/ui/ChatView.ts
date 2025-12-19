@@ -72,6 +72,10 @@ export class AcpChatView extends ItemView {
 	// 智能滚动
 	private scrollToBottomButton: HTMLElement | null = null;
 
+	// Phase 4: 输入历史
+	private inputHistory: string[] = [];
+	private inputHistoryIndex: number = -1;
+
 	// ========================================================================
 	// 构造函数
 	// ========================================================================
@@ -178,9 +182,9 @@ export class AcpChatView extends ItemView {
 		});
 		this.connectButtonEl.addEventListener('click', () => this.handleConnect());
 
-		// 状态指示器
-		this.statusEl = this.headerEl.createDiv({ cls: 'acp-status' });
-		this.updateStatus('未连接', 'idle');
+		// 连接状态栏（Phase 4 增强）
+		this.statusEl = this.headerEl.createDiv({ cls: 'acp-connection-status' });
+		this.updateConnectionStatus('disconnected');
 
 		// 模式指示器
 		this.modeIndicatorEl = this.headerEl.createDiv({ cls: 'acp-mode-indicator' });
@@ -231,11 +235,21 @@ export class AcpChatView extends ItemView {
 			},
 		});
 
-		// 监听回车键
+		// Phase 4: 增强键盘交互
 		this.inputEl.addEventListener('keydown', (e) => {
+			// Enter 发送（Shift+Enter 换行）
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
 				this.handleSend();
+			}
+
+			// 上下键导航历史消息
+			if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				this.navigateInputHistory('up');
+			} else if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				this.navigateInputHistory('down');
 			}
 		});
 
@@ -358,13 +372,13 @@ export class AcpChatView extends ItemView {
 		}
 
 		try {
-			this.updateStatus('连接中...', 'connecting');
+			this.updateConnectionStatus('connecting', this.selectedAgent.name);
 			this.connectButtonEl.disabled = true;
 
 			// 使用 ACP 模式连接
 			await this.connectWithAcp();
 
-			this.updateStatus('已连接', 'connected');
+			this.updateConnectionStatus('connected', this.selectedAgent.name);
 			this.connectButtonEl.textContent = '断开';
 			this.connectButtonEl.disabled = false;
 			this.setInputEnabled(true);
@@ -373,10 +387,11 @@ export class AcpChatView extends ItemView {
 			new Notice(`已连接到 ${this.selectedAgent.name}`);
 		} catch (error) {
 			console.error('[ChatView] 连接失败:', error);
-			this.updateStatus('连接失败', 'error');
+			this.updateConnectionStatus('error');
 			this.connectButtonEl.disabled = false;
-			this.addSystemMessage(`❌ 连接失败: ${error}`);
-			new Notice('连接失败');
+
+			// Phase 4: 友好化错误提示
+			this.showFriendlyError(error as Error, 'connection');
 		}
 	}
 
@@ -434,7 +449,7 @@ export class AcpChatView extends ItemView {
 			this.connection = null;
 		}
 
-		this.updateStatus('未连接', 'idle');
+		this.updateConnectionStatus('disconnected');
 		this.connectButtonEl.textContent = '连接';
 		this.setInputEnabled(false);
 
@@ -589,10 +604,14 @@ export class AcpChatView extends ItemView {
 				this.sendButtonEl.style.display = 'inline-block';
 				this.cancelButtonEl.style.display = 'none';
 				this.inputEl.disabled = false;
+				// Phase 4: 重置发送状态
+				this.setInputSending(false);
 				break;
 
 			case 'cancelled':
 				this.addSystemMessage('⚠️ 已取消');
+				// Phase 4: 重置发送状态
+				this.setInputSending(false);
 				break;
 		}
 	}
@@ -681,15 +700,37 @@ export class AcpChatView extends ItemView {
 			return;
 		}
 
+		// Phase 4: 保存到历史
+		this.addToInputHistory(text);
+
 		// 清空输入框
 		this.inputEl.value = '';
+
+		// Phase 4: 显示发送状态
+		this.setInputSending(true);
 
 		try {
 			// 使用 SessionManager 发送
 			await this.sessionManager.sendPrompt(text);
 		} catch (error) {
 			console.error('[ChatView] 发送失败:', error);
-			new Notice('发送失败');
+			this.showFriendlyError(error as Error, 'send');
+			this.setInputSending(false);
+		}
+	}
+
+	/**
+	 * 设置输入框发送状态（Phase 4）
+	 */
+	private setInputSending(sending: boolean): void {
+		if (sending) {
+			this.inputEl.disabled = true;
+			this.sendButtonEl.disabled = true;
+			this.sendButtonEl.textContent = '发送中...';
+		} else {
+			this.inputEl.disabled = false;
+			this.sendButtonEl.disabled = false;
+			this.sendButtonEl.textContent = '发送';
 		}
 	}
 
@@ -746,11 +787,60 @@ export class AcpChatView extends ItemView {
 	// ========================================================================
 
 	/**
-	 * 更新状态指示器
+	 * 更新连接状态栏（Phase 4 增强）
+	 */
+	private updateConnectionStatus(state: 'disconnected' | 'connecting' | 'connected' | 'error', agentName?: string): void {
+		this.statusEl.empty();
+		this.statusEl.className = `acp-connection-status acp-connection-status-${state}`;
+
+		// 状态图标
+		const iconEl = this.statusEl.createDiv({ cls: 'acp-connection-status-icon' });
+
+		let iconName: string;
+		let text: string;
+
+		switch (state) {
+			case 'disconnected':
+				iconName = 'circle';
+				text = '未连接 Agent';
+				break;
+			case 'connecting':
+				iconName = 'loader-2';
+				text = `正在连接 ${agentName || 'Agent'}...`;
+				iconEl.addClass('acp-spinner');
+				break;
+			case 'connected':
+				iconName = 'check-circle';
+				text = `已连接: ${agentName || 'Agent'}`;
+				break;
+			case 'error':
+				iconName = 'x-circle';
+				text = '连接失败';
+				break;
+		}
+
+		setIcon(iconEl, iconName);
+
+		// 状态文本
+		this.statusEl.createDiv({
+			cls: 'acp-connection-status-text',
+			text: text,
+		});
+	}
+
+	/**
+	 * 更新状态指示器（保留向后兼容）
 	 */
 	private updateStatus(text: string, state: 'idle' | 'connecting' | 'connected' | 'processing' | 'error'): void {
-		this.statusEl.textContent = text;
-		this.statusEl.className = `acp-status acp-status-${state}`;
+		// 映射到新的状态系统
+		const stateMap: Record<string, 'disconnected' | 'connecting' | 'connected' | 'error'> = {
+			'idle': 'disconnected',
+			'connecting': 'connecting',
+			'connected': 'connected',
+			'processing': 'connected',
+			'error': 'error',
+		};
+		this.updateConnectionStatus(stateMap[state] || 'disconnected', this.selectedAgent?.name);
 	}
 
 	/**
@@ -907,5 +997,147 @@ export class AcpChatView extends ItemView {
 			this.inputEl.value = `/${command.name}`;
 			await this.handleSend();
 		}
+	}
+
+	// ========================================================================
+	// Phase 4: UI/UX 增强方法
+	// ========================================================================
+
+	/**
+	 * 导航输入历史（Phase 4）
+	 */
+	private navigateInputHistory(direction: 'up' | 'down'): void {
+		if (this.inputHistory.length === 0) {
+			return;
+		}
+
+		if (direction === 'up') {
+			// 上键：向旧消息移动
+			if (this.inputHistoryIndex < this.inputHistory.length - 1) {
+				this.inputHistoryIndex++;
+			}
+		} else {
+			// 下键：向新消息移动
+			if (this.inputHistoryIndex > -1) {
+				this.inputHistoryIndex--;
+			}
+		}
+
+		// 更新输入框
+		if (this.inputHistoryIndex === -1) {
+			this.inputEl.value = '';
+		} else {
+			this.inputEl.value = this.inputHistory[this.inputHistoryIndex];
+		}
+
+		// 光标移到末尾
+		this.inputEl.setSelectionRange(this.inputEl.value.length, this.inputEl.value.length);
+	}
+
+	/**
+	 * 添加到输入历史（Phase 4）
+	 */
+	private addToInputHistory(text: string): void {
+		// 避免重复
+		if (this.inputHistory[0] === text) {
+			return;
+		}
+
+		// 添加到开头
+		this.inputHistory.unshift(text);
+
+		// 限制历史数量（最多 50 条）
+		if (this.inputHistory.length > 50) {
+			this.inputHistory.pop();
+		}
+
+		// 重置索引
+		this.inputHistoryIndex = -1;
+	}
+
+	/**
+	 * 显示友好化错误提示（Phase 4）
+	 */
+	private showFriendlyError(error: Error, context: 'connection' | 'send' | 'tool'): void {
+		const errorMessage = error.message || '未知错误';
+		let friendlyMessage = '';
+		let suggestions: string[] = [];
+
+		// 根据上下文和错误类型提供友好提示
+		if (context === 'connection') {
+			if (errorMessage.includes('ENOENT') || errorMessage.includes('not found')) {
+				friendlyMessage = 'Agent CLI 未安装或路径不正确';
+				suggestions = [
+					'1. 检查 Agent 是否已安装',
+					'2. 运行安装命令（参见设置页面）',
+					'3. 重启 Obsidian',
+				];
+			} else if (errorMessage.includes('EACCES') || errorMessage.includes('permission')) {
+				friendlyMessage = '权限不足';
+				suggestions = [
+					'1. 检查文件/目录权限',
+					'2. 使用 sudo 重新安装 CLI',
+					'3. 检查安全设置',
+				];
+			} else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+				friendlyMessage = '连接超时';
+				suggestions = [
+					'1. 检查网络连接',
+					'2. 检查 Agent 服务状态',
+					'3. 增加超时时间（设置页面）',
+				];
+			} else {
+				friendlyMessage = '连接失败';
+				suggestions = [
+					'1. 查看详细错误信息',
+					'2. 检查 Agent 配置',
+					'3. 查看控制台日志（Ctrl+Shift+I）',
+				];
+			}
+		} else if (context === 'send') {
+			friendlyMessage = '消息发送失败';
+			suggestions = [
+				'1. 检查连接状态',
+				'2. 重试发送',
+				'3. 重新连接 Agent',
+			];
+		} else if (context === 'tool') {
+			friendlyMessage = '工具调用失败';
+			suggestions = [
+				'1. 检查权限设置',
+				'2. 检查文件路径',
+				'3. 查看详细错误信息',
+			];
+		}
+
+		// 在 ChatView 中显示错误卡片
+		const errorEl = this.messagesEl.createDiv({ cls: 'acp-error-card' });
+
+		// 错误图标和标题
+		const headerEl = errorEl.createDiv({ cls: 'acp-error-header' });
+		const iconEl = headerEl.createDiv({ cls: 'acp-error-icon' });
+		setIcon(iconEl, 'alert-circle');
+		headerEl.createDiv({ cls: 'acp-error-title', text: friendlyMessage });
+
+		// 详细错误信息
+		const detailEl = errorEl.createDiv({ cls: 'acp-error-detail' });
+		detailEl.createDiv({ cls: 'acp-error-message', text: errorMessage });
+
+		// 解决方案
+		if (suggestions.length > 0) {
+			const solutionsEl = errorEl.createDiv({ cls: 'acp-error-solutions' });
+			solutionsEl.createDiv({ cls: 'acp-error-solutions-title', text: '解决方法:' });
+
+			const listEl = solutionsEl.createEl('ul');
+			for (const suggestion of suggestions) {
+				listEl.createEl('li', { text: suggestion });
+			}
+		}
+
+		// Obsidian Notice
+		new Notice(`❌ ${friendlyMessage}`);
+
+		// 自动滚动
+		this.smartScroll();
 	}
 }

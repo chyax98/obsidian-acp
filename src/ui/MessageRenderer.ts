@@ -56,6 +56,13 @@ export class MessageRenderer {
 			attr: { 'data-message-id': message.id },
 		});
 
+		// Phase 4: 时间戳
+		if (message.timestamp) {
+			const timestampEl = messageEl.createDiv({ cls: 'acp-message-timestamp' });
+			timestampEl.textContent = this.formatTimestamp(message.timestamp);
+			timestampEl.setAttribute('title', new Date(message.timestamp).toLocaleString());
+		}
+
 		// 消息内容容器（不显示发送者,通过位置区分）
 		const contentEl = messageEl.createDiv({ cls: 'acp-message-content' });
 
@@ -1102,6 +1109,59 @@ export class MessageRenderer {
 			low: '低',
 		};
 		return priorityMap[priority] || priority;
+	}
+
+	// ========================================================================
+	// Phase 4: 辅助方法
+	// ========================================================================
+
+	/**
+	 * 格式化时间戳（Phase 4）
+	 */
+	private static formatTimestamp(timestamp: number): string {
+		const now = Date.now();
+		const diff = now - timestamp;
+
+		// 小于 1 分钟
+		if (diff < 60000) {
+			return '刚刚';
+		}
+
+		// 小于 1 小时
+		if (diff < 3600000) {
+			const minutes = Math.floor(diff / 60000);
+			return `${minutes}分钟前`;
+		}
+
+		// 小于 1 天
+		if (diff < 86400000) {
+			const hours = Math.floor(diff / 3600000);
+			return `${hours}小时前`;
+		}
+
+		// 显示时间
+		const date = new Date(timestamp);
+		const today = new Date();
+
+		// 今天：显示时间
+		if (date.toDateString() === today.toDateString()) {
+			return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+		}
+
+		// 昨天
+		const yesterday = new Date(today);
+		yesterday.setDate(yesterday.getDate() - 1);
+		if (date.toDateString() === yesterday.toDateString()) {
+			return `昨天 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
+		}
+
+		// 其他：显示日期和时间
+		return date.toLocaleString('zh-CN', {
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit',
+		});
 	}
 }
 

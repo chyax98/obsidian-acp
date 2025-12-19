@@ -25,31 +25,32 @@ const DEFAULT_ACP_ARGS = ['--experimental-acp'];
  */
 export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 	// ========================================
-	// Claude Code - SDK 模式（主要支持）
+	// Claude Code - ACP 模式（通过 Zed 桥接）
 	// ========================================
 	claude: {
 		id: 'claude',
-		name: 'Claude Code (SDK)',
-		description: 'Anthropic Claude Code - 通过 SDK 直接调用，无需安装 CLI',
-		cliCommand: undefined, // SDK 模式不需要 CLI
-		authRequired: false, // SDK 会使用 Claude Code 已有的认证
-		enabled: true,
-		supportsStreaming: false,
-		acpArgs: [], // SDK 模式不需要参数
-	},
-
-	// ========================================
-	// Claude Code - ACP 模式（CLI）
-	// ========================================
-	'claude-acp': {
-		id: 'claude-acp',
-		name: 'Claude Code (ACP)',
-		description: 'Anthropic Claude Code - 通过 ACP 协议连接 CLI',
-		cliCommand: 'claude',
+		name: 'Claude Code',
+		description: 'Anthropic Claude Code - ACP 协议（通过 Zed 桥接）',
+		cliCommand: 'npx',
+		defaultCliPath: 'npx @zed-industries/claude-code-acp',
 		authRequired: false,
 		enabled: true,
 		supportsStreaming: false,
-		acpArgs: ['--experimental-acp'],
+		acpArgs: [], // npx 包已包含参数
+	},
+
+	// ========================================
+	// Claude Code - SDK 模式（已禁用 - Electron 不兼容）
+	// ========================================
+	'claude-sdk': {
+		id: 'claude-sdk',
+		name: 'Claude Code (SDK)',
+		description: 'SDK 模式 - 在 Electron 中不兼容',
+		cliCommand: undefined,
+		authRequired: false,
+		enabled: false, // 禁用
+		supportsStreaming: false,
+		acpArgs: [],
 	},
 
 	// ========================================

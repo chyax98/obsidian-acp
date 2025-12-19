@@ -51,7 +51,7 @@ export interface DetectionResult {
  *
  * 单例模式，启动时检测一次，全局共享结果。
  */
-class AcpCliDetector {
+export class AcpCliDetector {
 	private detectedAgents: DetectedAgent[] = [];
 	private isDetected = false;
 	private lastDetectionTime = 0;

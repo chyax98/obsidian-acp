@@ -19,7 +19,7 @@
  */
 export type AcpBackendId =
 	| 'claude'
-	| 'claude-acp'
+	| 'claude-sdk'
 	| 'codex'
 	| 'gemini'
 	| 'qwen'

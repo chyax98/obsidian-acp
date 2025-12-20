@@ -75,6 +75,8 @@ export class AcpChatView extends ItemView {
 
 	// 智能滚动
 	private scrollToBottomButton: HTMLElement | null = null;
+	private scrollDebounceTimer: NodeJS.Timeout | null = null;
+	private pendingScroll: boolean = false;
 
 	// 首条消息标记（用于注入 Obsidian 上下文）
 	private isFirstMessage: boolean = true;
@@ -177,7 +179,10 @@ export class AcpChatView extends ItemView {
 		const leftSection = this.headerEl.createDiv({ cls: 'acp-header-left' });
 
 		// 连接状态指示器（小圆点）
-		this.statusIndicatorEl = leftSection.createDiv({ cls: 'acp-status-dot acp-status-disconnected' });
+		this.statusIndicatorEl = leftSection.createDiv({
+			cls: 'acp-status-dot acp-status-disconnected',
+			attr: { 'aria-label': '未连接' },
+		});
 
 		// Agent 下拉框
 		this.agentSelectEl = leftSection.createEl('select', { cls: 'acp-agent-select-compact' });
@@ -643,7 +648,7 @@ export class AcpChatView extends ItemView {
 		if (isNew) {
 			void this.addMessage(message, container);
 		} else {
-			void this.updateMessage(message, container);
+			this.updateMessage(message, container);
 		}
 	}
 
@@ -929,10 +934,10 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 更新消息
 	 */
-	private async updateMessage(message: Message, container?: HTMLElement): Promise<void> {
+	private updateMessage(message: Message, container?: HTMLElement): void {
 		const target = container || this.messagesEl;
 		// 使用 MessageRenderer 更新
-		await MessageRenderer.updateMessage(target, message, this.markdownComponent, this.app);
+		MessageRenderer.updateMessage(target, message, this.markdownComponent, this.app);
 		this.smartScroll();
 	}
 
@@ -985,12 +990,28 @@ export class AcpChatView extends ItemView {
 
 	/**
 	 * 智能滚动（仅在用户接近底部时自动滚动）
+	 *
+	 * 优化：使用防抖，避免频繁滚动导致的抖动
 	 */
 	private smartScroll(): void {
-		if (this.isNearBottom()) {
-			this.forceScrollToBottom();
+		// 标记需要滚动
+		this.pendingScroll = true;
+
+		// 防抖：50ms 内的多次调用只执行最后一次
+		if (this.scrollDebounceTimer) {
+			clearTimeout(this.scrollDebounceTimer);
 		}
-		this.updateScrollButton();
+
+		this.scrollDebounceTimer = setTimeout(() => {
+			if (this.pendingScroll && this.isNearBottom()) {
+				// 使用 requestAnimationFrame 在下一帧执行滚动
+				requestAnimationFrame(() => {
+					this.forceScrollToBottom();
+				});
+			}
+			this.updateScrollButton();
+			this.pendingScroll = false;
+		}, 50);
 	}
 
 	/**

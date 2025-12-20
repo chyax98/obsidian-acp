@@ -11,130 +11,10 @@
 }
 
 /* ============================================================================
-   头部区域
+   头部区域 (紧凑版 - 主要样式在文件末尾)
    ============================================================================ */
 
-.acp-chat-header {
-	padding: 12px;
-	border-bottom: 1px solid var(--background-modifier-border);
-	background-color: var(--background-secondary);
-	flex-shrink: 0;
-}
-
-.acp-agent-selector {
-	display: flex;
-	gap: 8px;
-	align-items: center;
-}
-
-.acp-agent-select {
-	flex: 1;
-	padding: 6px 10px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	background-color: var(--background-primary);
-	color: var(--text-normal);
-	cursor: pointer;
-}
-
-.acp-agent-select:focus {
-	outline: none;
-	border-color: var(--interactive-accent);
-}
-
-.acp-connect-button {
-	padding: 6px 16px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	background-color: var(--interactive-normal);
-	color: var(--text-normal);
-	cursor: pointer;
-	white-space: nowrap;
-}
-
-.acp-connect-button:hover {
-	background-color: var(--interactive-hover);
-}
-
-.acp-connect-button:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.acp-status {
-	margin-top: 8px;
-	padding: 4px 8px;
-	font-size: 0.9em;
-	border-radius: 4px;
-	text-align: center;
-}
-
-.acp-status-idle {
-	background-color: var(--background-modifier-border);
-	color: var(--text-muted);
-}
-
-.acp-status-connecting {
-	background-color: var(--color-yellow);
-	color: var(--text-on-accent);
-}
-
-.acp-status-connected {
-	background-color: var(--color-green);
-	color: var(--text-on-accent);
-}
-
-.acp-status-processing {
-	background-color: var(--interactive-accent);
-	color: var(--text-on-accent);
-	animation: pulse 1.5s ease-in-out infinite;
-}
-
-.acp-status-error {
-	background-color: var(--color-red);
-	color: var(--text-on-accent);
-}
-
-@keyframes pulse {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.7;
-	}
-}
-
-/* 模式指示器 */
-.acp-mode-indicator {
-	margin-top: 8px;
-	padding: 6px 12px;
-	font-size: 0.85em;
-	border-radius: 4px;
-	text-align: center;
-	font-weight: 500;
-	transition: all 0.3s ease;
-}
-
-.acp-mode-ask {
-	background-color: var(--interactive-accent);
-	color: var(--text-on-accent);
-}
-
-.acp-mode-code {
-	background-color: var(--color-green);
-	color: var(--text-on-accent);
-}
-
-.acp-mode-plan {
-	background-color: var(--color-yellow);
-	color: var(--text-on-accent);
-}
-
-.acp-mode-default {
-	background-color: var(--background-modifier-border);
-	color: var(--text-muted);
-}
+/* 注意：主要头部样式已移至 "紧凑型头部" 部分 */
 
 /* ============================================================================
    消息区域
@@ -157,6 +37,8 @@
 	padding: 8px 12px;
 	animation: messageSlideIn 0.2s ease-out;
 	position: relative; /* 为操作按钮定位 */
+	contain: content; /* 优化：隔离布局计算 */
+	will-change: transform; /* 优化：提示浏览器优化 */
 }
 
 @keyframes messageSlideIn {
@@ -333,6 +215,12 @@
 	margin-left: 2px;
 }
 
+/* 流式输出期间的样式优化 */
+.acp-message-streaming {
+	/* 流式期间使用固定最小高度，避免内容增长时的抖动 */
+	min-height: 2em;
+}
+
 @keyframes blink {
 	50% {
 		opacity: 0;
@@ -435,7 +323,7 @@
 }
 
 /* ============================================================================
-   工具调用卡片
+   工具调用卡片 (Claude Code 风格)
    ============================================================================ */
 
 .acp-tool-call {
@@ -444,95 +332,110 @@
 	border-radius: 6px;
 	background-color: var(--background-secondary);
 	overflow: hidden;
+	transition: border-color 0.2s;
+	contain: content; /* 优化：隔离布局计算 */
+}
+
+.acp-tool-call:hover {
+	border-color: var(--background-modifier-border-hover);
 }
 
 .acp-tool-call-header {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 6px 10px;
+	justify-content: space-between;
+	padding: 8px 12px;
 	cursor: pointer;
 	user-select: none;
-	background-color: var(--background-secondary-alt);
-	font-size: 0.85em;
+	background-color: var(--background-secondary);
+	transition: background-color 0.15s;
 }
 
 .acp-tool-call-header:hover {
 	background-color: var(--background-modifier-hover);
 }
 
+/* 左侧：图标 + 标题 */
+.acp-tool-call-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+}
+
 .acp-tool-call-icon {
 	flex-shrink: 0;
-	width: 16px;
-	height: 16px;
+	width: 18px;
+	height: 18px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 }
 
-.acp-tool-call-status-pending .svg-icon {
+.acp-tool-call-icon .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.acp-tool-call-status-pending .acp-tool-call-icon .svg-icon {
 	color: var(--text-muted);
 }
 
-.acp-tool-call-status-in_progress .svg-icon {
+.acp-tool-call-status-in_progress .acp-tool-call-icon .svg-icon {
 	color: var(--interactive-accent);
 	animation: rotate 1s linear infinite;
 }
 
-.acp-tool-call-status-completed .svg-icon {
+.acp-tool-call-status-completed .acp-tool-call-icon .svg-icon {
 	color: var(--color-green);
 }
 
-.acp-tool-call-status-error .svg-icon {
+.acp-tool-call-status-failed .acp-tool-call-icon .svg-icon {
 	color: var(--color-red);
 }
 
-.acp-tool-call-status-cancelled .svg-icon {
-	color: var(--text-muted);
-}
-
 @keyframes rotate {
-	from {
-		transform: rotate(0deg);
-	}
-	to {
-		transform: rotate(360deg);
-	}
-}
-
-/* 标题容器 */
-.acp-tool-call-title-container {
-	flex: 1;
-	min-width: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
 }
 
 .acp-tool-call-title {
-	font-weight: 500;
 	font-size: 0.9em;
-	color: var(--text-muted);
-}
-
-/* Bash 命令显示 */
-.acp-tool-call-command {
-	font-family: var(--font-monospace);
-	font-size: 0.85em;
+	font-weight: 500;
 	color: var(--text-normal);
-	background: var(--background-primary);
-	padding: 2px 6px;
-	border-radius: 4px;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-/* 时间显示 */
+/* 右侧：时间 + 展开箭头 */
+.acp-tool-call-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-shrink: 0;
+}
+
 .acp-tool-call-time {
 	font-size: 0.75em;
 	color: var(--text-faint);
 	white-space: nowrap;
+}
+
+.acp-tool-call-chevron {
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	transition: transform 0.2s;
+}
+
+.acp-tool-call-chevron .svg-icon {
+	width: 14px;
+	height: 14px;
 }
 
 .acp-tool-call-kind {
@@ -870,29 +773,36 @@
    计划显示
    ============================================================================ */
 
-/* 思考块 */
+/* 思考块 (Claude Code 风格) */
 .acp-thoughts {
 	margin: 4px 0;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
 	background-color: var(--background-secondary);
 	overflow: hidden;
+	contain: content;
 }
 
 .acp-thoughts-header {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 6px 10px;
+	justify-content: space-between;
+	padding: 8px 12px;
 	cursor: pointer;
 	user-select: none;
-	background-color: rgba(255, 193, 7, 0.1);
-	border-bottom: 1px solid var(--background-modifier-border);
-	font-size: 0.85em;
+	background-color: rgba(147, 51, 234, 0.08);
+	border-bottom: 1px solid transparent;
+	transition: background-color 0.15s;
 }
 
 .acp-thoughts-header:hover {
-	background-color: var(--background-modifier-hover);
+	background-color: rgba(147, 51, 234, 0.12);
+}
+
+.acp-thoughts-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 }
 
 .acp-thoughts-toggle {
@@ -906,20 +816,35 @@
 }
 
 .acp-thoughts-toggle .svg-icon {
+	width: 14px;
+	height: 14px;
 	color: var(--text-muted);
 }
 
-.acp-thoughts-title {
-	flex: 1;
-	font-weight: 600;
-	font-size: 0.95em;
+.acp-thoughts-icon {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	justify-content: center;
 }
 
-.acp-thoughts-icon {
-	font-size: 1.1em;
+.acp-thoughts-icon .svg-icon {
+	width: 14px;
+	height: 14px;
+	color: rgb(147, 51, 234);
+}
+
+.acp-thoughts-title {
+	font-weight: 500;
+	font-size: 0.9em;
+	color: var(--text-normal);
+}
+
+.acp-thoughts-count {
+	font-size: 0.85em;
+	color: var(--text-muted);
 }
 
 .acp-thoughts-content {
@@ -959,37 +884,95 @@
 	margin-bottom: 0;
 }
 
-/* 计划 */
+/* 计划 (Claude Code 风格) */
 .acp-plan {
 	margin: 4px 0;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
 	background-color: var(--background-secondary);
 	overflow: hidden;
+	contain: content;
 }
 
 .acp-plan-header {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	cursor: pointer;
+	user-select: none;
+	background-color: rgba(59, 130, 246, 0.08);
+	border-bottom: 1px solid transparent;
+	transition: background-color 0.15s;
+}
+
+.acp-plan-header:hover {
+	background-color: rgba(59, 130, 246, 0.12);
+}
+
+.acp-plan-left {
+	display: flex;
+	align-items: center;
 	gap: 8px;
-	padding: 10px 12px;
-	background-color: var(--background-secondary-alt);
-	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.acp-plan-toggle {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform 0.2s;
+}
+
+.acp-plan-toggle .svg-icon {
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
 }
 
 .acp-plan-icon {
 	flex-shrink: 0;
 	width: 16px;
 	height: 16px;
-	color: var(--interactive-accent);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.acp-plan-icon .svg-icon {
+	width: 14px;
+	height: 14px;
+	color: rgb(59, 130, 246);
 }
 
 .acp-plan-title {
-	font-weight: 600;
-	font-size: 0.95em;
+	font-weight: 500;
+	font-size: 0.9em;
+	color: var(--text-normal);
+}
+
+.acp-plan-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.acp-plan-progress {
+	font-size: 0.85em;
+	color: var(--text-muted);
+	font-weight: 500;
 }
 
 .acp-plan-list {
+	padding: 8px 0;
+	transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.acp-plan-list-collapsed {
+	max-height: 0 !important;
+	overflow: hidden;
 	padding: 0;
 }
 
@@ -1350,89 +1333,7 @@
 	font-size: 12px;
 }
 
-/* ============================================================================
-   Phase 4: 连接状态栏
-   ============================================================================ */
-
-/* 连接状态栏 */
-.acp-connection-status {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin-top: 8px;
-	padding: 8px 12px;
-	border-radius: 6px;
-	font-size: 0.9em;
-	transition: all 0.3s ease;
-}
-
-.acp-connection-status-icon {
-	flex-shrink: 0;
-	width: 16px;
-	height: 16px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.acp-connection-status-text {
-	flex: 1;
-	font-weight: 500;
-}
-
-/* 未连接状态 */
-.acp-connection-status-disconnected {
-	background-color: var(--background-modifier-border);
-	color: var(--text-muted);
-}
-
-.acp-connection-status-disconnected .acp-connection-status-icon .svg-icon {
-	color: var(--text-muted);
-}
-
-/* 连接中状态 */
-.acp-connection-status-connecting {
-	background-color: var(--color-yellow);
-	color: var(--text-on-accent);
-}
-
-.acp-connection-status-connecting .acp-connection-status-icon .svg-icon {
-	color: var(--text-on-accent);
-}
-
-/* 已连接状态 */
-.acp-connection-status-connected {
-	background-color: var(--color-green);
-	color: var(--text-on-accent);
-}
-
-.acp-connection-status-connected .acp-connection-status-icon .svg-icon {
-	color: var(--text-on-accent);
-}
-
-/* 错误状态 */
-.acp-connection-status-error {
-	background-color: var(--color-red);
-	color: var(--text-on-accent);
-}
-
-.acp-connection-status-error .acp-connection-status-icon .svg-icon {
-	color: var(--text-on-accent);
-}
-
-/* Spinner 动画 */
-.acp-spinner .svg-icon {
-	animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-	from {
-		transform: rotate(0deg);
-	}
-	to {
-		transform: rotate(360deg);
-	}
-}
+/* Phase 4: 连接状态栏 - 已移除，使用紧凑版 .acp-status-dot */
 
 /* ============================================================================
    Phase 4: 错误卡片
@@ -1793,6 +1694,7 @@
 	flex-direction: column;
 	gap: 4px;
 	margin-bottom: 8px;
+	contain: layout style; /* 优化：隔离布局和样式计算 */
 }
 
 

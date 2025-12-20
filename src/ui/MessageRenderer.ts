@@ -310,19 +310,24 @@ export class MessageRenderer {
 	/**
 	 * 更新消息内容
 	 *
+	 * 优化策略：
+	 * 1. 流式输出时使用纯文本追加，避免频繁 Markdown 渲染
+	 * 2. 仅在流式结束时进行完整 Markdown 渲染
+	 * 3. 使用 requestAnimationFrame 批量更新
+	 *
 	 * @param container - 容器元素
 	 * @param message - 消息对象
 	 * @param component - Obsidian Component
 	 * @param app - Obsidian App 实例
 	 * @param sourcePath - Markdown 源路径（可选）
 	 */
-	public static async updateMessage(
+	public static updateMessage(
 		container: HTMLElement,
 		message: Message,
 		component: Component,
 		app: App,
 		sourcePath: string = '',
-	): Promise<void> {
+	): void {
 		const messageEl = container.querySelector(`[data-message-id="${message.id}"]`);
 		if (!messageEl) {
 			console.warn('[MessageRenderer] 找不到消息元素:', message.id);
@@ -335,30 +340,51 @@ export class MessageRenderer {
 			return;
 		}
 
-		// 清空并重新渲染
-		contentEl.empty();
+		// 使用 requestAnimationFrame 批量更新，减少重排
+		requestAnimationFrame(() => {
+			if (message.isStreaming) {
+				// 流式输出时：使用纯文本追加，避免 Markdown 重渲染的性能开销
+				// 保留已有内容结构，只更新文本
+				const existingText = contentEl.getAttribute('data-raw-content') || '';
+				const newContent = message.content || '';
 
-		if (message.content && message.content.trim()) {
-			try {
-				await MarkdownRenderer.render(
-					app,
-					message.content,
-					contentEl,
-					sourcePath,
-					component,
-				);
-			} catch (error) {
-				console.error('[MessageRenderer] Markdown 更新失败:', error);
-				contentEl.textContent = message.content;
+				if (newContent !== existingText) {
+					// 存储原始内容供后续使用
+					contentEl.setAttribute('data-raw-content', newContent);
+					// 流式期间使用简单文本显示（保留换行）
+					contentEl.innerHTML = this.escapeHtml(newContent).replace(/\n/g, '<br>');
+					contentEl.addClass('acp-message-streaming');
+				}
+			} else {
+				// 流式结束：进行完整的 Markdown 渲染
+				contentEl.removeClass('acp-message-streaming');
+				contentEl.removeAttribute('data-raw-content');
+
+				if (message.content && message.content.trim()) {
+					// 清空并渲染（仅在流式结束时执行一次）
+					contentEl.empty();
+					void MarkdownRenderer.render(
+						app,
+						message.content,
+						contentEl,
+						sourcePath,
+						component,
+					).catch((error) => {
+						console.error('[MessageRenderer] Markdown 更新失败:', error);
+						contentEl.textContent = message.content;
+					});
+				}
 			}
-		}
+		});
+	}
 
-		// 更新流式状态
-		if (message.isStreaming) {
-			contentEl.addClass('acp-message-streaming');
-		} else {
-			contentEl.removeClass('acp-message-streaming');
-		}
+	/**
+	 * HTML 转义（用于流式显示）
+	 */
+	private static escapeHtml(text: string): string {
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
 	}
 
 	/**
@@ -399,7 +425,12 @@ export class MessageRenderer {
 	// ========================================================================
 
 	/**
-	 * 渲染工具调用卡片（增强版，T12）
+	 * 渲染工具调用卡片 (Claude Code for VSCode 风格)
+	 *
+	 * 特点:
+	 * - 清晰的操作描述标题
+	 * - 紧凑的状态指示器
+	 * - 可折叠的详情区域
 	 *
 	 * @param container - 容器元素
 	 * @param toolCall - 工具调用对象
@@ -414,7 +445,7 @@ export class MessageRenderer {
 
 		if (toolCallEl) {
 			// 更新现有卡片
-			this.updateToolCallCard(toolCallEl, toolCall);
+			this.updateToolCallCard(toolCallEl, toolCall, app);
 			return toolCallEl;
 		}
 
@@ -427,29 +458,30 @@ export class MessageRenderer {
 		// 卡片头部
 		const headerEl = toolCallEl.createDiv({ cls: 'acp-tool-call-header' });
 
-		// 状态图标
-		const iconEl = headerEl.createDiv({ cls: 'acp-tool-call-icon' });
-		this.setToolCallIcon(iconEl, toolCall.status);
+		// 左侧：状态图标 + 标题
+		const leftEl = headerEl.createDiv({ cls: 'acp-tool-call-left' });
 
-		// 标题容器
-		const titleContainerEl = headerEl.createDiv({ cls: 'acp-tool-call-title-container' });
+		// 状态图标
+		const iconEl = leftEl.createDiv({ cls: 'acp-tool-call-icon' });
+		this.setToolCallIcon(iconEl, toolCall.status);
 
 		// 获取显示内容
 		const displayInfo = this.getToolCallDisplayInfo(toolCall);
 
-		// 标题（工具名称 + 内容）
-		const titleEl = titleContainerEl.createDiv({ cls: 'acp-tool-call-title' });
+		// 主标题：清晰描述操作
+		const titleEl = leftEl.createDiv({ cls: 'acp-tool-call-title' });
 		titleEl.textContent = displayInfo.title;
 
-		// 如果是 bash 命令，显示命令内容
-		if (displayInfo.command) {
-			const cmdEl = titleContainerEl.createDiv({ cls: 'acp-tool-call-command' });
-			cmdEl.textContent = displayInfo.command;
-		}
+		// 右侧：时间 + 展开图标
+		const rightEl = headerEl.createDiv({ cls: 'acp-tool-call-right' });
 
 		// 时间信息
-		const timeEl = headerEl.createDiv({ cls: 'acp-tool-call-time' });
+		const timeEl = rightEl.createDiv({ cls: 'acp-tool-call-time' });
 		timeEl.textContent = this.formatToolCallTime(toolCall);
+
+		// 展开/折叠指示器
+		const chevronEl = rightEl.createDiv({ cls: 'acp-tool-call-chevron' });
+		setIcon(chevronEl, 'chevron-right');
 
 		// 内容区域（默认折叠）
 		const contentEl = toolCallEl.createDiv({
@@ -457,14 +489,19 @@ export class MessageRenderer {
 			attr: { 'data-expanded': 'false' },
 		});
 
-		// 渲染内容（T12 增强：传递 app）
+		// 渲染内容
 		this.renderToolCallContent(contentEl, toolCall, app);
 
 		// 点击头部切换折叠/展开
 		headerEl.addEventListener('click', () => {
 			const expanded = contentEl.getAttribute('data-expanded') === 'true';
-			contentEl.setAttribute('data-expanded', expanded ? 'false' : 'true');
-			contentEl.toggleClass('acp-tool-call-content-expanded', !expanded);
+			const newExpanded = !expanded;
+			contentEl.setAttribute('data-expanded', newExpanded ? 'true' : 'false');
+			contentEl.toggleClass('acp-tool-call-content-expanded', newExpanded);
+
+			// 旋转 chevron
+			chevronEl.empty();
+			setIcon(chevronEl, newExpanded ? 'chevron-down' : 'chevron-right');
 		});
 
 		return toolCallEl;
@@ -472,35 +509,46 @@ export class MessageRenderer {
 
 	/**
 	 * 更新工具调用卡片
+	 *
+	 * 优化：使用 requestAnimationFrame 批量更新，减少重排
 	 */
-	private static updateToolCallCard(toolCallEl: HTMLElement, toolCall: ToolCall): void {
-		// 更新状态类
-		toolCallEl.className = `acp-tool-call acp-tool-call-status-${toolCall.status}`;
+	private static updateToolCallCard(toolCallEl: HTMLElement, toolCall: ToolCall, app?: App): void {
+		requestAnimationFrame(() => {
+			// 只在状态变化时更新状态类
+			const currentStatus = toolCallEl.getAttribute('data-status');
+			if (currentStatus !== toolCall.status) {
+				toolCallEl.className = `acp-tool-call acp-tool-call-status-${toolCall.status}`;
+				toolCallEl.setAttribute('data-status', toolCall.status);
 
-		// 更新图标
-		const iconEl = toolCallEl.querySelector('.acp-tool-call-icon');
-		if (iconEl) {
-			this.setToolCallIcon(iconEl as HTMLElement, toolCall.status);
-		}
+				// 更新图标
+				const iconEl = toolCallEl.querySelector('.acp-tool-call-icon');
+				if (iconEl) {
+					this.setToolCallIcon(iconEl as HTMLElement, toolCall.status);
+				}
+			}
 
-		// 更新标题
-		const titleEl = toolCallEl.querySelector('.acp-tool-call-title');
-		if (titleEl) {
-			titleEl.textContent = toolCall.title || '工具调用';
-		}
+			// 更新时间（总是更新，因为执行时间在变化）
+			const timeEl = toolCallEl.querySelector('.acp-tool-call-time');
+			if (timeEl) {
+				const newTime = this.formatToolCallTime(toolCall);
+				if (timeEl.textContent !== newTime) {
+					timeEl.textContent = newTime;
+				}
+			}
 
-		// 更新时间
-		const timeEl = toolCallEl.querySelector('.acp-tool-call-time');
-		if (timeEl) {
-			timeEl.textContent = this.formatToolCallTime(toolCall);
-		}
-
-		// 更新内容
-		const contentEl = toolCallEl.querySelector('.acp-tool-call-content');
-		if (contentEl) {
-			contentEl.empty();
-			this.renderToolCallContent(contentEl as HTMLElement, toolCall, undefined);
-		}
+			// 只在有新内容时更新内容区域
+			if (toolCall.content && toolCall.content.length > 0) {
+				const contentEl = toolCallEl.querySelector('.acp-tool-call-content');
+				if (contentEl) {
+					const currentContentCount = contentEl.querySelectorAll('.acp-tool-call-content-block').length;
+					// 只在内容数量变化时重新渲染
+					if (currentContentCount !== toolCall.content.length) {
+						(contentEl as HTMLElement).empty();
+						this.renderToolCallContent(contentEl as HTMLElement, toolCall, app);
+					}
+				}
+			}
+		});
 	}
 
 	/**
@@ -553,55 +601,123 @@ export class MessageRenderer {
 
 	/**
 	 * 获取工具调用的显示信息
-	 * 对于 Bash 等命令类工具，直接显示命令内容
+	 *
+	 * Claude Code 风格：清晰描述操作内容
+	 * - Bash: "执行 npm install"
+	 * - Read: "读取 src/index.ts"
+	 * - Write: "写入 config.json"
+	 * - Edit: "编辑 main.ts:42-58"
+	 * - Grep: "搜索 'function'"
+	 * - MCP: "调用 context7/search"
 	 */
-	private static getToolCallDisplayInfo(toolCall: ToolCall): { title: string; command?: string } {
+	private static getToolCallDisplayInfo(toolCall: ToolCall): { title: string } {
 		const kind = toolCall.kind?.toLowerCase() || '';
-		const rawInput = toolCall.rawInput;
+		const rawInput = toolCall.rawInput || {};
 		const title = toolCall.title || '';
 
-		// Bash / Execute / Terminal 类工具，显示命令
+		// Bash / Execute / Terminal 类工具
 		if (kind === 'bash' || kind === 'execute' || kind === 'shell' || kind === 'terminal') {
-			// 尝试从 rawInput 或 title 中获取命令
-			const command = (rawInput?.command as string) || title;
+			const command = (rawInput.command as string) || title;
 			if (command) {
-				const maxLen = 80;
-				const shortCmd = command.length > maxLen ? command.slice(0, maxLen) + '...' : command;
-				return {
-					title: 'Terminal',
-					command: shortCmd,
-				};
+				// 提取命令的第一部分（如 npm, git, python 等）
+				const firstWord = command.split(/\s+/)[0];
+				const shortCmd = command.length > 60 ? command.slice(0, 57) + '...' : command;
+				return { title: `执行 ${firstWord}: ${shortCmd}` };
 			}
+			return { title: '执行命令' };
 		}
 
-		// Read 类工具，显示文件路径
+		// Read 类工具
 		if (kind === 'read') {
-			const path = (rawInput?.path || rawInput?.file_path) as string | undefined;
+			const path = (rawInput.path || rawInput.file_path || title) as string;
 			if (path) {
-				return { title: `读取 ${this.shortenPath(path)}` };
+				return { title: `读取 ${this.getFileName(path)}` };
 			}
-			// 从 title 中提取路径
-			if (title) {
-				return { title: `读取 ${this.shortenPath(title)}` };
-			}
+			return { title: '读取文件' };
 		}
 
-		// Write / Edit 类工具，显示文件路径
-		if (kind === 'write' || kind === 'edit' || kind === 'patch') {
-			const path = (rawInput?.path || rawInput?.file_path) as string | undefined;
-			const action = kind === 'write' ? '写入' : '编辑';
+		// Write 类工具
+		if (kind === 'write') {
+			const path = (rawInput.path || rawInput.file_path || title) as string;
 			if (path) {
-				return { title: `${action} ${this.shortenPath(path)}` };
+				return { title: `写入 ${this.getFileName(path)}` };
 			}
-			if (title) {
-				return { title: `${action} ${this.shortenPath(title)}` };
-			}
+			return { title: '写入文件' };
 		}
 
-		// 默认使用原标题
-		return {
-			title: title || this.formatToolKind(kind) || '工具调用',
-		};
+		// Edit / Patch 类工具
+		if (kind === 'edit' || kind === 'patch') {
+			const path = (rawInput.path || rawInput.file_path || title) as string;
+			if (path) {
+				// 如果有行号信息，显示出来
+				const line = rawInput.line || rawInput.start_line;
+				const lineInfo = line ? `:${line}` : '';
+				return { title: `编辑 ${this.getFileName(path)}${lineInfo}` };
+			}
+			return { title: '编辑文件' };
+		}
+
+		// Grep / Search 类工具
+		if (kind === 'grep' || kind === 'search' || kind === 'find') {
+			const pattern = (rawInput.pattern || rawInput.query || rawInput.search) as string;
+			if (pattern) {
+				const shortPattern = pattern.length > 30 ? pattern.slice(0, 27) + '...' : pattern;
+				return { title: `搜索 "${shortPattern}"` };
+			}
+			return { title: '搜索' };
+		}
+
+		// Glob 类工具
+		if (kind === 'glob' || kind === 'list' || kind === 'ls') {
+			const pattern = (rawInput.pattern || rawInput.path) as string;
+			if (pattern) {
+				return { title: `列出 ${pattern}` };
+			}
+			return { title: '列出文件' };
+		}
+
+		// MCP 工具
+		if (kind === 'mcp' || kind.startsWith('mcp_')) {
+			const serverName = (rawInput.server || rawInput.serverName) as string;
+			const methodName = (rawInput.method || rawInput.tool) as string;
+			if (serverName && methodName) {
+				return { title: `MCP ${serverName}/${methodName}` };
+			}
+			if (methodName) {
+				return { title: `MCP ${methodName}` };
+			}
+			return { title: 'MCP 调用' };
+		}
+
+		// Web 搜索
+		if (kind === 'web_search' || kind === 'websearch') {
+			const query = (rawInput.query || rawInput.search) as string;
+			if (query) {
+				const shortQuery = query.length > 30 ? query.slice(0, 27) + '...' : query;
+				return { title: `搜索 "${shortQuery}"` };
+			}
+			return { title: '网页搜索' };
+		}
+
+		// 默认：使用原标题或工具类型
+		if (title) {
+			return { title: title.length > 50 ? title.slice(0, 47) + '...' : title };
+		}
+
+		return { title: this.formatToolKind(kind) || '工具调用' };
+	}
+
+	/**
+	 * 获取文件名（从完整路径）
+	 */
+	private static getFileName(path: string): string {
+		const parts = path.split(/[/\\]/);
+		const fileName = parts[parts.length - 1] || path;
+		// 如果路径很长，显示 ...目录/文件名
+		if (parts.length > 2 && path.length > 40) {
+			return `.../${parts[parts.length - 2]}/${fileName}`;
+		}
+		return fileName;
 	}
 
 	/**
@@ -1114,7 +1230,12 @@ export class MessageRenderer {
 	// ========================================================================
 
 	/**
-	 * 渲染思考块
+	 * 渲染思考块 (Claude Code 风格)
+	 *
+	 * 特点：
+	 * - 显示思考条数
+	 * - 默认折叠，点击展开
+	 * - 使用 requestAnimationFrame 优化更新
 	 *
 	 * @param container - 容器元素（应该是 turn 容器）
 	 * @param thoughts - 思考内容列表
@@ -1125,23 +1246,48 @@ export class MessageRenderer {
 		let thoughtsEl = container.querySelector('.acp-thoughts') as HTMLElement;
 
 		if (thoughtsEl) {
-			// 清空并重新渲染
-			thoughtsEl.empty();
-		} else {
-			// 创建新元素
-			thoughtsEl = container.createDiv({ cls: 'acp-thoughts' });
+			// 增量更新：只更新有变化的部分
+			requestAnimationFrame(() => {
+				const countEl = thoughtsEl.querySelector('.acp-thoughts-count');
+				if (countEl) {
+					countEl.textContent = `(${thoughts.length})`;
+				}
+
+				const contentEl = thoughtsEl.querySelector('.acp-thoughts-content');
+				if (contentEl) {
+					const existingCount = contentEl.querySelectorAll('.acp-thought-item').length;
+					// 只添加新的思考项
+					for (let i = existingCount; i < thoughts.length; i++) {
+						const thoughtEl = (contentEl as HTMLElement).createDiv({ cls: 'acp-thought-item' });
+						thoughtEl.textContent = thoughts[i];
+					}
+				}
+			});
+			return thoughtsEl;
 		}
+
+		// 创建新元素
+		thoughtsEl = container.createDiv({ cls: 'acp-thoughts' });
 
 		// 头部（可点击折叠/展开）
 		const headerEl = thoughtsEl.createDiv({ cls: 'acp-thoughts-header' });
 
+		// 左侧：图标 + 标题 + 数量
+		const leftEl = headerEl.createDiv({ cls: 'acp-thoughts-left' });
+
 		// 展开/折叠图标
-		const toggleIcon = headerEl.createDiv({ cls: 'acp-thoughts-toggle' });
+		const toggleIcon = leftEl.createDiv({ cls: 'acp-thoughts-toggle' });
 		setIcon(toggleIcon, 'chevron-right'); // 默认折叠
 
+		// 思考图标
+		const thinkIcon = leftEl.createDiv({ cls: 'acp-thoughts-icon' });
+		setIcon(thinkIcon, 'brain');
+
 		// 标题
-		const titleEl = headerEl.createDiv({ cls: 'acp-thoughts-title' });
-		titleEl.textContent = '思考过程';
+		leftEl.createDiv({ cls: 'acp-thoughts-title', text: '思考过程' });
+
+		// 数量
+		leftEl.createDiv({ cls: 'acp-thoughts-count', text: `(${thoughts.length})` });
 
 		// 内容区域（默认折叠）
 		const contentEl = thoughtsEl.createDiv({
@@ -1161,7 +1307,7 @@ export class MessageRenderer {
 			contentEl.setAttribute('data-expanded', expanded ? 'false' : 'true');
 			contentEl.toggleClass('acp-thoughts-content-expanded', !expanded);
 
-			// 切换图标
+			// 切换图标：折叠时显示 chevron-right，展开时显示 chevron-down
 			toggleIcon.empty();
 			setIcon(toggleIcon, expanded ? 'chevron-right' : 'chevron-down');
 		});
@@ -1170,7 +1316,12 @@ export class MessageRenderer {
 	}
 
 	/**
-	 * 渲染计划
+	 * 渲染计划 (Claude Code 风格)
+	 *
+	 * 特点：
+	 * - 可折叠的计划列表
+	 * - 显示完成进度
+	 * - 优化更新性能
 	 *
 	 * @param container - 容器元素（应该是 turn 容器）
 	 * @param plan - 计划条目列表
@@ -1180,23 +1331,78 @@ export class MessageRenderer {
 		// 在当前容器内查找是否已存在（限定在 turn 内）
 		let planEl = container.querySelector('.acp-plan') as HTMLElement;
 
+		// 计算进度
+		const completedCount = plan.filter(e => e.status === 'completed').length;
+		const progressText = `${completedCount}/${plan.length}`;
+
 		if (planEl) {
-			// 清空并重新渲染
-			planEl.empty();
-		} else {
-			// 创建新元素
-			planEl = container.createDiv({ cls: 'acp-plan' });
+			// 增量更新
+			requestAnimationFrame(() => {
+				// 更新进度
+				const progressEl = planEl.querySelector('.acp-plan-progress');
+				if (progressEl) {
+					progressEl.textContent = progressText;
+				}
+
+				// 更新列表
+				const listEl = planEl.querySelector('.acp-plan-list');
+				if (listEl) {
+					(listEl as HTMLElement).empty();
+					this.renderPlanEntries(listEl as HTMLElement, plan);
+				}
+			});
+			return planEl;
 		}
 
-		// 标题
+		// 创建新元素
+		planEl = container.createDiv({ cls: 'acp-plan' });
+
+		// 头部（可折叠）
 		const headerEl = planEl.createDiv({ cls: 'acp-plan-header' });
-		const iconEl = headerEl.createDiv({ cls: 'acp-plan-icon' });
+
+		// 左侧
+		const leftEl = headerEl.createDiv({ cls: 'acp-plan-left' });
+
+		// 展开/折叠图标
+		const toggleIcon = leftEl.createDiv({ cls: 'acp-plan-toggle' });
+		setIcon(toggleIcon, 'chevron-down'); // 默认展开
+
+		// 计划图标
+		const iconEl = leftEl.createDiv({ cls: 'acp-plan-icon' });
 		setIcon(iconEl, 'list-tree');
-		headerEl.createDiv({ cls: 'acp-plan-title', text: '执行计划' });
+
+		// 标题
+		leftEl.createDiv({ cls: 'acp-plan-title', text: '执行计划' });
+
+		// 右侧：进度
+		const rightEl = headerEl.createDiv({ cls: 'acp-plan-right' });
+		rightEl.createDiv({ cls: 'acp-plan-progress', text: progressText });
 
 		// 条目列表
-		const listEl = planEl.createDiv({ cls: 'acp-plan-list' });
+		const listEl = planEl.createDiv({
+			cls: 'acp-plan-list',
+			attr: { 'data-expanded': 'true' },
+		});
+		this.renderPlanEntries(listEl, plan);
 
+		// 点击头部切换展开/折叠
+		headerEl.addEventListener('click', () => {
+			const expanded = listEl.getAttribute('data-expanded') === 'true';
+			listEl.setAttribute('data-expanded', expanded ? 'false' : 'true');
+			listEl.toggleClass('acp-plan-list-collapsed', expanded);
+
+			// 切换图标
+			toggleIcon.empty();
+			setIcon(toggleIcon, expanded ? 'chevron-right' : 'chevron-down');
+		});
+
+		return planEl;
+	}
+
+	/**
+	 * 渲染计划条目
+	 */
+	private static renderPlanEntries(listEl: HTMLElement, plan: PlanEntry[]): void {
 		for (const entry of plan) {
 			const entryEl = listEl.createDiv({
 				cls: `acp-plan-entry acp-plan-entry-${entry.status}`,
@@ -1218,8 +1424,6 @@ export class MessageRenderer {
 				priorityEl.textContent = this.formatPriority(entry.priority);
 			}
 		}
-
-		return planEl;
 	}
 
 	/**

@@ -1,19 +1,14 @@
 /**
  * 优先级检测器
  *
- * 统一的 Agent CLI 检测器，实现 5 层优先级检测流程：
- * 1. 环境变量 (最高优先级)
- * 2. Vault 配置文件
- * 3. 全局配置文件
- * 4. 手动输入 (插件设置)
- * 5. 自动检测 (PATH) (最低优先级)
- *
- * TDD Phase 4: 实现完整检测流程
+ * 简化的 Agent CLI 检测器，实现 2 层优先级检测流程：
+ * 1. 用户填写 (插件设置) - 最高优先级
+ * 2. 自动检测 (默认路径 + PATH) - 用户未配置时使用
  */
 
-import { EnvDetector, type DetectionResult } from './env-detector';
-import { ConfigDetector } from './config-detector';
+import { type DetectionResult } from './env-detector';
 import { PathValidator } from './path-validator';
+import { getBackendConfig } from './backends';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
@@ -24,17 +19,17 @@ const execFileAsync = promisify(execFile);
  */
 export interface DetectionOptions {
 	/**
-	 * Vault 路径 (用于 Vault 配置)
+	 * Vault 路径 (保留用于向后兼容，但不再使用)
 	 */
 	vaultPath?: string;
 
 	/**
-	 * 全局配置文件路径 (默认 ~/.acprc)
+	 * 全局配置文件路径 (保留用于向后兼容，但不再使用)
 	 */
 	globalConfigPath?: string;
 
 	/**
-	 * 手动输入的路径 (from plugin settings)
+	 * 手动输入的路径 (from plugin settings) - 最高优先级
 	 */
 	manualPaths?: Record<string, string>;
 
@@ -68,20 +63,18 @@ export interface PriorityInfo {
  * 优先级检测器
  */
 export class PriorityDetector {
-	private envDetector: EnvDetector;
-	private configDetector: ConfigDetector;
 	private pathValidator: PathValidator;
 
 	constructor() {
-		this.envDetector = new EnvDetector();
-		this.configDetector = new ConfigDetector();
 		this.pathValidator = new PathValidator();
 	}
 
 	/**
 	 * 使用优先级检测 Agent 路径
 	 *
-	 * 按照 5 层优先级顺序检测，返回第一个有效的结果
+	 * 简化为 2 层优先级：
+	 * 1. 用户填写的路径（最高优先级）
+	 * 2. 自动检测（默认路径或 PATH 中的命令）
 	 *
 	 * @param agentId - Agent ID
 	 * @param options - 检测选项
@@ -91,55 +84,64 @@ export class PriorityDetector {
 		agentId: string,
 		options: DetectionOptions = {},
 	): Promise<DetectionResult> {
-		// 1️⃣ 优先级 1: 环境变量
-		const envResult = await this.envDetector.detectAgentPath(agentId);
-		if (envResult.found) {
-			return envResult;
-		}
+		// 1️⃣ 优先级 1: 用户填写的路径
+		if (options.manualPaths && options.manualPaths[agentId]) {
+			const manualPath = options.manualPaths[agentId].trim();
+			if (manualPath) {
+				const expandedPath = this.pathValidator.expandPath(manualPath);
+				const validation = await this.pathValidator.validatePath(expandedPath);
 
-		// 2️⃣ 优先级 2: Vault 配置文件
-		if (options.vaultPath) {
-			const vaultResult = await this.configDetector.detectAgentPath(
-				agentId,
-				options.vaultPath,
-			);
-			if (vaultResult.found) {
-				return vaultResult;
+				if (validation.isValid) {
+					const npxInfo = this.pathValidator.getNpxCommand(expandedPath);
+					return {
+						found: true,
+						agentId,
+						path: validation.path,
+						source: 'manual',
+						isNpxCommand: npxInfo.isNpx,
+						version: validation.version,
+					};
+				}
+				// 用户填写的路径无效，继续尝试自动检测
 			}
 		}
 
-		// 3️⃣ 优先级 3: 全局配置文件 (总是尝试，即使未指定路径也会使用默认 ~/.acprc)
-		const globalResult = await this.configDetector.detectAgentPath(
-			agentId,
-			undefined, // 跳过 Vault
-			options.globalConfigPath,
-		);
-		if (globalResult.found) {
-			return globalResult;
-		}
+		// 2️⃣ 优先级 2: 自动检测
+		// 2a. 优先使用后端配置的默认路径
+		const backendConfig = getBackendConfig(agentId as any);
+		if (backendConfig?.defaultCliPath) {
+			const defaultPath = backendConfig.defaultCliPath;
+			const npxInfo = this.pathValidator.getNpxCommand(defaultPath);
 
-		// 4️⃣ 优先级 4: 手动输入
-		if (options.manualPaths && options.manualPaths[agentId]) {
-			const manualPath = options.manualPaths[agentId];
-			const expandedPath = this.pathValidator.expandPath(manualPath);
-			const validation = await this.pathValidator.validatePath(expandedPath);
+			// npx 命令直接使用，不需要验证路径
+			if (npxInfo.isNpx) {
+				return {
+					found: true,
+					agentId,
+					path: defaultPath,
+					source: 'auto',
+					isNpxCommand: true,
+				};
+			}
 
+			// 非 npx 命令，验证路径
+			const validation = await this.pathValidator.validatePath(defaultPath);
 			if (validation.isValid) {
-				const npxInfo = this.pathValidator.getNpxCommand(expandedPath);
 				return {
 					found: true,
 					agentId,
 					path: validation.path,
-					source: 'manual',
-					isNpxCommand: npxInfo.isNpx,
+					source: 'auto',
+					isNpxCommand: false,
 					version: validation.version,
 				};
 			}
 		}
 
-		// 5️⃣ 优先级 5: 自动检测 (PATH)
-		if (options.cliCommand) {
-			const autoResult = await this.autoDetect(agentId, options.cliCommand);
+		// 2b. 从系统 PATH 中检测
+		const cliCommand = options.cliCommand || backendConfig?.cliCommand;
+		if (cliCommand && cliCommand !== 'npx') {
+			const autoResult = await this.autoDetect(agentId, cliCommand);
 			if (autoResult.found) {
 				return autoResult;
 			}
@@ -179,37 +181,20 @@ export class PriorityDetector {
 	/**
 	 * 获取优先级链说明
 	 *
-	 * @param agentId - Agent ID
+	 * @param _agentId - Agent ID (保留用于兼容)
 	 * @returns 优先级信息列表
 	 */
-	public getPriorityChain(agentId: string): PriorityInfo[] {
-		const envVarName = this.envDetector.getEnvVarName(agentId);
-
+	public getPriorityChain(_agentId: string): PriorityInfo[] {
 		return [
 			{
 				priority: 1,
-				source: 'env',
-				description: `环境变量 ${envVarName}`,
+				source: 'manual',
+				description: '用户填写 (插件设置)',
 			},
 			{
 				priority: 2,
-				source: 'vault-config',
-				description: 'Vault 配置文件 (.obsidian/plugins/obsidian-acp/.acp.json)',
-			},
-			{
-				priority: 3,
-				source: 'global-config',
-				description: '全局配置文件 (~/.acprc)',
-			},
-			{
-				priority: 4,
-				source: 'manual',
-				description: '手动输入 (插件设置)',
-			},
-			{
-				priority: 5,
 				source: 'auto',
-				description: '自动检测 (系统 PATH)',
+				description: '自动检测 (默认路径或系统 PATH)',
 			},
 		];
 	}

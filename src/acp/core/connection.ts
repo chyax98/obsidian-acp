@@ -119,6 +119,16 @@ export function createSpawnConfig(
 	const isMac = Platform.isMacOS === true;
 	const env = { ...process.env, ...customEnv };
 
+	// 处理 nvm 路径：如果 CLI 路径包含 .nvm，添加其 bin 目录到 PATH
+	if (cliPath.includes('/.nvm/') && !cliPath.startsWith('npx ')) {
+		const binDirMatch = cliPath.match(/^(.+\/\.nvm\/versions\/[^/]+\/[^/]+\/bin)\//);
+		if (binDirMatch) {
+			const nvmBinDir = binDirMatch[1];
+			env.PATH = `${nvmBinDir}:${env.PATH || ''}`;
+			console.log(`[ACP] 检测到 nvm 路径，添加到 PATH: ${nvmBinDir}`);
+		}
+	}
+
 	// ACP 参数：如果传入了空数组，表示不需要参数
 	const effectiveAcpArgs = acpArgs !== undefined ? acpArgs : ['--experimental-acp'];
 

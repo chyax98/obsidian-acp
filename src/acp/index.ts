@@ -52,23 +52,5 @@ export {
 	type DetectionResult,
 } from './detector';
 
-// 文件操作处理器
-export {
-	FileOperationHandler,
-	type FileHandlerConfig,
-	type ReadFileParams,
-	type ReadFileResult,
-	type WriteFileParams,
-	type FileOperationType,
-	type FileOperationRecord,
-} from './file-handler';
-
-// 会话持久化
-export {
-	SessionStorage,
-	type StoredSession,
-	type SessionSummary,
-} from './session-storage';
-
 // 类型定义
 export * from './types';

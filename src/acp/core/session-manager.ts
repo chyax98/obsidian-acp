@@ -86,6 +86,8 @@ export interface ToolCall {
 	content?: ToolCallContent[];
 	/** 相关位置 */
 	locations?: Array<{ path: string; line?: number; column?: number }>;
+	/** 原始输入参数（用于显示命令等） */
+	rawInput?: Record<string, unknown>;
 	/** 开始时间 */
 	startTime: number;
 	/** 结束时间 */
@@ -612,12 +614,24 @@ export class SessionManager {
 	private handleToolCall(update: ToolCallUpdateData): void {
 		if (!this.currentTurn) return;
 
+		// 打断当前消息流 - 让后续文本创建新消息元素
+		if (this.currentTurn.assistantMessage) {
+			// 完成当前消息缓冲
+			this.messageBuffer.complete(this.currentTurn.assistantMessage.id);
+			// 标记消息结束流式输出
+			this.currentTurn.assistantMessage.isStreaming = false;
+			this.onMessage(this.currentTurn.assistantMessage, false);
+			// 清除引用，下次文本会创建新消息
+			this.currentTurn.assistantMessage = undefined;
+		}
+
 		const toolCall: ToolCall = {
 			toolCallId: update.toolCallId,
 			title: update.title || '工具调用',
 			kind: update.kind || 'other',
 			status: (update.status as ToolCallStatus) || 'pending',
 			locations: update.locations,
+			rawInput: update.rawInput,
 			startTime: Date.now(),
 		};
 

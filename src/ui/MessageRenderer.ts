@@ -431,20 +431,25 @@ export class MessageRenderer {
 		const iconEl = headerEl.createDiv({ cls: 'acp-tool-call-icon' });
 		this.setToolCallIcon(iconEl, toolCall.status);
 
-		// 标题容器（包含标题和时间）
+		// 标题容器
 		const titleContainerEl = headerEl.createDiv({ cls: 'acp-tool-call-title-container' });
 
-		// 标题
+		// 获取显示内容
+		const displayInfo = this.getToolCallDisplayInfo(toolCall);
+
+		// 标题（工具名称 + 内容）
 		const titleEl = titleContainerEl.createDiv({ cls: 'acp-tool-call-title' });
-		titleEl.textContent = toolCall.title || '工具调用';
+		titleEl.textContent = displayInfo.title;
 
-		// 时间信息（T12 增强）
-		const timeEl = titleContainerEl.createDiv({ cls: 'acp-tool-call-time' });
+		// 如果是 bash 命令，显示命令内容
+		if (displayInfo.command) {
+			const cmdEl = titleContainerEl.createDiv({ cls: 'acp-tool-call-command' });
+			cmdEl.textContent = displayInfo.command;
+		}
+
+		// 时间信息
+		const timeEl = headerEl.createDiv({ cls: 'acp-tool-call-time' });
 		timeEl.textContent = this.formatToolCallTime(toolCall);
-
-		// 类型标签
-		const kindEl = headerEl.createDiv({ cls: 'acp-tool-call-kind' });
-		kindEl.textContent = this.formatToolKind(toolCall.kind);
 
 		// 内容区域（默认折叠）
 		const contentEl = toolCallEl.createDiv({
@@ -544,6 +549,68 @@ export class MessageRenderer {
 			other: '其他',
 		};
 		return kindMap[kind] || kind;
+	}
+
+	/**
+	 * 获取工具调用的显示信息
+	 * 对于 Bash 等命令类工具，直接显示命令内容
+	 */
+	private static getToolCallDisplayInfo(toolCall: ToolCall): { title: string; command?: string } {
+		const kind = toolCall.kind?.toLowerCase() || '';
+		const rawInput = toolCall.rawInput;
+		const title = toolCall.title || '';
+
+		// Bash / Execute / Terminal 类工具，显示命令
+		if (kind === 'bash' || kind === 'execute' || kind === 'shell' || kind === 'terminal') {
+			// 尝试从 rawInput 或 title 中获取命令
+			const command = (rawInput?.command as string) || title;
+			if (command) {
+				const maxLen = 80;
+				const shortCmd = command.length > maxLen ? command.slice(0, maxLen) + '...' : command;
+				return {
+					title: 'Terminal',
+					command: shortCmd,
+				};
+			}
+		}
+
+		// Read 类工具，显示文件路径
+		if (kind === 'read') {
+			const path = (rawInput?.path || rawInput?.file_path) as string | undefined;
+			if (path) {
+				return { title: `读取 ${this.shortenPath(path)}` };
+			}
+			// 从 title 中提取路径
+			if (title) {
+				return { title: `读取 ${this.shortenPath(title)}` };
+			}
+		}
+
+		// Write / Edit 类工具，显示文件路径
+		if (kind === 'write' || kind === 'edit' || kind === 'patch') {
+			const path = (rawInput?.path || rawInput?.file_path) as string | undefined;
+			const action = kind === 'write' ? '写入' : '编辑';
+			if (path) {
+				return { title: `${action} ${this.shortenPath(path)}` };
+			}
+			if (title) {
+				return { title: `${action} ${this.shortenPath(title)}` };
+			}
+		}
+
+		// 默认使用原标题
+		return {
+			title: title || this.formatToolKind(kind) || '工具调用',
+		};
+	}
+
+	/**
+	 * 缩短路径显示
+	 */
+	private static shortenPath(path: string): string {
+		const parts = path.split('/');
+		if (parts.length <= 2) return path;
+		return '.../' + parts.slice(-2).join('/');
 	}
 
 	/**

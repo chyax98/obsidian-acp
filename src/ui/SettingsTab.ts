@@ -457,29 +457,53 @@ export class AcpSettingTab extends PluginSettingTab {
 			<strong>完全信任</strong>：自动批准所有操作，配合 Git 回滚保证安全
 		`;
 
-		// 重置"始终允许"记录（仅在 interactive 模式下显示）
+		// 已授权工具列表（仅在 interactive 模式下显示）
 		if (this.plugin.settings.permission.mode === 'interactive') {
 			const allowedTools = this.plugin.settings.permission.alwaysAllowedTools;
-			const allowedCount = Object.keys(allowedTools).length;
+			const toolNames = Object.keys(allowedTools);
 
-			new Setting(containerEl)
-				.setName('重置"始终允许"记录')
-				.setDesc(
-					allowedCount > 0
-						? `当前已记录 ${allowedCount} 个工具：${Object.keys(allowedTools).join(', ')}`
-						: '当前没有记录任何工具',
-				)
-				.addButton(button => {
-					button
-						.setButtonText('清除')
-						.setDisabled(allowedCount === 0)
-						.onClick(async () => {
-							this.plugin.settings.permission.alwaysAllowedTools = {};
-							await this.plugin.saveSettings();
-							new Notice('已清除所有"始终允许"记录');
-							this.display(); // 刷新页面
-						});
+			if (toolNames.length > 0) {
+				// 工具列表容器
+				const toolListContainer = containerEl.createDiv({ cls: 'acp-allowed-tools-container' });
+				toolListContainer.createEl('h4', { text: '已授权工具', cls: 'acp-allowed-tools-title' });
+
+				const toolListEl = toolListContainer.createDiv({ cls: 'acp-allowed-tools-list' });
+
+				for (const toolName of toolNames) {
+					const toolItemEl = toolListEl.createDiv({ cls: 'acp-allowed-tool-item' });
+
+					// 工具名称
+					toolItemEl.createSpan({ text: toolName, cls: 'acp-allowed-tool-name' });
+
+					// 移除按钮
+					const removeBtn = toolItemEl.createEl('button', {
+						text: '×',
+						cls: 'acp-allowed-tool-remove',
+						attr: { 'aria-label': '移除授权' },
+					});
+					removeBtn.addEventListener('click', async () => {
+						delete this.plugin.settings.permission.alwaysAllowedTools[toolName];
+						await this.plugin.saveSettings();
+						new Notice(`已移除 ${toolName} 的授权`);
+						this.display();
+					});
+				}
+
+				// 清除全部按钮
+				const clearAllBtn = toolListContainer.createEl('button', {
+					text: '清除全部授权',
+					cls: 'acp-clear-all-btn',
 				});
+				clearAllBtn.addEventListener('click', async () => {
+					this.plugin.settings.permission.alwaysAllowedTools = {};
+					await this.plugin.saveSettings();
+					new Notice('已清除所有授权');
+					this.display();
+				});
+			} else {
+				const noToolsEl = containerEl.createDiv({ cls: 'acp-no-allowed-tools' });
+				noToolsEl.setText('暂无已授权工具。当你选择"始终允许"某个工具时，它会出现在这里。');
+			}
 		}
 	}
 

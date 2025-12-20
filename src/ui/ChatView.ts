@@ -64,6 +64,7 @@ export class AcpChatView extends ItemView {
 	private cancelButtonEl!: HTMLButtonElement;
 	private agentSelectEl!: HTMLSelectElement;
 	private connectButtonEl!: HTMLButtonElement;
+	private newChatButtonEl!: HTMLButtonElement;
 	private statusIndicatorEl!: HTMLElement;
 
 	// 空状态引导
@@ -74,6 +75,9 @@ export class AcpChatView extends ItemView {
 
 	// 智能滚动
 	private scrollToBottomButton: HTMLElement | null = null;
+
+	// 首条消息标记（用于注入 Obsidian 上下文）
+	private isFirstMessage: boolean = true;
 
 	// Phase 4: 输入历史
 	private inputHistory: string[] = [];
@@ -182,8 +186,21 @@ export class AcpChatView extends ItemView {
 			value: '',
 		});
 
-		// 右侧：连接按钮
-		this.connectButtonEl = this.headerEl.createEl('button', {
+		// 右侧：按钮组
+		const rightSection = this.headerEl.createDiv({ cls: 'acp-header-right' });
+
+		// 新对话按钮
+		this.newChatButtonEl = rightSection.createEl('button', {
+			cls: 'acp-new-chat-btn clickable-icon',
+			attr: { 'aria-label': '新对话' },
+		});
+		setIcon(this.newChatButtonEl, 'plus');
+		this.newChatButtonEl.addEventListener('click', () => {
+			void this.handleNewChat();
+		});
+
+		// 连接按钮
+		this.connectButtonEl = rightSection.createEl('button', {
 			cls: 'acp-connect-btn',
 			text: '连接',
 		});
@@ -200,8 +217,8 @@ export class AcpChatView extends ItemView {
 
 		this.messagesEl = messagesContainer.createDiv({ cls: 'acp-chat-messages' });
 
-		// 欢迎消息
-		this.addSystemMessage('欢迎使用 ACP Agent Client!\n请选择一个 Agent 并连接。');
+		// 简洁的空状态引导（Zed/Cursor 风格）
+		this.showEmptyState();
 
 		// "跳到最新"按钮
 		this.scrollToBottomButton = messagesContainer.createDiv({
@@ -231,7 +248,7 @@ export class AcpChatView extends ItemView {
 		this.inputEl = this.inputContainerEl.createEl('textarea', {
 			cls: 'acp-input-textarea',
 			attr: {
-				placeholder: '输入消息...',
+				placeholder: '输入消息，/ 查看命令',
 				rows: '3',
 			},
 		});
@@ -335,7 +352,6 @@ export class AcpChatView extends ItemView {
 					text: '未找到可用 Agent',
 					value: '',
 				});
-				this.addSystemMessage('⚠️ 未找到可用 Agent，请检查配置');
 			} else {
 				this.agentSelectEl.createEl('option', {
 					text: '选择 Agent...',
@@ -348,8 +364,6 @@ export class AcpChatView extends ItemView {
 						value: agent.backendId,
 					});
 				}
-
-				this.addSystemMessage(`✓ 找到 ${this.availableAgents.length} 个可用 Agent`);
 			}
 		} catch (error) {
 			console.error('[ChatView] 加载 Agent 失败:', error);
@@ -420,11 +434,14 @@ export class AcpChatView extends ItemView {
 
 			this.connectButtonEl.textContent = '断开';
 			this.connectButtonEl.disabled = false;
-			
+
+			// 隐藏空状态引导
+			this.hideEmptyState();
+
 			// 使用统一的状态更新
 			this.updateUIState('idle');
 
-			this.addSystemMessage(`✅ 已连接到 ${this.selectedAgent.name}`);
+			this.addSystemMessage(`已连接到 ${this.selectedAgent.name}`);
 			new Notice(`已连接到 ${this.selectedAgent.name}`);
 		} catch (error) {
 			console.error('[ChatView] 连接失败:', error);
@@ -495,11 +512,52 @@ export class AcpChatView extends ItemView {
 		this.updateConnectionStatus('disconnected');
 		this.connectButtonEl.textContent = '连接';
 		this.agentSelectEl.disabled = false;
-		
+
 		// 使用统一的状态更新
 		this.updateUIState('idle');
+	}
 
-		this.addSystemMessage('已断开连接');
+	/**
+	 * 处理新对话
+	 */
+	private async handleNewChat(): Promise<void> {
+		// 如果没有连接，直接清空消息
+		if (!this.connection?.isConnected || !this.sessionManager) {
+			this.clearMessages();
+			new Notice('已清空对话');
+			return;
+		}
+
+		try {
+			// 结束当前会话
+			this.sessionManager.end();
+
+			// 清空消息区域
+			this.clearMessages();
+
+			// 重置 turn 容器
+			this.currentTurnContainer = null;
+
+			// 创建新会话
+			await this.sessionManager.start();
+
+			this.addSystemMessage('✨ 新对话已开始');
+			new Notice('新对话已开始');
+		} catch (error) {
+			console.error('[ChatView] 新对话失败:', error);
+			new Notice('创建新对话失败');
+		}
+	}
+
+	/**
+	 * 清空消息区域
+	 */
+	private clearMessages(): void {
+		this.messagesEl.empty();
+		this.currentTurnContainer = null;
+		this.inputHistory = [];
+		this.inputHistoryIndex = -1;
+		this.isFirstMessage = true; // 重置首条消息标记
 	}
 
 	// ========================================================================
@@ -595,14 +653,8 @@ export class AcpChatView extends ItemView {
 	private handleToolCall(toolCall: ToolCall): void {
 		const container = this.getTurnContainer();
 
-		// 获取或创建工具调用组容器
-		let toolsContainer = container.querySelector('.acp-turn-tools') as HTMLElement;
-		if (!toolsContainer) {
-			toolsContainer = container.createDiv({ cls: 'acp-turn-tools' });
-		}
-
-		// 使用 MessageRenderer 渲染工具调用卡片
-		MessageRenderer.renderToolCall(toolsContainer, toolCall, this.app);
+		// 直接添加到 turn 容器，保持消息和工具调用的顺序
+		MessageRenderer.renderToolCall(container, toolCall, this.app);
 		this.smartScroll();
 	}
 
@@ -751,7 +803,7 @@ export class AcpChatView extends ItemView {
 	 * 处理发送
 	 */
 	private async handleSend(): Promise<void> {
-		const text = this.inputEl.value.trim();
+		let text = this.inputEl.value.trim();
 		if (!text) {
 			return;
 		}
@@ -768,6 +820,15 @@ export class AcpChatView extends ItemView {
 		// 清空输入框
 		this.inputEl.value = '';
 
+		// 首条消息注入 Obsidian 上下文
+		if (this.isFirstMessage) {
+			const context = this.getObsidianContext();
+			if (context) {
+				text = `${context}\n\n---\n\n${text}`;
+			}
+			this.isFirstMessage = false;
+		}
+
 		// Phase 4: 显示发送状态
 		this.setInputSending(true);
 
@@ -779,6 +840,37 @@ export class AcpChatView extends ItemView {
 			this.showFriendlyError(error as Error, 'send');
 			this.setInputSending(false);
 		}
+	}
+
+	/**
+	 * 获取 Obsidian 上下文信息
+	 */
+	private getObsidianContext(): string {
+		const parts: string[] = [];
+
+		// Vault 名称
+		const vaultName = this.app.vault.getName();
+		parts.push('[Obsidian Context]');
+		parts.push(`- Vault: ${vaultName}`);
+
+		// 工作目录
+		try {
+			const workingDir = this.getWorkingDirectory();
+			parts.push(`- Working Directory: ${workingDir}`);
+		} catch {
+			// 忽略
+		}
+
+		// 当前打开的文件
+		const activeFile = this.app.workspace.getActiveFile();
+		if (activeFile) {
+			parts.push(`- Active File: ${activeFile.path}`);
+		}
+
+		// Obsidian 特有语法提示
+		parts.push('- Note: This vault uses Obsidian\'s [[wikilinks]] syntax for internal links.');
+
+		return parts.join('\n');
 	}
 
 	/**
@@ -925,10 +1017,37 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 处理当前模式更新（简化版 - 仅保存状态）
 	 */
-	private handleCurrentModeUpdate(mode: string, description?: string): void {
+	private handleCurrentModeUpdate(mode: string, _description?: string): void {
 		this.currentMode = mode;
-		// 在紧凑型头部中，模式显示已简化，这里只保存状态即可
-		// 未来可以考虑在状态指示器的 tooltip 中显示模式信息
+	}
+
+	/**
+	 * 显示空状态引导（简洁版）
+	 */
+	private showEmptyState(): void {
+		if (this.emptyStateEl) return;
+
+		this.emptyStateEl = this.messagesEl.createDiv({ cls: 'acp-empty-state' });
+
+		// 图标
+		const iconEl = this.emptyStateEl.createDiv({ cls: 'acp-empty-state-icon' });
+		setIcon(iconEl, 'bot');
+
+		// 提示文本
+		this.emptyStateEl.createDiv({
+			cls: 'acp-empty-state-text',
+			text: '选择 Agent 开始对话',
+		});
+	}
+
+	/**
+	 * 隐藏空状态引导
+	 */
+	private hideEmptyState(): void {
+		if (this.emptyStateEl) {
+			this.emptyStateEl.remove();
+			this.emptyStateEl = null;
+		}
 	}
 
 	/**

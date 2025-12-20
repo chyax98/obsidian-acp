@@ -9,6 +9,8 @@ import type { PermissionRequest, PermissionResponse } from '../acp/permission-ma
  * 用于 2 种模式的权限系统：interactive（每次询问）和 trustAll（完全信任）
  */
 export class PermissionModal extends Modal {
+	private responded = false;
+
 	constructor(
 		app: App,
 		private request: PermissionRequest,
@@ -63,8 +65,7 @@ export class PermissionModal extends Modal {
 		// 拒绝
 		const rejectBtn = buttonsEl.createEl('button', { text: '拒绝' });
 		rejectBtn.addEventListener('click', () => {
-			this.onResponse({ outcome: 'selected', optionId: 'reject-once' });
-			this.close();
+			this.respond({ outcome: 'selected', optionId: 'reject-once' });
 		});
 
 		// 允许一次
@@ -73,8 +74,7 @@ export class PermissionModal extends Modal {
 			cls: 'mod-cta',
 		});
 		allowOnceBtn.addEventListener('click', () => {
-			this.onResponse({ outcome: 'selected', optionId: 'allow-once' });
-			this.close();
+			this.respond({ outcome: 'selected', optionId: 'allow-once' });
 		});
 
 		// 始终允许
@@ -82,19 +82,30 @@ export class PermissionModal extends Modal {
 			text: '始终允许此工具',
 		});
 		alwaysBtn.addEventListener('click', () => {
-			this.onResponse({ outcome: 'selected', optionId: 'allow-always' });
-			this.close();
+			this.respond({ outcome: 'selected', optionId: 'allow-always' });
 		});
 
 		// 键盘快捷键
 		this.scope.register([], 'Enter', () => {
-			this.onResponse({ outcome: 'selected', optionId: 'allow-once' });
-			this.close();
+			this.respond({ outcome: 'selected', optionId: 'allow-once' });
 			return false;
 		});
 	}
 
+	private respond(response: PermissionResponse): void {
+		if (!this.responded) {
+			this.responded = true;
+			this.onResponse(response);
+			this.close();
+		}
+	}
+
 	public onClose(): void {
+		// 如果用户关闭弹窗但没有点击任何按钮，默认允许一次（避免阻塞）
+		if (!this.responded) {
+			this.responded = true;
+			this.onResponse({ outcome: 'selected', optionId: 'allow-once' });
+		}
 		this.contentEl.empty();
 	}
 

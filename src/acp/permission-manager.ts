@@ -44,8 +44,15 @@ export class PermissionManager {
 	): Promise<PermissionResponse> {
 		const { toolName } = request;
 
+		console.log('[PermissionManager] 权限请求:', {
+			toolName,
+			mode: this.settings.mode,
+			alwaysAllowed: this.settings.alwaysAllowedTools,
+		});
+
 		// 模式 1: 完全信任 - 自动批准所有请求
 		if (this.settings.mode === 'trustAll') {
+			console.log('[PermissionManager] trustAll 模式，自动批准');
 			return {
 				outcome: 'selected',
 				optionId: 'allow-once',
@@ -54,6 +61,7 @@ export class PermissionManager {
 
 		// 模式 2: 每次询问 - 检查是否已记录"始终允许"
 		if (this.settings.alwaysAllowedTools[toolName]) {
+			console.log('[PermissionManager] 工具已在始终允许列表');
 			return {
 				outcome: 'selected',
 				optionId: 'allow-once',
@@ -61,6 +69,7 @@ export class PermissionManager {
 		}
 
 		// 弹出权限对话框
+		console.log('[PermissionManager] 显示权限对话框');
 		return await this.showPermissionDialog(request);
 	}
 

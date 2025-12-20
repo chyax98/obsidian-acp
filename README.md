@@ -139,12 +139,10 @@ qwen --version
 - [Agent 配置](./docs/user-guide/AGENT_SETUP.md) - 每个 Agent 的详细配置教程
 - [权限系统](./docs/user-guide/PERMISSIONS.md) - 理解和配置权限管理
 - [常见问题 FAQ](./docs/user-guide/FAQ.md) - 安装、配置、使用问题解答
-- [快速参考](./USAGE.md) - 常用操作和示例
 
 **开发文档**:
-- [集成指南](./docs/development/INTEGRATION_GUIDE.md) - 5层检测系统集成（新）
-- [检测系统总结](./docs/development/DETECTION_SYSTEM_SUMMARY.md) - 完整实现和技术细节（新）
-- [产品愿景](./CLAUDE.md) - 完整的产品设计和技术架构
+- [集成指南](./docs/development/INTEGRATION_GUIDE.md) - 5层检测系统集成
+- [检测系统总结](./docs/development/DETECTION_SYSTEM_SUMMARY.md) - 完整实现和技术细节
 
 ## 🔧 开发
 

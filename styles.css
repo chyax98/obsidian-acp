@@ -154,9 +154,7 @@
 .acp-message {
 	display: flex;
 	flex-direction: column;
-	max-width: 90%;
 	padding: 8px 12px;
-	border-radius: 6px;
 	animation: messageSlideIn 0.2s ease-out;
 	position: relative; /* 为操作按钮定位 */
 }
@@ -172,11 +170,13 @@
 	}
 }
 
-/* 用户消息 */
+/* 用户消息 - 右对齐，蓝色背景，聊天气泡风格 */
 .acp-message-user {
 	align-self: flex-end;
+	max-width: 80%;
 	background-color: var(--interactive-accent);
 	color: var(--text-on-accent);
+	border-radius: 12px 12px 4px 12px;
 }
 
 .acp-message-user .acp-message-header {
@@ -184,11 +184,12 @@
 	opacity: 0.9;
 }
 
-/* Agent 消息 */
+/* Agent 消息 - 左对齐，灰色背景，聊天气泡风格 */
 .acp-message-assistant {
 	align-self: flex-start;
+	max-width: 85%;
 	background-color: var(--background-secondary);
-	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px 12px 12px 4px;
 }
 
 /* 系统消息 */
@@ -288,16 +289,11 @@
 
 /* 减小 Markdown 渲染的段落间距 */
 .acp-message-content p {
-	margin-top: 0.3em;
-	margin-bottom: 0.3em;
+	margin: 0;
 }
 
-.acp-message-content p:first-child {
-	margin-top: 0;
-}
-
-.acp-message-content p:last-child {
-	margin-bottom: 0;
+.acp-message-content p + p {
+	margin-top: 0.5em;
 }
 
 /* 减小列表间距 */
@@ -504,9 +500,10 @@
 	}
 }
 
-/* T12 增强：标题容器 */
+/* 标题容器 */
 .acp-tool-call-title-container {
 	flex: 1;
+	min-width: 0;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
@@ -514,14 +511,28 @@
 
 .acp-tool-call-title {
 	font-weight: 500;
-	font-size: 0.95em;
+	font-size: 0.9em;
+	color: var(--text-muted);
 }
 
-/* T12 增强：时间显示 */
-.acp-tool-call-time {
-	font-size: 0.8em;
-	color: var(--text-muted);
+/* Bash 命令显示 */
+.acp-tool-call-command {
 	font-family: var(--font-monospace);
+	font-size: 0.85em;
+	color: var(--text-normal);
+	background: var(--background-primary);
+	padding: 2px 6px;
+	border-radius: 4px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* 时间显示 */
+.acp-tool-call-time {
+	font-size: 0.75em;
+	color: var(--text-faint);
+	white-space: nowrap;
 }
 
 .acp-tool-call-kind {
@@ -1514,12 +1525,15 @@
 .acp-message-timestamp {
 	font-size: 0.75em;
 	color: var(--text-faint);
-	margin-bottom: 4px;
-	opacity: 0.7;
-	transition: opacity 0.2s;
+	height: 0;
+	overflow: hidden;
+	opacity: 0;
+	transition: all 0.2s;
 }
 
 .acp-message:hover .acp-message-timestamp {
+	height: auto;
+	margin-bottom: 4px;
 	opacity: 1;
 }
 
@@ -1773,25 +1787,14 @@
 	overflow: visible;  /* 不阻止子元素的滚动 */
 }
 
-/* Turn 容器 */
+/* Turn 容器（简洁版，无边框） */
 .acp-turn-container {
 	display: flex;
 	flex-direction: column;
-	gap: 3px;
+	gap: 4px;
 	margin-bottom: 8px;
-	padding: 6px;
-	border-radius: 8px;
-	background-color: var(--background-primary-alt);
-	border: 1px solid var(--background-modifier-border-hover);
 }
 
-/* Turn 内的工具调用组 */
-.acp-turn-tools {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	margin-top: 6px;
-}
 
 /* 跳到最新按钮 */
 .acp-scroll-to-bottom {
@@ -2010,5 +2013,251 @@
 
 .theme-dark .acp-agent-item-enhanced:hover {
   background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* ============================================================================
+   紧凑型头部（Chat 页面）
+   ============================================================================ */
+
+.acp-chat-header-compact {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+	flex-shrink: 0;
+	gap: 8px;
+}
+
+.acp-header-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+}
+
+.acp-header-right {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+/* 新对话按钮 */
+.acp-new-chat-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.acp-new-chat-btn:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.acp-new-chat-btn:active {
+	background-color: var(--background-modifier-active-hover);
+}
+
+/* 状态指示器（小圆点） */
+.acp-status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+	transition: background-color 0.2s;
+}
+
+.acp-status-dot.acp-status-disconnected {
+	background-color: var(--text-muted);
+}
+
+.acp-status-dot.acp-status-connecting {
+	background-color: var(--color-yellow);
+	animation: pulse 1s ease-in-out infinite;
+}
+
+.acp-status-dot.acp-status-connected {
+	background-color: var(--color-green);
+}
+
+.acp-status-dot.acp-status-error {
+	background-color: var(--color-red);
+}
+
+/* Agent 选择器（紧凑版） */
+.acp-agent-select-compact {
+	flex: 1;
+	min-width: 0;
+	padding: 4px 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 0.9em;
+	cursor: pointer;
+}
+
+.acp-agent-select-compact:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+.acp-agent-select-compact:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+/* 连接按钮（紧凑版） */
+.acp-connect-btn {
+	padding: 4px 12px;
+	border: none;
+	border-radius: 4px;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-size: 0.85em;
+	font-weight: 500;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background-color 0.2s;
+}
+
+.acp-connect-btn:hover:not(:disabled) {
+	background-color: var(--interactive-accent-hover);
+}
+
+.acp-connect-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* ============================================================================
+   空状态引导（简洁版）
+   ============================================================================ */
+
+.acp-empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 40px 20px;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.acp-empty-state-icon {
+	width: 48px;
+	height: 48px;
+	margin-bottom: 16px;
+	opacity: 0.5;
+}
+
+.acp-empty-state-text {
+	font-size: 0.95em;
+	line-height: 1.5;
+}
+
+.acp-empty-state-hint {
+	margin-top: 8px;
+	font-size: 0.85em;
+	opacity: 0.7;
+}
+
+/* ============================================================================
+   权限管理样式
+   ============================================================================ */
+
+.acp-allowed-tools-container {
+	margin-top: 16px;
+	padding: 12px;
+	background-color: var(--background-secondary);
+	border-radius: 8px;
+}
+
+.acp-allowed-tools-title {
+	margin: 0 0 12px 0;
+	font-size: 0.9em;
+	color: var(--text-muted);
+}
+
+.acp-allowed-tools-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.acp-allowed-tool-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px 4px 12px;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 16px;
+	font-size: 0.85em;
+}
+
+.acp-allowed-tool-name {
+	color: var(--text-normal);
+	font-family: var(--font-monospace);
+}
+
+.acp-allowed-tool-remove {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background-color: transparent;
+	color: var(--text-muted);
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.acp-allowed-tool-remove:hover {
+	background-color: var(--background-modifier-error);
+	color: var(--text-on-accent);
+}
+
+.acp-clear-all-btn {
+	padding: 4px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: transparent;
+	color: var(--text-muted);
+	font-size: 0.85em;
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.acp-clear-all-btn:hover {
+	background-color: var(--background-modifier-error);
+	color: var(--text-on-accent);
+	border-color: var(--background-modifier-error);
+}
+
+.acp-no-allowed-tools {
+	margin-top: 12px;
+	padding: 12px;
+	background-color: var(--background-secondary);
+	border-radius: 8px;
+	color: var(--text-muted);
+	font-size: 0.9em;
+	font-style: italic;
 }
 

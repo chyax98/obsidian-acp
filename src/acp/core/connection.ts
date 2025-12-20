@@ -505,7 +505,7 @@ export class AcpConnection {
 			this.state = 'connected';
 			// 连接成功后重置重试计数
 			this.retryCount = 0;
-			console.log(`[ACP] 连接成功: ${options.backendId}`);
+			// console.log(`[ACP] 连接成功: ${options.backendId}`);
 		} catch (error) {
 			this.state = 'error';
 			this.disconnect();
@@ -533,17 +533,17 @@ export class AcpConnection {
 	 * 断开连接
 	 */
 	public disconnect(): void {
-		console.log('[ACP] 断开连接中...');
+		// console.log('[ACP] 断开连接中...');
 
 		if (this.child) {
 			this.child.kill();
 			this.child = null;
-			console.log('[ACP] 子进程已终止');
+			// console.log('[ACP] 子进程已终止');
 		}
 
 		// 清空请求队列
 		this.requestQueue.clear('连接已断开');
-		console.log('[ACP] 请求队列已清空');
+		// console.log('[ACP] 请求队列已清空');
 
 		// 重置状态
 		this.sessionId = null;
@@ -552,7 +552,7 @@ export class AcpConnection {
 		this.initializeResponse = null;
 		this.messageBuffer = '';
 		this.state = 'disconnected';
-		console.log('[ACP] 连接已断开，状态已重置');
+		// console.log('[ACP] 连接已断开，状态已重置');
 	}
 
 	/**
@@ -563,9 +563,11 @@ export class AcpConnection {
 
 		let spawnError: Error | null = null;
 
-		// stderr 日志
-		this.child.stderr?.on('data', (data: Buffer) => {
-			console.error('[ACP STDERR]:', data.toString());
+		// stderr 日志（仅在调试模式下输出）
+		this.child.stderr?.on('data', (_data: Buffer) => {
+			// Claude Code 的 stderr 包含大量调试信息，正常情况下忽略
+			// 如需调试，取消下面的注释：
+			// console.debug('[ACP STDERR]:', _data.toString());
 		});
 
 		// 进程错误
@@ -576,7 +578,9 @@ export class AcpConnection {
 
 		// 进程退出
 		this.child.on('exit', (code, signal) => {
-			console.log(`[ACP] 进程退出: code=${code}, signal=${signal}`);
+			if (code !== 0) {
+				console.warn(`[ACP] 进程异常退出: code=${code}, signal=${signal}`);
+			}
 			this.onDisconnect(code, signal);
 			this.state = 'disconnected';
 		});
@@ -673,7 +677,7 @@ export class AcpConnection {
 	private async handleIncomingRequest(message: AcpRequest | AcpNotification): Promise<void> {
 		const { method, params } = message;
 		const messageId = 'id' in message ? message.id : undefined;
-		console.log(`[ACP] 收到请求: method=${method}, id=${messageId}`);
+		// console.log(`[ACP] 收到请求: method=${method}, id=${messageId}`);
 
 		try {
 			let result: unknown = null;
@@ -763,7 +767,7 @@ export class AcpConnection {
 		};
 
 		const json = JSON.stringify(response);
-		console.log('[ACP] 发送响应:', json);
+		// console.log('[ACP] 发送响应:', json);
 		const lineEnding = Platform.isWin ? '\r\n' : '\n';
 		this.child.stdin.write(json + lineEnding);
 	}
@@ -967,7 +971,7 @@ export class AcpConnection {
 		};
 
 		// 调试日志
-		console.log('[ACP] session/new 参数:', JSON.stringify(params, null, 2));
+		// console.log('[ACP] session/new 参数:', JSON.stringify(params, null, 2));
 
 		const response = await this.sendRequest<NewSessionResponse>(
 			AcpMethod.SESSION_NEW,

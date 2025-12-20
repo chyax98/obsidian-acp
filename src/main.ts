@@ -167,6 +167,15 @@ export default class AcpPlugin extends Plugin {
 			},
 		});
 
+		// 添加新建 ACP Chat 窗口的命令
+		this.addCommand({
+			id: 'new-acp-chat',
+			name: '新建 ACP Chat 窗口',
+			callback: () => {
+				void this.activateChatView(true);
+			},
+		});
+
 		// 添加 Ribbon 图标
 		this.addRibbonIcon('bot', 'ACP Agent Chat', () => {
 			void this.activateChatView();
@@ -181,18 +190,19 @@ export default class AcpPlugin extends Plugin {
 
 	/**
 	 * 激活或创建 ChatView
+	 * @param forceNew 如果为 true，则强制创建新窗口
 	 */
-	public async activateChatView(): Promise<void> {
+	public async activateChatView(forceNew = false): Promise<void> {
 		const { workspace } = this.app;
 
 		let leaf: WorkspaceLeaf | null = null;
 		const leaves = workspace.getLeavesOfType(ACP_CHAT_VIEW_TYPE);
 
-		if (leaves.length > 0) {
-			// 已存在，激活它
+		if (!forceNew && leaves.length > 0) {
+			// 已存在且不强制新建，激活第一个
 			leaf = leaves[0];
 		} else {
-			// 不存在，在右侧创建新的
+			// 不存在或强制新建，在右侧创建新的
 			leaf = workspace.getRightLeaf(false);
 			if (leaf) {
 				await leaf.setViewState({ type: ACP_CHAT_VIEW_TYPE, active: true });
@@ -207,8 +217,18 @@ export default class AcpPlugin extends Plugin {
 	public async loadSettings(): Promise<void> {
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-redundant-type-constituents
 		const loadedData = (await this.loadData()) as Partial<AcpPluginSettings> | undefined;
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData || {});
+
+		// 深度合并设置，确保嵌套对象正确合并
+		this.settings = {
+			...DEFAULT_SETTINGS,
+			...loadedData,
+			permission: {
+				...DEFAULT_SETTINGS.permission,
+				...(loadedData?.permission || {}),
+			},
+		};
+
+		console.log('[ACP] 加载设置:', this.settings.permission);
 	}
 
 	public async saveSettings(): Promise<void> {

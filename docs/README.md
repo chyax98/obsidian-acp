@@ -2,7 +2,7 @@
 
 ## 📚 文档导航
 
-### 🚀 用户指南 (User Guide)
+### 🚀 用户指南
 
 新用户从这里开始：
 
@@ -11,7 +11,7 @@
 - **[权限管理](user-guide/PERMISSIONS.md)** - 了解权限系统
 - **[常见问题](user-guide/FAQ.md)** - 故障排查和常见问题解答
 
-### 🔧 开发文档 (Development)
+### 🔧 开发文档
 
 开发者和贡献者参考：
 
@@ -22,14 +22,7 @@
 
 - **[README.md](../README.md)** - 项目主文档
 - **[CHANGELOG.md](../CHANGELOG.md)** - 版本更新日志
-- **[USAGE.md](../USAGE.md)** - 使用说明
 - **[CLAUDE.md](../CLAUDE.md)** - 项目配置和愿景文档
-
-### 🗄️ 历史文档 (Archive)
-
-历史开发记录和已归档文档：
-
-- [查看归档文档](archive/)
 
 ---
 
@@ -44,10 +37,6 @@
 1. [权限管理](user-guide/PERMISSIONS.md) - 细粒度控制
 2. [集成指南](development/INTEGRATION_GUIDE.md) - 自定义和扩展
 
-### 开发者
-1. [集成指南](development/INTEGRATION_GUIDE.md) - 如何集成新功能
-2. [检测系统](development/DETECTION_SYSTEM_SUMMARY.md) - 技术架构
-
 ---
 
 ## 📊 文档结构
@@ -60,12 +49,9 @@ docs/
 │   ├── AGENT_SETUP.md          # Agent 配置
 │   ├── PERMISSIONS.md          # 权限管理
 │   └── FAQ.md                  # 常见问题
-├── development/                 # 开发文档
-│   ├── INTEGRATION_GUIDE.md    # 集成指南
-│   └── DETECTION_SYSTEM_SUMMARY.md  # 检测系统总结
-└── archive/                     # 历史文档
-    ├── features/               # 功能设计文档
-    └── ...                     # 其他历史文档
+└── development/                 # 开发文档
+    ├── INTEGRATION_GUIDE.md    # 集成指南
+    └── DETECTION_SYSTEM_SUMMARY.md  # 检测系统总结
 ```
 
 ---
@@ -79,5 +65,4 @@ docs/
 
 ---
 
-**版本**: 1.0.0
-**最后更新**: 2025-12-20
+**最后更新**: 2025-12-21

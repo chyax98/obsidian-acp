@@ -903,21 +903,21 @@ export class AcpConnection {
 					config.url = this.replaceVariables(server.url);
 				}
 
-				// 转换 headers 数组为对象
+				// headers 保持数组格式（ACP 协议要求）
 				if (server.headers && server.headers.length > 0) {
-					config.headers = {};
-					for (const header of server.headers) {
-						config.headers[header.name] = this.replaceVariables(header.value);
-					}
+					config.headers = server.headers.map(header => ({
+						name: header.name,
+						value: this.replaceVariables(header.value),
+					}));
 				}
 			}
 
-			// 转换 env 数组为对象
+			// env 保持数组格式（ACP 协议要求）
 			if (server.env && server.env.length > 0) {
-				config.env = {};
-				for (const envVar of server.env) {
-					config.env[envVar.name] = this.replaceVariables(envVar.value);
-				}
+				config.env = server.env.map(envVar => ({
+					name: envVar.name,
+					value: this.replaceVariables(envVar.value),
+				}));
 			}
 
 			console.log(`[ACP] MCP 服务器配置: ${server.name}`, config);

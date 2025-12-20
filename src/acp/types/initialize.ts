@@ -243,6 +243,16 @@ export type AcpMethodType = (typeof AcpMethod)[keyof typeof AcpMethod];
 // ============================================================================
 
 /**
+ * 环境变量配置
+ */
+export interface EnvVariable {
+	/** 环境变量名 */
+	name: string;
+	/** 环境变量值 */
+	value: string;
+}
+
+/**
  * MCP 服务器配置
  *
  * 在 session/new 时传递给 Agent，Agent 启动时会加载这些 MCP 服务器。
@@ -252,16 +262,16 @@ export interface SessionNewMcpServerConfig {
 	name: string;
 	/** 传输类型 */
 	type: 'stdio' | 'http' | 'sse';
-	/** stdio 类型: 命令 */
+	/** stdio 类型: 命令（必填） */
 	command?: string;
-	/** stdio 类型: 参数 */
+	/** stdio 类型: 参数（必填） */
 	args?: string[];
 	/** http/sse 类型: URL */
 	url?: string;
-	/** 环境变量 (键值对) */
-	env?: Record<string, string>;
-	/** http/sse 类型: 请求头 (键值对) */
-	headers?: Record<string, string>;
+	/** 环境变量（数组格式） */
+	env?: EnvVariable[];
+	/** http/sse 类型: 请求头（数组格式） */
+	headers?: Array<{ name: string; value: string }>;
 }
 
 /**

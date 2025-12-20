@@ -64,6 +64,7 @@ const AGENT_ENV_MAP: Record<string, string> = {
 	'claude': 'CLAUDE_CODE_PATH',
 	'kimi': 'KIMI_PATH',
 	'codex': 'CODEX_PATH',
+	'codex-acp': 'CODEX_PATH', // 别名：支持 codex-acp 使用 CODEX_PATH
 	'gemini': 'GEMINI_PATH',
 	'qwen': 'QWEN_PATH',
 	'goose': 'GOOSE_PATH',

@@ -277,15 +277,15 @@ export function getBackendCommand(id: AcpBackendId, customCliPath?: string): { c
  * 生成可检测的 CLI 列表
  *
  * 仅包含有 cliCommand 且已启用的后端。
- * 排除 custom (用户配置) 和 gemini (暂未支持)。
+ * 排除 custom (用户配置)。
  */
 export function getDetectableCliList(): DetectableAcpCli[] {
 	return Object.entries(ACP_BACKENDS)
 		.filter(([id, config]) => {
 			// 排除无 CLI 命令的后端
 			if (!config.cliCommand) return false;
-			// 排除 custom 和 gemini
-			if (id === 'custom' || id === 'gemini') return false;
+			// 排除 custom (用户自定义后端)
+			if (id === 'custom') return false;
 			// 仅包含启用的后端
 			return config.enabled;
 		})

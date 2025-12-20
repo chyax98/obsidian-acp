@@ -48,6 +48,14 @@ interface ConfigFile {
 }
 
 /**
+ * Agent 别名映射表
+ * 支持向后兼容，旧的配置键自动映射到新的后端 ID
+ */
+const AGENT_ALIAS_MAP: Record<string, string> = {
+	'codex': 'codex-acp', // 向后兼容：codex → codex-acp
+};
+
+/**
  * 配置文件检测器
  */
 export class ConfigDetector {
@@ -86,12 +94,24 @@ export class ConfigDetector {
 	 * @returns 配置加载结果
 	 */
 	public async loadGlobalConfig(configPath?: string): Promise<ConfigLoadResult> {
-		const finalPath = configPath || path.join(
-			process.env.HOME || '/tmp',
-			'.acprc',
-		);
+		const finalPath = configPath || this.getDefaultGlobalConfigPath();
 
 		return this.loadConfigFile(finalPath);
+	}
+
+	/**
+	 * 获取默认全局配置文件路径
+	 *
+	 * 跨平台兼容：
+	 * - Windows: %USERPROFILE%/.acprc
+	 * - Unix: $HOME/.acprc
+	 * - 降级: /tmp/.acprc
+	 *
+	 * @returns 默认全局配置文件路径
+	 */
+	private getDefaultGlobalConfigPath(): string {
+		const home = process.env.USERPROFILE || process.env.HOME || '/tmp';
+		return path.join(home, '.acprc');
 	}
 
 	/**
@@ -109,24 +129,33 @@ export class ConfigDetector {
 		vaultPath?: string,
 		globalConfigPath?: string,
 	): Promise<DetectionResult> {
+		// 应用别名转换
+		const normalizedAgentId = this.resolveAlias(agentId);
+
 		let agentPath: string | undefined;
 		let source: DetectionResult['source'] = 'none';
 
 		// 1. 尝试 Vault 配置
 		if (vaultPath) {
 			const vaultConfig = await this.loadVaultConfig(vaultPath);
-			if (vaultConfig.loaded && vaultConfig.agents[agentId]) {
-				agentPath = vaultConfig.agents[agentId];
-				source = 'vault-config';
+			if (vaultConfig.loaded) {
+				// 尝试原始 ID 和别名
+				agentPath = vaultConfig.agents[agentId] || vaultConfig.agents[normalizedAgentId];
+				if (agentPath) {
+					source = 'vault-config';
+				}
 			}
 		}
 
-		// 2. 如果没找到，尝试全局配置
-		if (!agentPath && globalConfigPath) {
+		// 2. 如果没找到，尝试全局配置（总是尝试，即使 globalConfigPath 为 undefined 也会使用默认 ~/.acprc）
+		if (!agentPath) {
 			const globalConfig = await this.loadGlobalConfig(globalConfigPath);
-			if (globalConfig.loaded && globalConfig.agents[agentId]) {
-				agentPath = globalConfig.agents[agentId];
-				source = 'global-config';
+			if (globalConfig.loaded) {
+				// 尝试原始 ID 和别名
+				agentPath = globalConfig.agents[agentId] || globalConfig.agents[normalizedAgentId];
+				if (agentPath) {
+					source = 'global-config';
+				}
 			}
 		}
 
@@ -198,17 +227,15 @@ export class ConfigDetector {
 			}
 		}
 
-		// 2. 加载全局配置 (跳过已处理的 Agent)
-		if (globalConfigPath) {
-			const globalConfig = await this.loadGlobalConfig(globalConfigPath);
-			if (globalConfig.loaded) {
-				for (const agentId of Object.keys(globalConfig.agents)) {
-					if (!processedAgents.has(agentId)) {
-						const result = await this.detectAgentPath(agentId, undefined, globalConfigPath);
-						if (result.found) {
-							results.push(result);
-							processedAgents.add(agentId);
-						}
+		// 2. 加载全局配置 (跳过已处理的 Agent)（总是尝试，即使 globalConfigPath 为 undefined 也会使用默认 ~/.acprc）
+		const globalConfig = await this.loadGlobalConfig(globalConfigPath);
+		if (globalConfig.loaded) {
+			for (const agentId of Object.keys(globalConfig.agents)) {
+				if (!processedAgents.has(agentId)) {
+					const result = await this.detectAgentPath(agentId, undefined, globalConfigPath);
+					if (result.found) {
+						results.push(result);
+						processedAgents.add(agentId);
 					}
 				}
 			}
@@ -243,6 +270,18 @@ export class ConfigDetector {
 
 		// 写入文件
 		await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+	}
+
+	/**
+	 * 解析 Agent 别名
+	 *
+	 * 如果 agentId 在别名映射表中，返回规范的 ID，否则返回原值
+	 *
+	 * @param agentId - Agent ID
+	 * @returns 规范化的 Agent ID
+	 */
+	private resolveAlias(agentId: string): string {
+		return AGENT_ALIAS_MAP[agentId] || agentId;
 	}
 
 	/**

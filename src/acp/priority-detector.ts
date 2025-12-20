@@ -14,10 +14,10 @@
 import { EnvDetector, type DetectionResult } from './env-detector';
 import { ConfigDetector } from './config-detector';
 import { PathValidator } from './path-validator';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * 检测选项
@@ -225,9 +225,10 @@ export class PriorityDetector {
 		try {
 			// 使用 which (Unix) 或 where (Windows)
 			const whichCommand = process.platform === 'win32' ? 'where' : 'which';
-			const { stdout } = await execAsync(`${whichCommand} ${cliCommand}`);
+			const { stdout } = await execFileAsync(whichCommand, [cliCommand]);
 
-			const cliPath = stdout.trim().split('\n')[0]; // 取第一个结果
+			// Windows 的 where 输出可能包含 CRLF，需要去除 \r
+			const cliPath = stdout.trim().split(/\r?\n/)[0]; // 取第一个结果，兼容 CRLF
 
 			// 验证路径
 			const validation = await this.pathValidator.validatePath(cliPath);

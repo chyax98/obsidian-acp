@@ -99,17 +99,13 @@ export async function renderEnhancedAgentItem(
 				// 显示检测来源
 				const sourceText = getSourceText(result.source, result.envVar);
 				const sourceEl = detectionInfoEl.createDiv({ cls: 'acp-detection-source' });
-				sourceEl.innerHTML = `
-					<span class="acp-source-label">检测来源:</span>
-					<span class="acp-source-value">${sourceText}</span>
-				`;
+				sourceEl.createSpan({ cls: 'acp-source-label', text: '检测来源:' });
+				sourceEl.createSpan({ cls: 'acp-source-value', text: sourceText });
 
 				// 显示检测到的路径
 				const pathEl = detectionInfoEl.createDiv({ cls: 'acp-detection-path' });
-				pathEl.innerHTML = `
-					<span class="acp-path-label">CLI 路径:</span>
-					<code class="acp-path-value">${result.path}</code>
-				`;
+				pathEl.createSpan({ cls: 'acp-path-label', text: 'CLI 路径:' });
+				pathEl.createEl('code', { cls: 'acp-path-value', text: result.path });
 
 				// 添加复制按钮
 				const copyBtn = pathEl.createEl('button', {
@@ -149,10 +145,9 @@ export async function renderEnhancedAgentItem(
 
 				// 显示安装提示
 				const installEl = detectionInfoEl.createDiv({ cls: 'acp-install-help' });
-				installEl.innerHTML = `
-					<div class="acp-install-title">💡 如何安装：</div>
-					<code class="acp-install-command">${getInstallCommand(config)}</code>
-				`;
+				installEl.createDiv({ cls: 'acp-install-title', text: '💡 如何安装：' });
+				installEl.createEl('code', { cls: 'acp-install-command', text: getInstallCommand(config) });
+
 
 				const copyInstallBtn = installEl.createEl('button', {
 					text: '复制安装命令',
@@ -166,7 +161,7 @@ export async function renderEnhancedAgentItem(
 				// 显示优先级说明
 				const priorityChain = detector.getPriorityChain(agentId);
 				const priorityEl = detectionInfoEl.createDiv({ cls: 'acp-priority-help' });
-				priorityEl.innerHTML = '<div class="acp-priority-title">🔍 检测优先级：</div>';
+				priorityEl.createDiv({ cls: 'acp-priority-title', text: '🔍 检测优先级：' });
 				const priorityList = priorityEl.createEl('ol', { cls: 'acp-priority-list' });
 
 				for (const priority of priorityChain) {
@@ -234,8 +229,16 @@ async function testConnection(cliPath: string): Promise<boolean> {
 	try {
 		const { spawn } = await import('child_process');
 
+		// 解析命令：支持 "npx @pkg" 或 "/path/to/cli" 格式
+		const parts = cliPath.trim().split(/\s+/);
+		const command = parts[0];
+		const baseArgs = parts.slice(1);
+
+		// Windows 下 npx 需要使用 npx.cmd
+		const actualCommand = process.platform === 'win32' && command === 'npx' ? 'npx.cmd' : command;
+
 		return new Promise((resolve) => {
-			const proc = spawn(cliPath, ['--version'], {
+			const proc = spawn(actualCommand, [...baseArgs, '--version'], {
 				stdio: 'pipe',
 				timeout: 10000,
 			});

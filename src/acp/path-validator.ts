@@ -13,10 +13,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { spawn } from 'child_process';
 
 /**
  * 验证选项
@@ -132,8 +129,13 @@ export class PathValidator {
 				result.versionChecked = true;
 				try {
 					const versionFlag = options.versionFlag || '--version';
-					const { stdout } = await execAsync(`${pathStr} ${versionFlag}`);
-					result.version = stdout.trim();
+					// 解析 npx 命令
+					const parts = pathStr.trim().split(/\s+/);
+					const command = parts[0];
+					const baseArgs = parts.slice(1);
+					const actualCommand = process.platform === 'win32' && command === 'npx' ? 'npx.cmd' : command;
+
+					result.version = await this.getVersionSafe(actualCommand, [...baseArgs, versionFlag]);
 				} catch (err) {
 					// npx 命令可能不支持 --version,但仍然有效
 					result.version = undefined;
@@ -190,8 +192,7 @@ export class PathValidator {
 			result.versionChecked = true;
 			try {
 				const versionFlag = options.versionFlag || '--version';
-				const { stdout } = await execAsync(`${expandedPath} ${versionFlag}`);
-				result.version = stdout.trim();
+				result.version = await this.getVersionSafe(expandedPath, [versionFlag]);
 			} catch (err) {
 				// 版本检查失败不影响路径有效性
 				result.version = undefined;
@@ -289,5 +290,48 @@ export class PathValidator {
 			package: packageName,
 			args,
 		};
+	}
+
+	/**
+	 * 安全地获取版本信息
+	 *
+	 * 使用 spawn 替代 exec 避免 shell 注入
+	 *
+	 * @param command - 命令
+	 * @param args - 参数数组
+	 * @returns 版本字符串
+	 */
+	private async getVersionSafe(command: string, args: string[]): Promise<string | undefined> {
+		return new Promise((resolve) => {
+			const proc = spawn(command, args, {
+				stdio: 'pipe',
+				timeout: 5000,
+			});
+
+			let stdout = '';
+
+			proc.stdout?.on('data', (data) => {
+				stdout += data.toString();
+			});
+
+			const timeout = setTimeout(() => {
+				proc.kill();
+				resolve(undefined);
+			}, 5000);
+
+			proc.on('error', () => {
+				clearTimeout(timeout);
+				resolve(undefined);
+			});
+
+			proc.on('exit', (code) => {
+				clearTimeout(timeout);
+				if (code === 0) {
+					resolve(stdout.trim());
+				} else {
+					resolve(undefined);
+				}
+			});
+		});
 	}
 }

@@ -263,7 +263,7 @@ export class SessionManager {
 	/**
 	 * 获取当前状态
 	 */
-	get state(): SessionState {
+	public get state(): SessionState {
 		return this._state;
 	}
 
@@ -281,21 +281,21 @@ export class SessionManager {
 	/**
 	 * 获取会话 ID
 	 */
-	get sessionId(): string | null {
+	public get sessionId(): string | null {
 		return this._sessionId;
 	}
 
 	/**
 	 * 是否有活动会话
 	 */
-	get hasActiveSession(): boolean {
+	public get hasActiveSession(): boolean {
 		return this._sessionId !== null;
 	}
 
 	/**
 	 * 是否正在处理
 	 */
-	get isProcessing(): boolean {
+	public get isProcessing(): boolean {
 		return this._state === 'processing';
 	}
 
@@ -306,21 +306,21 @@ export class SessionManager {
 	/**
 	 * 获取消息列表
 	 */
-	get messages(): Message[] {
+	public get messages(): Message[] {
 		return [...this._messages];
 	}
 
 	/**
 	 * 获取回合列表
 	 */
-	get turns(): Turn[] {
+	public get turns(): Turn[] {
 		return [...this._turns];
 	}
 
 	/**
 	 * 获取当前回合
 	 */
-	get activeTurn(): Turn | null {
+	public get activeTurn(): Turn | null {
 		return this.currentTurn;
 	}
 
@@ -331,7 +331,7 @@ export class SessionManager {
 	/**
 	 * 开始新会话
 	 */
-	async start(workingDir?: string): Promise<void> {
+	public async start(workingDir?: string): Promise<void> {
 		if (this._sessionId) {
 			throw new Error('会话已存在，请先结束当前会话');
 		}
@@ -340,14 +340,12 @@ export class SessionManager {
 		const response = await this.connection.newSession(cwd);
 		this._sessionId = response.sessionId;
 		this.workingDir = cwd;
-
-		console.log(`[SessionManager] 会话已创建: ${this._sessionId}`);
 	}
 
 	/**
 	 * 发送提示并等待响应
 	 */
-	async sendPrompt(text: string): Promise<StopReason> {
+	public async sendPrompt(text: string): Promise<StopReason> {
 		if (!this._sessionId) {
 			throw new Error('没有活动会话，请先调用 start()');
 		}
@@ -392,7 +390,7 @@ export class SessionManager {
 	/**
 	 * 取消当前回合
 	 */
-	async cancel(): Promise<void> {
+	public async cancel(): Promise<void> {
 		if (this._state !== 'processing') {
 			return; // 不在处理中，无需取消
 		}
@@ -412,7 +410,7 @@ export class SessionManager {
 	/**
 	 * 结束会话
 	 */
-	end(): void {
+	public end(): void {
 		if (this.currentTurn) {
 			this.completeTurn('cancelled');
 		}
@@ -422,14 +420,12 @@ export class SessionManager {
 
 		this._sessionId = null;
 		this.setState('idle');
-
-		console.log('[SessionManager] 会话已结束');
 	}
 
 	/**
 	 * 清空历史
 	 */
-	clearHistory(): void {
+	public clearHistory(): void {
 		this._messages = [];
 		this._turns = [];
 		this.currentTurn = null;
@@ -535,12 +531,9 @@ export class SessionManager {
 				// 通常在 session/load 时收到，暂不处理
 				break;
 
-			default: {
+			default:
 				// 处理未识别的更新类型
-				const unknownUpdate = update as any;
-				console.log('[SessionManager] 未处理的更新类型:', unknownUpdate.sessionUpdate);
 				break;
-			}
 		}
 	}
 
@@ -586,7 +579,7 @@ export class SessionManager {
 		this.messageBuffer.append(
 			this.currentTurn.assistantMessage.id,
 			text,
-			(content: string, isFinal: boolean) => {
+			(content: string, _isFinal: boolean) => {
 				if (this.currentTurn?.assistantMessage) {
 					this.currentTurn.assistantMessage.content = content;
 					this.onMessage(this.currentTurn.assistantMessage, false);
@@ -694,7 +687,6 @@ export class SessionManager {
 	 * 处理当前模式更新
 	 */
 	private handleCurrentModeUpdate(update: CurrentModeUpdateData): void {
-		console.log('[SessionManager] 模式更新:', update.mode, update.description);
 		this.onCurrentModeUpdate(update.mode, update.description);
 	}
 
@@ -702,7 +694,6 @@ export class SessionManager {
 	 * 处理可用命令更新
 	 */
 	private handleAvailableCommandsUpdate(update: AvailableCommandsUpdateData): void {
-		console.log('[SessionManager] 可用命令更新:', update.availableCommands.length, '个命令');
 		this.onAvailableCommandsUpdate(update.availableCommands);
 	}
 }

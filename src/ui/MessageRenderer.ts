@@ -16,7 +16,7 @@
 
 import type { Component, App } from 'obsidian';
 import { MarkdownRenderer, setIcon, Notice, Modal, MarkdownView } from 'obsidian';
-import type { Message, ToolCall, PlanEntry, Turn } from '../acp/core/session-manager';
+import type { Message, ToolCall, PlanEntry } from '../acp/core/session-manager';
 
 // ============================================================================
 // MessageRenderer 类
@@ -41,7 +41,7 @@ export class MessageRenderer {
 	 * @param app - Obsidian App 实例
 	 * @param sourcePath - Markdown 源路径（可选）
 	 */
-	static async renderMessage(
+	public static async renderMessage(
 		container: HTMLElement,
 		message: Message,
 		component: Component,
@@ -316,7 +316,7 @@ export class MessageRenderer {
 	 * @param app - Obsidian App 实例
 	 * @param sourcePath - Markdown 源路径（可选）
 	 */
-	static async updateMessage(
+	public static async updateMessage(
 		container: HTMLElement,
 		message: Message,
 		component: Component,
@@ -405,7 +405,7 @@ export class MessageRenderer {
 	 * @param app - Obsidian App 实例（用于文件跳转）
 	 * @returns 工具调用元素
 	 */
-	static renderToolCall(container: HTMLElement, toolCall: ToolCall, app?: App): HTMLElement {
+	public static renderToolCall(container: HTMLElement, toolCall: ToolCall, app?: App): HTMLElement {
 		// 查找是否已存在
 		let toolCallEl = container.querySelector(
 			`[data-tool-call-id="${toolCall.toolCallId}"]`,
@@ -912,7 +912,7 @@ export class MessageRenderer {
 
 		// 终端内容
 		const preEl = wrapperEl.createEl('pre');
-		const codeEl = preEl.createEl('code', { text: terminalId });
+		preEl.createEl('code', { text: terminalId });
 
 		// 复制按钮
 		const copyBtn = wrapperEl.createDiv({ cls: 'acp-copy-button acp-copy-button-terminal' });
@@ -959,7 +959,7 @@ export class MessageRenderer {
 	 * @param app - Obsidian App 实例
 	 * @returns 分组元素
 	 */
-	static renderToolCallGroup(
+	public static renderToolCallGroup(
 		container: HTMLElement,
 		toolCalls: ToolCall[],
 		groupTitle?: string,
@@ -1050,7 +1050,7 @@ export class MessageRenderer {
 	 * @param thoughts - 思考内容列表
 	 * @returns 思考块元素
 	 */
-	static renderThoughts(container: HTMLElement, thoughts: string[]): HTMLElement {
+	public static renderThoughts(container: HTMLElement, thoughts: string[]): HTMLElement {
 		// 在当前容器内查找是否已存在（限定在 turn 内）
 		let thoughtsEl = container.querySelector('.acp-thoughts') as HTMLElement;
 
@@ -1106,7 +1106,7 @@ export class MessageRenderer {
 	 * @param plan - 计划条目列表
 	 * @returns 计划元素
 	 */
-	static renderPlan(container: HTMLElement, plan: PlanEntry[]): HTMLElement {
+	public static renderPlan(container: HTMLElement, plan: PlanEntry[]): HTMLElement {
 		// 在当前容器内查找是否已存在（限定在 turn 内）
 		let planEl = container.querySelector('.acp-plan') as HTMLElement;
 
@@ -1257,7 +1257,7 @@ class ImagePreviewModal extends Modal {
 		this.imageSrc = imageSrc;
 	}
 
-	onOpen(): void {
+	public onOpen(): void {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass('acp-image-preview-modal');
@@ -1284,7 +1284,7 @@ class ImagePreviewModal extends Modal {
 		});
 	}
 
-	onClose(): void {
+	public onClose(): void {
 		const { contentEl } = this;
 		contentEl.empty();
 	}

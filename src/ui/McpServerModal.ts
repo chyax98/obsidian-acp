@@ -39,7 +39,7 @@ export class McpServerModal extends Modal {
 		};
 	}
 
-	onOpen(): void {
+	public onOpen(): void {
 		const { contentEl } = this;
 		contentEl.empty();
 
@@ -213,7 +213,7 @@ export class McpServerModal extends Modal {
 		return true;
 	}
 
-	onClose(): void {
+	public onClose(): void {
 		this.contentEl.empty();
 	}
 }

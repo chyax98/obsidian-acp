@@ -63,7 +63,7 @@ export class AcpCliDetector {
 	 * @param manualPaths 用户手动配置的 Agent 路径 (backendId -> path)
 	 * @returns 检测结果
 	 */
-	async detect(force = false, manualPaths?: Record<string, string>): Promise<DetectionResult> {
+	public async detect(force = false, manualPaths?: Record<string, string>): Promise<DetectionResult> {
 		// 如果已检测且不强制，返回缓存结果
 		if (this.isDetected && !force) {
 			return {
@@ -73,7 +73,6 @@ export class AcpCliDetector {
 			};
 		}
 
-		console.log('[ACP Detector] 开始检测已安装的 CLI...');
 		const startTime = Date.now();
 
 		// 获取可检测的 CLI 列表
@@ -103,7 +102,6 @@ export class AcpCliDetector {
 		this.lastDetectionTime = Date.now();
 
 		const duration = Date.now() - startTime;
-		console.log(`[ACP Detector] 检测完成，耗时 ${duration}ms，发现 ${detected.length} 个 Agent`);
 
 		return {
 			agents: detected,
@@ -151,7 +149,7 @@ export class AcpCliDetector {
 
 		// 2. 特殊处理：Claude Code 需要特殊检测
 		if (cli.backendId === 'claude') {
-			return await this.detectClaudeCodeAcp();
+			return this.detectClaudeCodeAcp();
 		}
 
 		// 3. 通用检测：尝试 which/where 命令
@@ -164,7 +162,7 @@ export class AcpCliDetector {
 
 			const cliPath = result.trim().split('\n')[0].trim();
 			if (cliPath) {
-				const version = await this.getCliVersion(cli.cmd);
+				const version = this.getCliVersion(cli.cmd);
 				return {
 					backendId: cli.backendId,
 					name: cli.name,
@@ -184,7 +182,7 @@ export class AcpCliDetector {
 	 * 检测 Claude Code ACP wrapper（Zed 版本）
 	 * 直接尝试运行命令，不依赖 which
 	 */
-	private async detectClaudeCodeAcp(): Promise<DetectedAgent | null> {
+	private detectClaudeCodeAcp(): DetectedAgent | null {
 		// 方案1：尝试直接运行（依赖 PATH）
 		try {
 			const result = execSync('claude-code-acp --version', {
@@ -194,7 +192,6 @@ export class AcpCliDetector {
 			});
 
 			if (result) {
-				console.log('[ACP Detector] ✅ 检测到 claude-code-acp');
 				const version = result.trim();
 				return {
 					backendId: 'claude',
@@ -234,7 +231,6 @@ export class AcpCliDetector {
 					});
 
 					if (result) {
-						console.log(`[ACP Detector] ✅ 检测到 claude-code-acp: ${expandedPath}`);
 						const version = result.trim();
 						return {
 							backendId: 'claude',
@@ -250,7 +246,6 @@ export class AcpCliDetector {
 			}
 		}
 
-		console.log('[ACP Detector] claude-code-acp 不可用，请手动配置路径');
 		return null;
 	}
 
@@ -258,12 +253,12 @@ export class AcpCliDetector {
 	 * 验证手动配置的路径
 	 *
 	 * @param manualPath 用户配置的路径
-	 * @param cmd CLI 命令名
+	 * @param _cmd CLI 命令名
 	 * @returns 验证结果（路径和版本）或 null
 	 */
 	private async validateManualPath(
 		manualPath: string,
-		cmd: string,
+		_cmd: string,
 	): Promise<{ path: string; version?: string } | null> {
 		try {
 			// 1. 检查文件是否存在且可执行
@@ -279,9 +274,8 @@ export class AcpCliDetector {
 			}
 
 			// 2. 尝试获取版本
-			const version = await this.getCliVersion(manualPath);
+			const version = this.getCliVersion(manualPath);
 
-			console.log(`[ACP Detector] 使用手动配置的路径: ${manualPath}`);
 			return { path: manualPath, version };
 		} catch {
 			console.warn(`[ACP Detector] 手动配置的路径无效: ${manualPath}`);
@@ -292,7 +286,7 @@ export class AcpCliDetector {
 	/**
 	 * 尝试获取 CLI 版本
 	 */
-	private async getCliVersion(cmd: string): Promise<string | undefined> {
+	private getCliVersion(cmd: string): string | undefined {
 		try {
 			// 尝试 --version 参数
 			const result = execSync(`${cmd} --version`, {
@@ -313,35 +307,35 @@ export class AcpCliDetector {
 	/**
 	 * 获取检测到的 Agent 列表
 	 */
-	getDetectedAgents(): DetectedAgent[] {
+	public getDetectedAgents(): DetectedAgent[] {
 		return [...this.detectedAgents];
 	}
 
 	/**
 	 * 检查是否有可用的 Agent
 	 */
-	hasAgents(): boolean {
+	public hasAgents(): boolean {
 		return this.detectedAgents.length > 0;
 	}
 
 	/**
 	 * 检查特定后端是否可用
 	 */
-	isBackendAvailable(backendId: AcpBackendId): boolean {
+	public isBackendAvailable(backendId: AcpBackendId): boolean {
 		return this.detectedAgents.some((agent) => agent.backendId === backendId);
 	}
 
 	/**
 	 * 获取特定后端的检测信息
 	 */
-	getBackendInfo(backendId: AcpBackendId): DetectedAgent | undefined {
+	public getBackendInfo(backendId: AcpBackendId): DetectedAgent | undefined {
 		return this.detectedAgents.find((agent) => agent.backendId === backendId);
 	}
 
 	/**
 	 * 获取所有后端的运行时状态
 	 */
-	getBackendStates(): BackendRuntimeState[] {
+	public getBackendStates(): BackendRuntimeState[] {
 		const cliList = getDetectableClis();
 
 		return cliList.map((cli) => {
@@ -360,7 +354,7 @@ export class AcpCliDetector {
 	/**
 	 * 重置检测状态
 	 */
-	reset(): void {
+	public reset(): void {
 		this.detectedAgents = [];
 		this.isDetected = false;
 		this.lastDetectionTime = 0;
@@ -369,7 +363,7 @@ export class AcpCliDetector {
 	/**
 	 * 是否已完成检测
 	 */
-	get detected(): boolean {
+	public get detected(): boolean {
 		return this.isDetected;
 	}
 }

@@ -836,7 +836,7 @@ export class AcpConnection {
 	/**
 	 * 认证
 	 */
-	async authenticate(methodId?: string): Promise<void> {
+	public async authenticate(methodId?: string): Promise<void> {
 		await this.sendRequest(AcpMethod.AUTHENTICATE, methodId ? { methodId } : undefined);
 	}
 

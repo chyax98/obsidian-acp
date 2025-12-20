@@ -92,30 +92,28 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 视图类型
 	 */
-	getViewType(): string {
+	public getViewType(): string {
 		return ACP_CHAT_VIEW_TYPE;
 	}
 
 	/**
 	 * 显示文本
 	 */
-	getDisplayText(): string {
+	public getDisplayText(): string {
 		return 'ACP Chat';
 	}
 
 	/**
 	 * 图标
 	 */
-	getIcon(): string {
+	public getIcon(): string {
 		return 'bot';
 	}
 
 	/**
 	 * 打开视图
 	 */
-	async onOpen(): Promise<void> {
-		console.log('[ChatView] 打开视图');
-
+	public async onOpen(): Promise<void> {
 		// 加载 Markdown 组件
 		this.markdownComponent.load();
 
@@ -140,9 +138,7 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 关闭视图
 	 */
-	async onClose(): Promise<void> {
-		console.log('[ChatView] 关闭视图');
-
+	public onClose(): void {
 		// 断开 ACP 连接
 		if (this.sessionManager) {
 			this.sessionManager.end();
@@ -180,7 +176,9 @@ export class AcpChatView extends ItemView {
 			cls: 'acp-connect-button',
 			text: '连接',
 		});
-		this.connectButtonEl.addEventListener('click', () => this.handleConnect());
+		this.connectButtonEl.addEventListener('click', () => {
+			void this.handleConnect();
+		});
 
 		// 连接状态栏（Phase 4 增强）
 		this.statusEl = this.headerEl.createDiv({ cls: 'acp-connection-status' });
@@ -240,7 +238,7 @@ export class AcpChatView extends ItemView {
 			// Enter 发送（Shift+Enter 换行）
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
-				this.handleSend();
+				void this.handleSend();
 			}
 
 			// 上下键导航历史消息
@@ -261,7 +259,9 @@ export class AcpChatView extends ItemView {
 			cls: 'acp-send-button mod-cta',
 			text: '发送',
 		});
-		this.sendButtonEl.addEventListener('click', () => this.handleSend());
+		this.sendButtonEl.addEventListener('click', () => {
+			void this.handleSend();
+		});
 
 		// 取消按钮（初始隐藏）
 		this.cancelButtonEl = buttonContainer.createEl('button', {
@@ -269,7 +269,9 @@ export class AcpChatView extends ItemView {
 			text: '取消',
 		});
 		this.cancelButtonEl.style.display = 'none';
-		this.cancelButtonEl.addEventListener('click', () => this.handleCancel());
+		this.cancelButtonEl.addEventListener('click', () => {
+			void this.handleCancel();
+		});
 
 		// 初始状态禁用输入
 		this.setInputEnabled(false);
@@ -537,9 +539,9 @@ export class AcpChatView extends ItemView {
 		const container = this.getTurnContainer();
 
 		if (isNew) {
-			this.addMessage(message, container);
+			void this.addMessage(message, container);
 		} else {
-			this.updateMessage(message, container);
+			void this.updateMessage(message, container);
 		}
 	}
 
@@ -574,7 +576,7 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 处理思考块
 	 */
-	private handleThought(thought: string): void {
+	private handleThought(_thought: string): void {
 		if (!this.sessionManager) return;
 
 		const turn = this.sessionManager.activeTurn;
@@ -640,8 +642,6 @@ export class AcpChatView extends ItemView {
 	 * 处理权限请求
 	 */
 	private async handlePermissionRequest(params: RequestPermissionParams): Promise<PermissionOutcome> {
-		console.log('[ChatView] 权限请求:', params);
-
 		// 显示权限弹窗
 		return new Promise((resolve) => {
 			try {
@@ -880,7 +880,6 @@ export class AcpChatView extends ItemView {
 	 * 处理当前模式更新
 	 */
 	private handleCurrentModeUpdate(mode: string, description?: string): void {
-		console.log('[ChatView] 模式更新:', mode, description);
 		this.currentMode = mode;
 
 		// 更新模式指示器
@@ -904,7 +903,6 @@ export class AcpChatView extends ItemView {
 	 * 处理可用命令更新
 	 */
 	private handleAvailableCommandsUpdate(commands: any[]): void {
-		console.log('[ChatView] 可用命令更新:', commands.length, '个命令');
 		this.availableCommands = commands;
 
 		// 在输入框上方显示可用命令按钮
@@ -954,7 +952,7 @@ export class AcpChatView extends ItemView {
 
 			// 点击事件
 			cmdButton.addEventListener('click', () => {
-				this.handleCommandClick(cmd);
+				void this.handleCommandClick(cmd);
 			});
 
 			// 悬停提示

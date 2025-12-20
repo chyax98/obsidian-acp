@@ -220,7 +220,8 @@ export function isValidBackendId(id: string): id is AcpBackendId {
  * 检查后端是否启用
  */
 export function isBackendEnabled(id: AcpBackendId): boolean {
-	return ACP_BACKENDS[id]?.enabled ?? false;
+	const backend = ACP_BACKENDS[id];
+	return backend ? (backend.enabled ?? false) : false;
 }
 
 /**
@@ -228,7 +229,7 @@ export function isBackendEnabled(id: AcpBackendId): boolean {
  */
 export function getBackendAcpArgs(id: AcpBackendId): string[] {
 	const config = ACP_BACKENDS[id];
-	return config?.acpArgs ?? DEFAULT_ACP_ARGS;
+	return config && config.acpArgs ? config.acpArgs : DEFAULT_ACP_ARGS;
 }
 
 /**
@@ -289,7 +290,7 @@ export function getDetectableCliList(): DetectableAcpCli[] {
 			return config.enabled;
 		})
 		.map(([id, config]) => ({
-			cmd: config.cliCommand!,
+			cmd: config.cliCommand as string,
 			args: config.acpArgs ?? DEFAULT_ACP_ARGS,
 			name: config.name,
 			backendId: id as AcpBackendId,

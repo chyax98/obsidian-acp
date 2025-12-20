@@ -87,7 +87,7 @@ export class RequestQueue {
 	 * @param timeoutMs - 超时时间 (毫秒)
 	 * @returns 请求句柄 (ID 和 Promise)
 	 */
-	create<T>(method: string, timeoutMs: number): RequestHandle<T> {
+	public create<T>(method: string, timeoutMs: number): RequestHandle<T> {
 		const id = this.nextId++;
 		const startTime = Date.now();
 
@@ -130,7 +130,7 @@ export class RequestQueue {
 	 * @param value - 响应值
 	 * @returns 是否找到并完成了请求
 	 */
-	resolve(id: RequestId, value: unknown): boolean {
+	public resolve(id: RequestId, value: unknown): boolean {
 		const request = this.requests.get(id);
 		if (!request) return false;
 
@@ -151,7 +151,7 @@ export class RequestQueue {
 	 * @param error - 错误信息
 	 * @returns 是否找到并完成了请求
 	 */
-	reject(id: RequestId, error: Error): boolean {
+	public reject(id: RequestId, error: Error): boolean {
 		const request = this.requests.get(id);
 		if (!request) return false;
 
@@ -168,7 +168,7 @@ export class RequestQueue {
 	/**
 	 * 拒绝指定 ID 的请求（使用错误消息）
 	 */
-	rejectWithMessage(id: RequestId, message: string): boolean {
+	public rejectWithMessage(id: RequestId, message: string): boolean {
 		return this.reject(id, new Error(message));
 	}
 
@@ -184,7 +184,7 @@ export class RequestQueue {
 	 * @param id - 请求 ID
 	 * @returns 是否成功暂停
 	 */
-	pauseTimeout(id: RequestId): boolean {
+	public pauseTimeout(id: RequestId): boolean {
 		const request = this.requests.get(id);
 		if (!request || request.isPaused) return false;
 
@@ -209,7 +209,7 @@ export class RequestQueue {
 	 * @param id - 请求 ID
 	 * @returns 是否成功恢复
 	 */
-	resumeTimeout(id: RequestId): boolean {
+	public resumeTimeout(id: RequestId): boolean {
 		const request = this.requests.get(id);
 		if (!request || !request.isPaused) return false;
 
@@ -244,7 +244,7 @@ export class RequestQueue {
 	 * @param method - 方法名
 	 * @returns 暂停的请求数
 	 */
-	pauseByMethod(method: string): number {
+	public pauseByMethod(method: string): number {
 		let count = 0;
 		for (const [id, request] of this.requests) {
 			if (request.method === method && !request.isPaused) {
@@ -261,7 +261,7 @@ export class RequestQueue {
 	 * @param method - 方法名
 	 * @returns 恢复的请求数
 	 */
-	resumeByMethod(method: string): number {
+	public resumeByMethod(method: string): number {
 		let count = 0;
 		for (const [id, request] of this.requests) {
 			if (request.method === method && request.isPaused) {
@@ -279,21 +279,21 @@ export class RequestQueue {
 	/**
 	 * 队列中的请求数量
 	 */
-	get size(): number {
+	public get size(): number {
 		return this.requests.size;
 	}
 
 	/**
 	 * 检查请求是否存在
 	 */
-	has(id: RequestId): boolean {
+	public has(id: RequestId): boolean {
 		return this.requests.has(id);
 	}
 
 	/**
 	 * 获取请求的方法名
 	 */
-	getMethod(id: RequestId): string | undefined {
+	public getMethod(id: RequestId): string | undefined {
 		return this.requests.get(id)?.method;
 	}
 
@@ -303,7 +303,7 @@ export class RequestQueue {
 	 * @param reason - 拒绝原因
 	 * @returns 清空的请求数
 	 */
-	clear(reason = '连接已断开'): number {
+	public clear(reason = '连接已断开'): number {
 		const count = this.requests.size;
 
 		for (const [_id, request] of this.requests) {
@@ -320,7 +320,7 @@ export class RequestQueue {
 	/**
 	 * 获取队列统计信息
 	 */
-	getStats(): QueueStats {
+	public getStats(): QueueStats {
 		const byMethod: Record<string, number> = {};
 		let paused = 0;
 
@@ -339,14 +339,14 @@ export class RequestQueue {
 	/**
 	 * 获取所有待处理请求的 ID 列表
 	 */
-	getPendingIds(): RequestId[] {
+	public getPendingIds(): RequestId[] {
 		return Array.from(this.requests.keys());
 	}
 
 	/**
 	 * 按方法名获取请求 ID 列表
 	 */
-	getIdsByMethod(method: string): RequestId[] {
+	public getIdsByMethod(method: string): RequestId[] {
 		const ids: RequestId[] = [];
 		for (const [id, request] of this.requests) {
 			if (request.method === method) {

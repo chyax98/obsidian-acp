@@ -136,12 +136,10 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
  * - 设置管理
  */
 export default class AcpPlugin extends Plugin {
-	settings: AcpPluginSettings = DEFAULT_SETTINGS;
-	detector: AcpCliDetector = cliDetector;
+	public settings: AcpPluginSettings = DEFAULT_SETTINGS;
+	public detector: AcpCliDetector = cliDetector;
 
-	async onload(): Promise<void> {
-		console.log('ACP Plugin: 加载中...');
-
+	public async onload(): Promise<void> {
 		// 加载设置
 		await this.loadSettings();
 
@@ -162,18 +160,15 @@ export default class AcpPlugin extends Plugin {
 
 		// 注册设置页面
 		this.addSettingTab(new AcpSettingTab(this.app, this));
-
-		console.log('ACP Plugin: 加载完成');
 	}
 
-	onunload() {
-		console.log('ACP Plugin: 已卸载');
+	public onunload(): void {
 	}
 
 	/**
 	 * 激活或创建 ChatView
 	 */
-	async activateChatView() {
+	public async activateChatView(): Promise<void> {
 		const { workspace } = this.app;
 
 		let leaf: WorkspaceLeaf | null = null;
@@ -195,11 +190,11 @@ export default class AcpPlugin extends Plugin {
 		}
 	}
 
-	async loadSettings() {
+	public async loadSettings(): Promise<void> {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 	}
 
-	async saveSettings() {
+	public async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
 	}
 }

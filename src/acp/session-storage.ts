@@ -119,7 +119,7 @@ export class SessionStorage {
 	/**
 	 * 加载存储数据
 	 */
-	async load(): Promise<void> {
+	public async load(): Promise<void> {
 		const loadedData = (await this.plugin.loadData()) as StorageData | null;
 
 		if (!loadedData) {
@@ -132,8 +132,6 @@ export class SessionStorage {
 			// TODO: 未来版本迁移逻辑
 			this.data = loadedData;
 		}
-
-		console.log(`[SessionStorage] 已加载 ${this.data.sessions.length} 个会话`);
 	}
 
 	/**
@@ -156,7 +154,7 @@ export class SessionStorage {
 	 *
 	 * 如果会话已存在则更新，否则新建。
 	 */
-	async saveSession(session: StoredSession): Promise<void> {
+	public async saveSession(session: StoredSession): Promise<void> {
 		if (!this.data) {
 			throw new Error('SessionStorage 未初始化，请先调用 load()');
 		}
@@ -170,7 +168,6 @@ export class SessionStorage {
 				...session,
 				updatedAt: Date.now(),
 			};
-			console.log(`[SessionStorage] 已更新会话: ${session.id}`);
 		} else {
 			// 新增会话
 			const newSession = {
@@ -180,7 +177,6 @@ export class SessionStorage {
 			};
 
 			this.data.sessions.push(newSession);
-			console.log(`[SessionStorage] 已保存新会话: ${session.id}`);
 
 			// 检查是否超过最大数量
 			if (this.data.sessions.length > this.maxSessions) {
@@ -196,7 +192,7 @@ export class SessionStorage {
 	 *
 	 * @returns 会话数据，如果不存在则返回 null
 	 */
-	async loadSession(id: string): Promise<StoredSession | null> {
+	public loadSession(id: string): StoredSession | null {
 		if (!this.data) {
 			throw new Error('SessionStorage 未初始化，请先调用 load()');
 		}
@@ -204,10 +200,8 @@ export class SessionStorage {
 		const session = this.data.sessions.find((s) => s.id === id);
 
 		if (session) {
-			console.log(`[SessionStorage] 已加载会话: ${id}`);
 			return { ...session };
 		} else {
-			console.log(`[SessionStorage] 会话不存在: ${id}`);
 			return null;
 		}
 	}
@@ -219,7 +213,7 @@ export class SessionStorage {
 	 *
 	 * @returns 会话摘要列表
 	 */
-	async listSessions(): Promise<SessionSummary[]> {
+	public listSessions(): SessionSummary[] {
 		if (!this.data) {
 			throw new Error('SessionStorage 未初始化，请先调用 load()');
 		}
@@ -257,7 +251,7 @@ export class SessionStorage {
 	/**
 	 * 删除会话
 	 */
-	async deleteSession(id: string): Promise<void> {
+	public async deleteSession(id: string): Promise<void> {
 		if (!this.data) {
 			throw new Error('SessionStorage 未初始化，请先调用 load()');
 		}
@@ -267,10 +261,7 @@ export class SessionStorage {
 		const afterCount = this.data.sessions.length;
 
 		if (beforeCount !== afterCount) {
-			console.log(`[SessionStorage] 已删除会话: ${id}`);
 			await this.persist();
-		} else {
-			console.log(`[SessionStorage] 会话不存在，无法删除: ${id}`);
 		}
 	}
 
@@ -281,13 +272,12 @@ export class SessionStorage {
 	 *
 	 * @param keepCount 保留的会话数量
 	 */
-	async clearOldSessions(keepCount: number): Promise<void> {
+	public async clearOldSessions(keepCount: number): Promise<void> {
 		if (!this.data) {
 			throw new Error('SessionStorage 未初始化，请先调用 load()');
 		}
 
 		if (this.data.sessions.length <= keepCount) {
-			console.log('[SessionStorage] 会话数量未超过限制，无需清理');
 			return;
 		}
 
@@ -296,11 +286,7 @@ export class SessionStorage {
 
 		// 保留前 N 个
 		const toKeep = sorted.slice(0, keepCount);
-		const toDelete = this.data.sessions.length - toKeep.length;
-
 		this.data.sessions = toKeep;
-
-		console.log(`[SessionStorage] 已清理 ${toDelete} 个旧会话，保留最近 ${keepCount} 个`);
 
 		await this.persist();
 	}
@@ -308,15 +294,12 @@ export class SessionStorage {
 	/**
 	 * 清空所有会话
 	 */
-	async clearAll(): Promise<void> {
+	public async clearAll(): Promise<void> {
 		if (!this.data) {
 			throw new Error('SessionStorage 未初始化，请先调用 load()');
 		}
 
-		const count = this.data.sessions.length;
 		this.data.sessions = [];
-
-		console.log(`[SessionStorage] 已清空所有会话 (${count} 个)`);
 
 		await this.persist();
 	}
@@ -328,21 +311,21 @@ export class SessionStorage {
 	/**
 	 * 获取当前存储的会话数量
 	 */
-	get sessionCount(): number {
+	public get sessionCount(): number {
 		return this.data?.sessions.length || 0;
 	}
 
 	/**
 	 * 获取最大保留会话数
 	 */
-	get maxSessionCount(): number {
+	public get maxSessionCount(): number {
 		return this.maxSessions;
 	}
 
 	/**
 	 * 设置最大保留会话数
 	 */
-	setMaxSessions(count: number): void {
+	public setMaxSessions(count: number): void {
 		if (count < 1) {
 			throw new Error('最大会话数必须至少为 1');
 		}

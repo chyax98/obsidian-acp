@@ -20,14 +20,14 @@ import { McpServerModal } from './McpServerModal';
  * ACP 插件设置页面
  */
 export class AcpSettingTab extends PluginSettingTab {
-	plugin: AcpPlugin;
+	public plugin: AcpPlugin;
 
 	constructor(app: App, plugin: AcpPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
-	display(): void {
+	public display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 
@@ -110,7 +110,7 @@ export class AcpSettingTab extends PluginSettingTab {
 			// Agent 名称和状态
 			const headerEl = agentItemEl.createDiv({ cls: 'acp-agent-header' });
 
-			const nameEl = headerEl.createDiv({
+			headerEl.createDiv({
 				cls: 'acp-agent-name',
 				text: config.name,
 			});
@@ -158,7 +158,7 @@ export class AcpSettingTab extends PluginSettingTab {
 						cls: 'acp-install-label',
 					});
 
-					const cmdEl = installEl.createEl('code', {
+					installEl.createEl('code', {
 						text: this.getInstallCommand(config),
 						cls: 'acp-install-command',
 					});

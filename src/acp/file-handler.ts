@@ -128,7 +128,7 @@ export class FileOperationHandler {
 	/**
 	 * 读取文件内容
 	 */
-	async readFile(params: ReadFileParams): Promise<ReadFileResult> {
+	public async readFile(params: ReadFileParams): Promise<ReadFileResult> {
 		const resolvedPath = this.resolvePath(params.path);
 		const sessionId = params.sessionId || '';
 
@@ -218,7 +218,7 @@ export class FileOperationHandler {
 	/**
 	 * 写入文件内容
 	 */
-	async writeFile(params: WriteFileParams): Promise<void> {
+	public async writeFile(params: WriteFileParams): Promise<void> {
 		const resolvedPath = this.resolvePath(params.path);
 		const sessionId = params.sessionId || '';
 
@@ -323,7 +323,7 @@ export class FileOperationHandler {
 	/**
 	 * 解析路径 (相对路径 → 绝对路径)
 	 */
-	resolvePath(targetPath: string): string {
+	public resolvePath(targetPath: string): string {
 		if (!targetPath) return this.workingDir;
 		if (path.isAbsolute(targetPath)) return targetPath;
 		return path.join(this.workingDir, targetPath);
@@ -332,7 +332,7 @@ export class FileOperationHandler {
 	/**
 	 * 检查是否为 Vault 内路径
 	 */
-	isVaultPath(absolutePath: string): boolean {
+	public isVaultPath(absolutePath: string): boolean {
 		if (!this.vaultPath) return false;
 
 		const normalizedTarget = path.normalize(absolutePath);
@@ -371,14 +371,14 @@ export class FileOperationHandler {
 	/**
 	 * 更新工作目录
 	 */
-	setWorkingDir(workingDir: string): void {
+	public setWorkingDir(workingDir: string): void {
 		this.workingDir = workingDir;
 	}
 
 	/**
 	 * 获取当前工作目录
 	 */
-	getWorkingDir(): string {
+	public getWorkingDir(): string {
 		return this.workingDir;
 	}
 
@@ -401,28 +401,28 @@ export class FileOperationHandler {
 	/**
 	 * 获取操作历史
 	 */
-	get history(): FileOperationRecord[] {
+	public get history(): FileOperationRecord[] {
 		return [...this._history];
 	}
 
 	/**
 	 * 获取指定会话的操作历史
 	 */
-	getSessionHistory(sessionId: string): FileOperationRecord[] {
+	public getSessionHistory(sessionId: string): FileOperationRecord[] {
 		return this._history.filter((r) => r.sessionId === sessionId);
 	}
 
 	/**
 	 * 清空操作历史
 	 */
-	clearHistory(): void {
+	public clearHistory(): void {
 		this._history = [];
 	}
 
 	/**
 	 * 获取历史统计
 	 */
-	getStats(): { reads: number; writes: number; errors: number; totalSize: number } {
+	public getStats(): { reads: number; writes: number; errors: number; totalSize: number } {
 		let reads = 0;
 		let writes = 0;
 		let errors = 0;

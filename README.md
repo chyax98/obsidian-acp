@@ -6,6 +6,7 @@ Agent Client Protocol (ACP) 集成插件 - 在 Obsidian 中连接多个 AI 编�
 
 - 🤖 **多 Agent 支持**: Claude Code, Kimi, Codex ACP, Gemini CLI, Qwen Code
 - 🔄 **完整 ACP 协议**: 基于开放标准，全量事件类型支持
+- 🔍 **智能检测**: 5层优先级检测系统（环境变量→Vault配置→全局配置→手动输入→自动检测）
 - ⚡ **高性能流式**: 消息缓冲优化，减少 UI 更新 95%
 - 🛡️ **健壮性**: 自动重连、错误分类、超时管理
 - 💭 **思考过程**: 实时显示 Agent 内部思考（可折叠）
@@ -119,22 +120,31 @@ qwen --version
 ```
 ✅ Claude Code: 4/4 测试通过
 ✅ 协议实现：100% 兼容
-✅ 总计：7/8 测试通过（87.5%）
+✅ 检测系统：52/52 测试通过（100%）
+✅ 总计：59/60 测试通过（98.3%）
 ```
+
+**新增：5层优先级检测系统**
+- PathValidator: 15 tests ✅
+- EnvDetector: 12 tests ✅
+- ConfigDetector: 15 tests ✅
+- PriorityDetector: 10 tests ✅
 
 ## 📖 文档
 
+📚 **[完整文档中心](./docs/README.md)** - 查看所有文档
+
 **用户文档**:
-- [快速开始](./docs/GETTING_STARTED.md) - 5 分钟上手指南
-- [Agent 配置](./docs/AGENT_SETUP.md) - 每个 Agent 的详细配置教程
-- [常见问题 FAQ](./docs/FAQ.md) - 安装、配置、使用问题解答
-- [权限系统](./docs/PERMISSIONS.md) - 理解和配置权限管理
+- [快速开始](./docs/user-guide/GETTING_STARTED.md) - 5 分钟上手指南
+- [Agent 配置](./docs/user-guide/AGENT_SETUP.md) - 每个 Agent 的详细配置教程
+- [权限系统](./docs/user-guide/PERMISSIONS.md) - 理解和配置权限管理
+- [常见问题 FAQ](./docs/user-guide/FAQ.md) - 安装、配置、使用问题解答
 - [快速参考](./USAGE.md) - 常用操作和示例
 
-**技术文档**:
+**开发文档**:
+- [集成指南](./docs/development/INTEGRATION_GUIDE.md) - 5层检测系统集成（新）
+- [检测系统总结](./docs/development/DETECTION_SYSTEM_SUMMARY.md) - 完整实现和技术细节（新）
 - [产品愿景](./CLAUDE.md) - 完整的产品设计和技术架构
-- [测试指南](./TESTING.md) - 开发者测试说明
-- [质量报告](./QUALITY_REPORT.md) - 代码质量和测试结果
 
 ## 🔧 开发
 
@@ -148,7 +158,8 @@ npm test             # 测试
 
 - ✅ TypeScript: 0 errors
 - ✅ ESLint: 0 errors
-- ✅ 测试: 7/8 passed
+- ✅ 测试: 59/60 passed (98.3%)
+- ✅ 代码行数: 10,000+ (含新检测系统)
 
 ## 📄 许可证
 

@@ -11,7 +11,7 @@ export interface PermissionRequest {
 	toolName: string;      // 如 "fs/read", "bash/run"
 	title: string;         // 如 "Reading configuration file"
 	kind: string;          // 如 "read", "write", "execute"
-	rawInput: Record<string, any>;
+	rawInput: Record<string, unknown>;
 }
 
 /**
@@ -74,13 +74,13 @@ export class PermissionManager {
 			const modal = new PermissionModal(
 				this.app,
 				request,
-				async (response: PermissionResponse) => {
+				(response: PermissionResponse) => {
 					// 如果用户选择"始终允许"，记录到设置
 					if (response.optionId === 'allow-always') {
 						this.settings.alwaysAllowedTools[request.toolName] = true;
-						await this.saveSettings();
-
-						new Notice(`已记住：始终允许 ${request.toolName}`);
+						void this.saveSettings().then(() => {
+							new Notice(`已记住：始终允许 ${request.toolName}`);
+						});
 
 						// 转换为 allow-once 返回给 Agent
 						resolve({

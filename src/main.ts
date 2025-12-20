@@ -150,12 +150,14 @@ export default class AcpPlugin extends Plugin {
 		this.addCommand({
 			id: 'open-acp-chat',
 			name: '打开 ACP Chat',
-			callback: () => this.activateChatView(),
+			callback: () => {
+				void this.activateChatView();
+			},
 		});
 
 		// 添加 Ribbon 图标
 		this.addRibbonIcon('bot', 'ACP Agent Chat', () => {
-			this.activateChatView();
+			void this.activateChatView();
 		});
 
 		// 注册设置页面
@@ -186,12 +188,15 @@ export default class AcpPlugin extends Plugin {
 		}
 
 		if (leaf) {
-			workspace.revealLeaf(leaf);
+			void workspace.revealLeaf(leaf);
 		}
 	}
 
 	public async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-redundant-type-constituents
+		const loadedData = (await this.loadData()) as Partial<AcpPluginSettings> | undefined;
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData || {});
 	}
 
 	public async saveSettings(): Promise<void> {

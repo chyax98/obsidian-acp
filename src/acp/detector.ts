@@ -128,6 +128,7 @@ export class AcpCliDetector {
 	 * @param whichCommand which/where 命令
 	 * @param manualPath 用户手动配置的路径（可选）
 	 */
+	// eslint-disable-next-line @typescript-eslint/require-await
 	private async detectSingleCli(
 		cli: DetectableAcpCli,
 		whichCommand: string,
@@ -135,7 +136,7 @@ export class AcpCliDetector {
 	): Promise<DetectedAgent | null> {
 		// 1. 如果有手动配置路径，优先使用
 		if (manualPath) {
-			const validated = await this.validateManualPath(manualPath, cli.cmd);
+			const validated = this.validateManualPath(manualPath, cli.cmd);
 			if (validated) {
 				return {
 					backendId: cli.backendId,
@@ -256,10 +257,10 @@ export class AcpCliDetector {
 	 * @param _cmd CLI 命令名
 	 * @returns 验证结果（路径和版本）或 null
 	 */
-	private async validateManualPath(
+	private validateManualPath(
 		manualPath: string,
 		_cmd: string,
-	): Promise<{ path: string; version?: string } | null> {
+	): { path: string; version?: string } | null {
 		try {
 			// 1. 检查文件是否存在且可执行
 			const result = execSync(`test -x "${manualPath}" && echo "ok"`, {

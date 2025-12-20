@@ -118,7 +118,7 @@ export class AcpSettingTab extends PluginSettingTab {
 			const statusEl = headerEl.createDiv({ cls: 'acp-agent-status' });
 
 			// 异步检测状态
-			this.detectAgentStatus(agentId as AcpBackendId, config).then(status => {
+			void this.detectAgentStatus(agentId as AcpBackendId, config).then(status => {
 				if (status.installed) {
 					statusEl.textContent = `✅ 已安装${status.version ? ` (${status.version})` : ''}`;
 					statusEl.style.color = 'var(--color-green)';
@@ -130,20 +130,18 @@ export class AcpSettingTab extends PluginSettingTab {
 					});
 					testBtn.style.marginTop = '8px';
 
-					testBtn.addEventListener('click', async () => {
+					testBtn.addEventListener('click', () => {
 						testBtn.disabled = true;
 						testBtn.textContent = '测试中...';
 
-						const success = await this.testAgentConnection(
-							agentId as AcpBackendId,
-						);
+						void this.testAgentConnection(agentId as AcpBackendId).then((success) => {
+							testBtn.disabled = false;
+							testBtn.textContent = success ? '✅ 连接成功' : '❌ 连接失败';
 
-						testBtn.disabled = false;
-						testBtn.textContent = success ? '✅ 连接成功' : '❌ 连接失败';
-
-						setTimeout(() => {
-							testBtn.textContent = '测试连接';
-						}, 2000);
+							setTimeout(() => {
+								testBtn.textContent = '测试连接';
+							}, 2000);
+						});
 					});
 				} else {
 					statusEl.textContent = '⚠️ 未安装';
@@ -165,8 +163,9 @@ export class AcpSettingTab extends PluginSettingTab {
 
 					const copyBtn = installEl.createEl('button', { text: '复制' });
 					copyBtn.addEventListener('click', () => {
-						navigator.clipboard.writeText(this.getInstallCommand(config));
-						new Notice('已复制安装命令');
+						void navigator.clipboard.writeText(this.getInstallCommand(config)).then(() => {
+							new Notice('已复制安装命令');
+						});
 					});
 				}
 			});
@@ -292,8 +291,9 @@ export class AcpSettingTab extends PluginSettingTab {
 	 */
 	private getInstallCommand(config: AcpBackendConfig): string {
 		// 1. 优先使用 registry 中的 installCommand（如果存在）
-		if ('installCommand' in config && typeof (config as any).installCommand === 'string') {
-			return (config as any).installCommand;
+		const configWithInstall = config as { installCommand?: string };
+		if ('installCommand' in config && typeof configWithInstall.installCommand === 'string') {
+			return configWithInstall.installCommand;
 		}
 
 		// 2. 根据 command 生成安装指令
@@ -362,11 +362,12 @@ export class AcpSettingTab extends PluginSettingTab {
 					text: '删除',
 					cls: 'mod-warning',
 				});
-				deleteBtn.addEventListener('click', async () => {
+				deleteBtn.addEventListener('click', () => {
 					this.plugin.settings.mcpServers =
 						this.plugin.settings.mcpServers.filter(s => s.id !== server.id);
-					await this.plugin.saveSettings();
-					this.display(); // 重新渲染
+					void this.plugin.saveSettings().then(() => {
+						this.display(); // 重新渲染
+					});
 				});
 			}
 		}
@@ -401,7 +402,7 @@ export class AcpSettingTab extends PluginSettingTab {
 		const modal = new McpServerModal(
 			this.app,
 			server || null,
-			async (updatedServer: McpServerConfig) => {
+			(updatedServer: McpServerConfig) => {
 				if (server) {
 					// 编辑现有服务器
 					const index = this.plugin.settings.mcpServers.findIndex(
@@ -415,9 +416,10 @@ export class AcpSettingTab extends PluginSettingTab {
 					this.plugin.settings.mcpServers.push(updatedServer);
 				}
 
-				await this.plugin.saveSettings();
-				this.display(); // 重新渲染
-				new Notice('MCP 服务器配置已保存');
+				void this.plugin.saveSettings().then(() => {
+					this.display(); // 重新渲染
+					new Notice('MCP 服务器配置已保存');
+				});
 			},
 		);
 

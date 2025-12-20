@@ -15,7 +15,7 @@
  */
 
 import type { Component, App } from 'obsidian';
-import { MarkdownRenderer, setIcon, Notice, Modal, MarkdownView } from 'obsidian';
+import { MarkdownRenderer, setIcon, Notice, Modal, MarkdownView, TFile } from 'obsidian';
 import type { Message, ToolCall, PlanEntry } from '../acp/core/session-manager';
 
 // ============================================================================
@@ -178,7 +178,7 @@ export class MessageRenderer {
 			this.setupImageEvents(imgEl, imageWrapper, app);
 		} else if (uri.startsWith('file://')) {
 			// file:// URI - 需要完整处理
-			this.handleFileUri(uri, imgEl, imageWrapper, app);
+			void this.handleFileUri(uri, imgEl, imageWrapper, app);
 		} else {
 			// 其他情况 - 尝试作为相对路径处理
 			imgEl.src = uri;
@@ -375,20 +375,21 @@ export class MessageRenderer {
 		});
 		setIcon(copyBtn, 'copy');
 
-		copyBtn.addEventListener('click', async (e) => {
+		copyBtn.addEventListener('click', (e) => {
 			e.stopPropagation();
 			const text = message.content || '';
 			if (text) {
-				await navigator.clipboard.writeText(text);
-				new Notice('已复制消息');
+				void navigator.clipboard.writeText(text).then(() => {
+					new Notice('已复制消息');
 
-				// 临时切换图标
-				copyBtn.empty();
-				setIcon(copyBtn, 'check');
-				setTimeout(() => {
+					// 临时切换图标
 					copyBtn.empty();
-					setIcon(copyBtn, 'copy');
-				}, 1500);
+					setIcon(copyBtn, 'check');
+					setTimeout(() => {
+						copyBtn.empty();
+						setIcon(copyBtn, 'copy');
+					}, 1500);
+				});
 			}
 		});
 	}
@@ -664,13 +665,11 @@ export class MessageRenderer {
 			}
 
 			// 点击跳转
-			locationEl.addEventListener('click', async () => {
-				try {
-					await this.openFileAtLocation(app, location.path, location.line, location.column);
-				} catch (error) {
+			locationEl.addEventListener('click', () => {
+				void this.openFileAtLocation(app, location.path, location.line, location.column).catch((error) => {
 					console.error('[MessageRenderer] 打开文件失败:', error);
 					new Notice(`无法打开文件: ${location.path}`);
-				}
+				});
 			});
 		}
 	}
@@ -692,10 +691,10 @@ export class MessageRenderer {
 		// 尝试在 Obsidian 中打开文件
 		const file = app.vault.getAbstractFileByPath(path);
 
-		if (file && 'path' in file) {
+		if (file instanceof TFile) {
 			// 使用 Obsidian API 打开文件
 			const leaf = app.workspace.getLeaf(false);
-			await leaf.openFile(file as any);
+			await leaf.openFile(file);
 
 			// 如果指定了行号，跳转到该行
 			if (line !== undefined) {
@@ -796,18 +795,19 @@ export class MessageRenderer {
 		setIcon(copyBtn, 'copy');
 		copyBtn.setAttribute('aria-label', '复制');
 
-		copyBtn.addEventListener('click', async (e) => {
+		copyBtn.addEventListener('click', (e) => {
 			e.stopPropagation();
-			await navigator.clipboard.writeText(text);
-			new Notice('已复制到剪贴板');
+			void navigator.clipboard.writeText(text).then(() => {
+				new Notice('已复制到剪贴板');
 
-			// 临时切换图标
-			copyBtn.empty();
-			setIcon(copyBtn, 'check');
-			setTimeout(() => {
+				// 临时切换图标
 				copyBtn.empty();
-				setIcon(copyBtn, 'copy');
-			}, 1500);
+				setIcon(copyBtn, 'check');
+				setTimeout(() => {
+					copyBtn.empty();
+					setIcon(copyBtn, 'copy');
+				}, 1500);
+			});
 		});
 	}
 
@@ -823,19 +823,20 @@ export class MessageRenderer {
 
 		// 文件路径头部
 		if (diffContent.path) {
+			const filePath = diffContent.path; // Capture for closure
 			const pathHeaderEl = wrapperEl.createDiv({ cls: 'acp-diff-path' });
 
 			// 文件路径
 			const pathEl = pathHeaderEl.createEl('span', {
 				cls: 'acp-diff-path-text',
-				text: diffContent.path,
+				text: filePath,
 			});
 
 			// 如果提供了 app，添加点击跳转
 			if (app) {
 				pathEl.addClass('acp-diff-path-clickable');
 				pathEl.addEventListener('click', () => {
-					this.openFile(app, diffContent.path!);
+					this.openFile(app, filePath);
 				});
 			}
 
@@ -844,18 +845,19 @@ export class MessageRenderer {
 			setIcon(copyBtn, 'copy');
 			copyBtn.setAttribute('aria-label', '复制 diff');
 
-			copyBtn.addEventListener('click', async (e) => {
+			copyBtn.addEventListener('click', (e) => {
 				e.stopPropagation();
 				const diffText = this.buildDiffString(diffContent);
-				await navigator.clipboard.writeText(diffText);
-				new Notice('已复制 diff');
+				void navigator.clipboard.writeText(diffText).then(() => {
+					new Notice('已复制 diff');
 
-				copyBtn.empty();
-				setIcon(copyBtn, 'check');
-				setTimeout(() => {
 					copyBtn.empty();
-					setIcon(copyBtn, 'copy');
-				}, 1500);
+					setIcon(copyBtn, 'check');
+					setTimeout(() => {
+						copyBtn.empty();
+						setIcon(copyBtn, 'copy');
+					}, 1500);
+				});
 			});
 		}
 
@@ -919,17 +921,18 @@ export class MessageRenderer {
 		setIcon(copyBtn, 'copy');
 		copyBtn.setAttribute('aria-label', '复制终端输出');
 
-		copyBtn.addEventListener('click', async (e) => {
+		copyBtn.addEventListener('click', (e) => {
 			e.stopPropagation();
-			await navigator.clipboard.writeText(terminalId);
-			new Notice('已复制终端输出');
+			void navigator.clipboard.writeText(terminalId).then(() => {
+				new Notice('已复制终端输出');
 
-			copyBtn.empty();
-			setIcon(copyBtn, 'check');
-			setTimeout(() => {
 				copyBtn.empty();
-				setIcon(copyBtn, 'copy');
-			}, 1500);
+				setIcon(copyBtn, 'check');
+				setTimeout(() => {
+					copyBtn.empty();
+					setIcon(copyBtn, 'copy');
+				}, 1500);
+			});
 		});
 	}
 
@@ -940,7 +943,7 @@ export class MessageRenderer {
 		// 尝试在 Obsidian 中打开文件
 		const file = app.vault.getAbstractFileByPath(path);
 		if (file) {
-			app.workspace.openLinkText(path, '', false);
+			void app.workspace.openLinkText(path, '', false);
 		} else {
 			new Notice(`文件不存在: ${path}`);
 		}

@@ -13,6 +13,7 @@ import type { Message, ToolCall, PlanEntry, SessionState } from '../acp/core/ses
 import type { DetectedAgent } from '../acp/detector';
 import { PermissionModal } from './PermissionModal';
 import type { RequestPermissionParams, PermissionOutcome } from '../acp/types/permissions';
+import type { AvailableCommand } from '../acp/types/updates';
 import { MessageRenderer } from './MessageRenderer';
 
 // ============================================================================
@@ -49,7 +50,7 @@ export class AcpChatView extends ItemView {
 
 	// 会话状态
 	private currentMode: string | null = null;
-	private availableCommands: any[] = [];
+	private availableCommands: AvailableCommand[] = [];
 
 	// Obsidian Component（用于 MarkdownRenderer 生命周期管理）
 	private markdownComponent: Component = new Component();
@@ -138,7 +139,7 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 关闭视图
 	 */
-	public onClose(): void {
+	public async onClose(): Promise<void> {
 		// 断开 ACP 连接
 		if (this.sessionManager) {
 			this.sessionManager.end();
@@ -328,8 +329,8 @@ export class AcpChatView extends ItemView {
 		try {
 			const adapter = this.plugin.app.vault.adapter;
 			if ('getBasePath' in adapter && typeof adapter.getBasePath === 'function') {
-				const basePath = adapter.getBasePath();
-				if (basePath) {
+				const basePath = adapter.getBasePath() as unknown;
+				if (typeof basePath === 'string') {
 					return basePath;
 				}
 			}
@@ -514,7 +515,7 @@ export class AcpChatView extends ItemView {
 		};
 
 		// 可用命令更新
-		this.sessionManager.onAvailableCommandsUpdate = (commands: any[]) => {
+		this.sessionManager.onAvailableCommandsUpdate = (commands: AvailableCommand[]) => {
 			this.handleAvailableCommandsUpdate(commands);
 		};
 	}
@@ -902,7 +903,7 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 处理可用命令更新
 	 */
-	private handleAvailableCommandsUpdate(commands: any[]): void {
+	private handleAvailableCommandsUpdate(commands: AvailableCommand[]): void {
 		this.availableCommands = commands;
 
 		// 在输入框上方显示可用命令按钮
@@ -918,7 +919,7 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 渲染可用命令按钮栏
 	 */
-	private renderAvailableCommands(commands: any[]): void {
+	private renderAvailableCommands(commands: AvailableCommand[]): void {
 		// 移除旧的命令栏
 		const oldCommandsBar = this.inputContainerEl.querySelector('.acp-available-commands-bar');
 		if (oldCommandsBar) oldCommandsBar.remove();
@@ -966,7 +967,7 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 处理命令按钮点击
 	 */
-	private async handleCommandClick(command: any): Promise<void> {
+	private async handleCommandClick(command: AvailableCommand): Promise<void> {
 		// 如果命令有输入提示，弹出输入框
 		if (command.input && command.input.hint) {
 			// 预填充输入框

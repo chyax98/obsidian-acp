@@ -10,7 +10,7 @@
 
 import { Setting, Notice } from 'obsidian';
 import type { AcpBackendId, AcpBackendConfig } from '../acp/backends/types';
-import { UnifiedDetector } from '../acp/unified-detector';
+import type { UnifiedDetector } from '../acp/unified-detector';
 import type AcpPlugin from '../main';
 
 /**
@@ -27,7 +27,7 @@ export async function renderEnhancedAgentItem(
 	agentId: AcpBackendId,
 	config: AcpBackendConfig,
 	plugin: AcpPlugin,
-	detector: UnifiedDetector
+	detector: UnifiedDetector,
 ): Promise<void> {
 	const agentItemEl = containerEl.createDiv({ cls: 'acp-agent-item-enhanced' });
 
@@ -85,10 +85,10 @@ export async function renderEnhancedAgentItem(
 		try {
 			// 使用统一检测器
 			const result = await detector.detectSingle(agentId, {
-				vaultPath: plugin.app.vault.adapter.basePath,
+				vaultPath: (plugin.app.vault.adapter as { basePath?: string }).basePath,
 				globalConfigPath: undefined, // 使用默认 ~/.acprc
 				manualPath: plugin.settings.manualAgentPaths?.[agentId],
-				cliCommand: config.cmd // 用于 PATH 自动检测
+				cliCommand: config.cliCommand, // 使用 cliCommand 而不是 cmd
 			});
 
 			if (result.found && result.path) {
@@ -114,7 +114,7 @@ export async function renderEnhancedAgentItem(
 				// 添加复制按钮
 				const copyBtn = pathEl.createEl('button', {
 					cls: 'acp-copy-btn',
-					text: '📋'
+					text: '📋',
 				});
 				copyBtn.title = '复制路径';
 				copyBtn.addEventListener('click', () => {
@@ -155,7 +155,7 @@ export async function renderEnhancedAgentItem(
 				`;
 
 				const copyInstallBtn = installEl.createEl('button', {
-					text: '复制安装命令'
+					text: '复制安装命令',
 				});
 				copyInstallBtn.addEventListener('click', () => {
 					void navigator.clipboard.writeText(getInstallCommand(config)).then(() => {
@@ -212,18 +212,19 @@ function getSourceText(source: string, envVar?: string): string {
  * 获取安装命令
  */
 function getInstallCommand(config: AcpBackendConfig): string {
-	// 优先使用 config 中定义的安装命令
-	if (config.installCommand) {
-		return config.installCommand;
+	// 如果有 defaultCliPath 且以 npx 开头，直接使用
+	if (config.defaultCliPath?.startsWith('npx ')) {
+		return config.defaultCliPath;
 	}
 
-	// 根据 cmd 生成安装命令
-	if (config.cmd.startsWith('npx ')) {
-		return config.cmd; // npx 命令本身就是安装命令
+	// 如果有 cliCommand
+	if (config.cliCommand) {
+		// 常见的 npm 包安装
+		return `npm install -g ${config.cliCommand}`;
 	}
 
-	// 默认 npm 全局安装
-	return `npm install -g ${config.cmd}`;
+	// 默认
+	return `# 请参考 ${config.name} 官方文档`;
 }
 
 /**

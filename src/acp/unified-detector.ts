@@ -72,7 +72,7 @@ export class UnifiedDetector {
 			vaultPath?: string;
 			globalConfigPath?: string;
 			manualPaths?: Record<string, string>;
-		} = {}
+		} = {},
 	): Promise<DetectionResult> {
 		// 如果已检测且不强制，返回缓存结果
 		if (this.isDetected && !force) {
@@ -93,7 +93,7 @@ export class UnifiedDetector {
 		const detectionResults = await this.priorityDetector.detectAll(agentIds, {
 			vaultPath: options.vaultPath,
 			globalConfigPath: options.globalConfigPath,
-			manualPaths: options.manualPaths
+			manualPaths: options.manualPaths,
 		});
 
 		// 转换为旧格式
@@ -106,10 +106,10 @@ export class UnifiedDetector {
 				backendId: result.agentId as AcpBackendId,
 				name: cliConfig.name,
 				cliPath: result.path,
-				acpArgs: cliConfig.acpArgs,
+				acpArgs: cliConfig.args, // 使用 args 而不是 acpArgs
 				version: result.version,
-				source: result.source,
-				envVar: result.envVar
+				source: result.source === 'none' ? undefined : result.source as any,
+				envVar: result.envVar,
 			});
 		}
 
@@ -141,13 +141,13 @@ export class UnifiedDetector {
 			globalConfigPath?: string;
 			manualPath?: string;
 			cliCommand?: string;
-		} = {}
+		} = {},
 	): Promise<PriorityResult> {
 		return this.priorityDetector.detectWithPriority(agentId, {
 			vaultPath: options.vaultPath,
 			globalConfigPath: options.globalConfigPath,
 			manualPaths: options.manualPath ? { [agentId]: options.manualPath } : undefined,
-			cliCommand: options.cliCommand
+			cliCommand: options.cliCommand,
 		});
 	}
 

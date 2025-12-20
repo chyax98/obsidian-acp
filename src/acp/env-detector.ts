@@ -68,7 +68,7 @@ const AGENT_ENV_MAP: Record<string, string> = {
 	'qwen': 'QWEN_PATH',
 	'goose': 'GOOSE_PATH',
 	'auggie': 'AUGGIE_PATH',
-	'opencode': 'OPENCODE_PATH'
+	'opencode': 'OPENCODE_PATH',
 };
 
 /**
@@ -99,7 +99,7 @@ export class EnvDetector {
 			return {
 				found: false,
 				agentId,
-				source: 'none'
+				source: 'none',
 			};
 		}
 
@@ -117,7 +117,7 @@ export class EnvDetector {
 				path: expandedPath,
 				source: 'env',
 				envVar: envVarName,
-				error: validation.error
+				error: validation.error,
 			};
 		}
 
@@ -132,7 +132,7 @@ export class EnvDetector {
 			source: 'env',
 			envVar: envVarName,
 			isNpxCommand: npxInfo.isNpx,
-			version: validation.version
+			version: validation.version,
 		};
 	}
 

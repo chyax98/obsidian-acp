@@ -106,13 +106,13 @@ export class PathValidator {
 	 */
 	public async validatePath(
 		pathStr: string,
-		options: ValidateOptions = {}
+		options: ValidateOptions = {},
 	): Promise<ValidationResult> {
 		// 检查空路径
 		if (!pathStr || pathStr.trim() === '') {
 			return {
 				isValid: false,
-				error: '路径不能为空'
+				error: '路径不能为空',
 			};
 		}
 
@@ -124,7 +124,7 @@ export class PathValidator {
 			const result: ValidationResult = {
 				isValid: true,
 				path: pathStr,
-				isNpxCommand: true
+				isNpxCommand: true,
 			};
 
 			// 可选地检查版本
@@ -154,14 +154,14 @@ export class PathValidator {
 				return {
 					isValid: false,
 					path: expandedPath,
-					error: `文件不存在: ${expandedPath}`
+					error: `文件不存在: ${expandedPath}`,
 				};
 			}
 		} catch (err) {
 			return {
 				isValid: false,
 				path: expandedPath,
-				error: `文件不存在: ${expandedPath}`
+				error: `文件不存在: ${expandedPath}`,
 			};
 		}
 
@@ -173,7 +173,7 @@ export class PathValidator {
 				return {
 					isValid: false,
 					path: expandedPath,
-					error: `文件没有执行权限: ${expandedPath}`
+					error: `文件没有执行权限: ${expandedPath}`,
 				};
 			}
 		}
@@ -182,7 +182,7 @@ export class PathValidator {
 		const result: ValidationResult = {
 			isValid: true,
 			path: expandedPath,
-			isNpxCommand: false
+			isNpxCommand: false,
 		};
 
 		// 可选地检查版本
@@ -212,14 +212,14 @@ export class PathValidator {
 	public async validateAgentCli(
 		agentId: string,
 		pathStr: string,
-		options: ValidateOptions = {}
+		options: ValidateOptions = {},
 	): Promise<ValidationResult> {
 		const result = await this.validatePath(pathStr, options);
 
 		// 添加 agentId
 		return {
 			...result,
-			agentId
+			agentId,
 		};
 	}
 
@@ -264,7 +264,7 @@ export class PathValidator {
 			return {
 				isNpx: false,
 				package: '',
-				args: []
+				args: [],
 			};
 		}
 
@@ -276,7 +276,7 @@ export class PathValidator {
 			return {
 				isNpx: false,
 				package: '',
-				args: []
+				args: [],
 			};
 		}
 
@@ -287,7 +287,7 @@ export class PathValidator {
 		return {
 			isNpx: true,
 			package: packageName,
-			args
+			args,
 		};
 	}
 }

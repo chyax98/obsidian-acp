@@ -71,7 +71,7 @@ export class ConfigDetector {
 			'.obsidian',
 			'plugins',
 			'obsidian-acp',
-			'.acp.json'
+			'.acp.json',
 		);
 
 		return this.loadConfigFile(configPath);
@@ -88,7 +88,7 @@ export class ConfigDetector {
 	public async loadGlobalConfig(configPath?: string): Promise<ConfigLoadResult> {
 		const finalPath = configPath || path.join(
 			process.env.HOME || '/tmp',
-			'.acprc'
+			'.acprc',
 		);
 
 		return this.loadConfigFile(finalPath);
@@ -107,7 +107,7 @@ export class ConfigDetector {
 	public async detectAgentPath(
 		agentId: string,
 		vaultPath?: string,
-		globalConfigPath?: string
+		globalConfigPath?: string,
 	): Promise<DetectionResult> {
 		let agentPath: string | undefined;
 		let source: DetectionResult['source'] = 'none';
@@ -135,7 +135,7 @@ export class ConfigDetector {
 			return {
 				found: false,
 				agentId,
-				source: 'none'
+				source: 'none',
 			};
 		}
 
@@ -152,7 +152,7 @@ export class ConfigDetector {
 				agentId,
 				path: expandedPath,
 				source,
-				error: validation.error
+				error: validation.error,
 			};
 		}
 
@@ -166,7 +166,7 @@ export class ConfigDetector {
 			path: validation.path,
 			source,
 			isNpxCommand: npxInfo.isNpx,
-			version: validation.version
+			version: validation.version,
 		};
 	}
 
@@ -179,7 +179,7 @@ export class ConfigDetector {
 	 */
 	public async listConfiguredAgents(
 		vaultPath?: string,
-		globalConfigPath?: string
+		globalConfigPath?: string,
 	): Promise<DetectionResult[]> {
 		const results: DetectionResult[] = [];
 		const processedAgents = new Set<string>();
@@ -225,13 +225,13 @@ export class ConfigDetector {
 	 */
 	public async saveVaultConfig(
 		vaultPath: string,
-		agents: Record<string, string>
+		agents: Record<string, string>,
 	): Promise<void> {
 		const configDir = path.join(
 			vaultPath,
 			'.obsidian',
 			'plugins',
-			'obsidian-acp'
+			'obsidian-acp',
 		);
 		const configPath = path.join(configDir, '.acp.json');
 
@@ -264,7 +264,7 @@ export class ConfigDetector {
 				return {
 					loaded: false,
 					agents: {},
-					error: `JSON 解析失败: ${err instanceof Error ? err.message : String(err)}`
+					error: `JSON 解析失败: ${err instanceof Error ? err.message : String(err)}`,
 				};
 			}
 
@@ -273,7 +273,7 @@ export class ConfigDetector {
 				return {
 					loaded: false,
 					agents: {},
-					error: '配置文件格式无效: 缺少 agents 字段'
+					error: '配置文件格式无效: 缺少 agents 字段',
 				};
 			}
 
@@ -286,21 +286,21 @@ export class ConfigDetector {
 			return {
 				loaded: true,
 				configPath,
-				agents: expandedAgents
+				agents: expandedAgents,
 			};
 		} catch (err) {
 			// 文件不存在或读取失败
 			if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
 				return {
 					loaded: false,
-					agents: {}
+					agents: {},
 				};
 			}
 
 			return {
 				loaded: false,
 				agents: {},
-				error: `读取配置文件失败: ${err instanceof Error ? err.message : String(err)}`
+				error: `读取配置文件失败: ${err instanceof Error ? err.message : String(err)}`,
 			};
 		}
 	}

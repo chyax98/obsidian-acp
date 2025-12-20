@@ -8,7 +8,7 @@ import type { WorkspaceLeaf } from 'obsidian';
 import { Plugin } from 'obsidian';
 import { AcpSettingTab } from './ui/SettingsTab';
 import { AcpChatView, ACP_CHAT_VIEW_TYPE } from './ui/ChatView';
-import { cliDetector, type AcpCliDetector } from './acp/detector';
+import { UnifiedDetector } from './acp/unified-detector';
 
 // ============================================================================
 // 类型定义
@@ -137,11 +137,23 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
  */
 export default class AcpPlugin extends Plugin {
 	public settings: AcpPluginSettings = DEFAULT_SETTINGS;
-	public detector: AcpCliDetector = cliDetector;
+	public detector: UnifiedDetector;
+
+	constructor(app: any, manifest: any) {
+		super(app, manifest);
+		this.detector = new UnifiedDetector();
+	}
 
 	public async onload(): Promise<void> {
 		// 加载设置
 		await this.loadSettings();
+
+		// 执行初始检测
+		await this.detector.detect(false, {
+			vaultPath: (this.app.vault.adapter as { basePath?: string }).basePath,
+			globalConfigPath: undefined, // 使用默认 ~/.acprc
+			manualPaths: this.settings.manualAgentPaths,
+		});
 
 		// 注册 ChatView
 		this.registerView(ACP_CHAT_VIEW_TYPE, (leaf) => new AcpChatView(leaf, this));

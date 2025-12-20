@@ -89,7 +89,7 @@ export class PriorityDetector {
 	 */
 	public async detectWithPriority(
 		agentId: string,
-		options: DetectionOptions = {}
+		options: DetectionOptions = {},
 	): Promise<DetectionResult> {
 		// 1️⃣ 优先级 1: 环境变量
 		const envResult = await this.envDetector.detectAgentPath(agentId);
@@ -101,23 +101,21 @@ export class PriorityDetector {
 		if (options.vaultPath) {
 			const vaultResult = await this.configDetector.detectAgentPath(
 				agentId,
-				options.vaultPath
+				options.vaultPath,
 			);
 			if (vaultResult.found) {
 				return vaultResult;
 			}
 		}
 
-		// 3️⃣ 优先级 3: 全局配置文件
-		if (options.globalConfigPath || true) { // 总是尝试默认路径
-			const globalResult = await this.configDetector.detectAgentPath(
-				agentId,
-				undefined, // 跳过 Vault
-				options.globalConfigPath
-			);
-			if (globalResult.found) {
-				return globalResult;
-			}
+		// 3️⃣ 优先级 3: 全局配置文件 (总是尝试，即使未指定路径也会使用默认 ~/.acprc)
+		const globalResult = await this.configDetector.detectAgentPath(
+			agentId,
+			undefined, // 跳过 Vault
+			options.globalConfigPath,
+		);
+		if (globalResult.found) {
+			return globalResult;
 		}
 
 		// 4️⃣ 优先级 4: 手动输入
@@ -134,7 +132,7 @@ export class PriorityDetector {
 					path: validation.path,
 					source: 'manual',
 					isNpxCommand: npxInfo.isNpx,
-					version: validation.version
+					version: validation.version,
 				};
 			}
 		}
@@ -151,7 +149,7 @@ export class PriorityDetector {
 		return {
 			found: false,
 			agentId,
-			source: 'none'
+			source: 'none',
 		};
 	}
 
@@ -164,7 +162,7 @@ export class PriorityDetector {
 	 */
 	public async detectAll(
 		agentIds: string[],
-		options: DetectionOptions = {}
+		options: DetectionOptions = {},
 	): Promise<DetectionResult[]> {
 		const results: DetectionResult[] = [];
 
@@ -191,28 +189,28 @@ export class PriorityDetector {
 			{
 				priority: 1,
 				source: 'env',
-				description: `环境变量 ${envVarName}`
+				description: `环境变量 ${envVarName}`,
 			},
 			{
 				priority: 2,
 				source: 'vault-config',
-				description: 'Vault 配置文件 (.obsidian/plugins/obsidian-acp/.acp.json)'
+				description: 'Vault 配置文件 (.obsidian/plugins/obsidian-acp/.acp.json)',
 			},
 			{
 				priority: 3,
 				source: 'global-config',
-				description: '全局配置文件 (~/.acprc)'
+				description: '全局配置文件 (~/.acprc)',
 			},
 			{
 				priority: 4,
 				source: 'manual',
-				description: '手动输入 (插件设置)'
+				description: '手动输入 (插件设置)',
 			},
 			{
 				priority: 5,
 				source: 'auto',
-				description: '自动检测 (系统 PATH)'
-			}
+				description: '自动检测 (系统 PATH)',
+			},
 		];
 	}
 
@@ -241,7 +239,7 @@ export class PriorityDetector {
 					path: validation.path,
 					source: 'auto',
 					isNpxCommand: false,
-					version: validation.version
+					version: validation.version,
 				};
 			}
 		} catch (err) {
@@ -251,7 +249,7 @@ export class PriorityDetector {
 		return {
 			found: false,
 			agentId,
-			source: 'none'
+			source: 'none',
 		};
 	}
 }

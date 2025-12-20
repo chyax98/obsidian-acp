@@ -15,6 +15,8 @@ import type { McpServerConfig } from '../main';
 import { ACP_BACKENDS } from '../acp/backends/registry';
 import type { AcpBackendId, AcpBackendConfig } from '../acp/backends/types';
 import { McpServerModal } from './McpServerModal';
+import { renderEnhancedAgentItem } from './EnhancedAgentSettings';
+import type { UnifiedDetector } from '../acp/unified-detector';
 
 /**
  * ACP 插件设置页面
@@ -61,7 +63,7 @@ export class AcpSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Agent 配置部分 - 完全重构
+	 * Agent 配置部分 - 使用增强UI
 	 */
 	private renderAgentSection(containerEl: HTMLElement): void {
 		containerEl.createEl('h3', { text: 'Agent 配置' });
@@ -69,7 +71,7 @@ export class AcpSettingTab extends PluginSettingTab {
 		// 全局检测按钮
 		new Setting(containerEl)
 			.setName('自动检测已安装的 Agent')
-			.setDesc('扫描系统中已安装的 ACP 兼容 Agent')
+			.setDesc('扫描系统中已安装的 ACP 兼容 Agent（支持5层优先级检测）')
 			.addButton(button => {
 				button
 					.setButtonText('重新检测')
@@ -79,10 +81,12 @@ export class AcpSettingTab extends PluginSettingTab {
 						button.setDisabled(true);
 
 						try {
-							const result = await this.plugin.detector.detect(
-								true,
-								this.plugin.settings.manualAgentPaths,
-							);
+							// 清除缓存并重新检测
+							this.plugin.detector.clearCache();
+							const result = await this.plugin.detector.detect(true, {
+								vaultPath: (this.plugin.app.vault.adapter as { basePath?: string }).basePath,
+								manualPaths: this.plugin.settings.manualAgentPaths,
+							});
 							new Notice(
 								`检测完成：发现 ${result.agents.length} 个 Agent`,
 							);
@@ -101,82 +105,17 @@ export class AcpSettingTab extends PluginSettingTab {
 		// Agent 列表容器
 		const agentListEl = containerEl.createDiv({ cls: 'acp-agent-list' });
 
-		// 遍历所有 Agent 配置
+		// 使用增强的 Agent 渲染
 		for (const [agentId, config] of Object.entries(ACP_BACKENDS)) {
 			if (!config.enabled) continue; // 跳过禁用的
 
-			const agentItemEl = agentListEl.createDiv({ cls: 'acp-agent-item' });
-
-			// Agent 名称和状态
-			const headerEl = agentItemEl.createDiv({ cls: 'acp-agent-header' });
-
-			headerEl.createDiv({
-				cls: 'acp-agent-name',
-				text: config.name,
-			});
-
-			const statusEl = headerEl.createDiv({ cls: 'acp-agent-status' });
-
-			// 异步检测状态
-			void this.detectAgentStatus(agentId as AcpBackendId, config).then(status => {
-				if (status.installed) {
-					statusEl.textContent = `✅ 已安装${status.version ? ` (${status.version})` : ''}`;
-					statusEl.style.color = 'var(--color-green)';
-
-					// 添加测试按钮
-					const testBtn = agentItemEl.createEl('button', {
-						cls: 'mod-cta',
-						text: '测试连接',
-					});
-					testBtn.style.marginTop = '8px';
-
-					testBtn.addEventListener('click', () => {
-						testBtn.disabled = true;
-						testBtn.textContent = '测试中...';
-
-						void this.testAgentConnection(agentId as AcpBackendId).then((success) => {
-							testBtn.disabled = false;
-							testBtn.textContent = success ? '✅ 连接成功' : '❌ 连接失败';
-
-							setTimeout(() => {
-								testBtn.textContent = '测试连接';
-							}, 2000);
-						});
-					});
-				} else {
-					statusEl.textContent = '⚠️ 未安装';
-					statusEl.style.color = 'var(--text-muted)';
-
-					// 显示安装命令
-					const installEl = agentItemEl.createDiv({
-						cls: 'acp-agent-install',
-					});
-					installEl.createEl('div', {
-						text: '安装命令:',
-						cls: 'acp-install-label',
-					});
-
-					installEl.createEl('code', {
-						text: this.getInstallCommand(config),
-						cls: 'acp-install-command',
-					});
-
-					const copyBtn = installEl.createEl('button', { text: '复制' });
-					copyBtn.addEventListener('click', () => {
-						void navigator.clipboard.writeText(this.getInstallCommand(config)).then(() => {
-							new Notice('已复制安装命令');
-						});
-					});
-				}
-			});
-
-			// Agent 描述
-			if (config.description) {
-				agentItemEl.createDiv({
-					cls: 'acp-agent-description',
-					text: config.description,
-				});
-			}
+			void renderEnhancedAgentItem(
+				agentListEl,
+				agentId as AcpBackendId,
+				config,
+				this.plugin,
+				this.plugin.detector,
+			);
 		}
 	}
 

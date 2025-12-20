@@ -290,7 +290,7 @@ export class AcpChatView extends ItemView {
 		try {
 			// 使用 detector 检测可用的 Agent
 			await this.plugin.detector.detect();
-			this.availableAgents = this.plugin.detector.getDetectedAgents();
+			this.availableAgents = this.plugin.detector.getAll();
 
 			// 更新下拉框
 			this.agentSelectEl.empty();

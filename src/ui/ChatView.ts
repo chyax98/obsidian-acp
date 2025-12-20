@@ -77,6 +77,10 @@ export class AcpChatView extends ItemView {
 	private inputHistory: string[] = [];
 	private inputHistoryIndex: number = -1;
 
+	// 斜杠命令菜单
+	private commandMenuEl: HTMLElement | null = null;
+	private commandMenuSelectedIndex: number = -1;
+
 	// ========================================================================
 	// 构造函数
 	// ========================================================================
@@ -237,19 +241,53 @@ export class AcpChatView extends ItemView {
 
 		// Phase 4: 增强键盘交互
 		this.inputEl.addEventListener('keydown', (e) => {
+			// 如果命令菜单显示中
+			if (this.commandMenuEl) {
+				if (e.key === 'ArrowUp') {
+					e.preventDefault();
+					this.navigateCommandMenu('up');
+					return;
+				} else if (e.key === 'ArrowDown') {
+					e.preventDefault();
+					this.navigateCommandMenu('down');
+					return;
+				} else if (e.key === 'Enter' && !e.shiftKey) {
+					e.preventDefault();
+					void this.selectCommand();
+					return;
+				} else if (e.key === 'Escape') {
+					e.preventDefault();
+					this.hideCommandMenu();
+					return;
+				}
+			}
+
 			// Enter 发送（Shift+Enter 换行）
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
 				void this.handleSend();
 			}
 
-			// 上下键导航历史消息
+			// 上下键导航历史消息（仅在菜单未显示时）
 			if (e.key === 'ArrowUp') {
 				e.preventDefault();
 				this.navigateInputHistory('up');
 			} else if (e.key === 'ArrowDown') {
 				e.preventDefault();
 				this.navigateInputHistory('down');
+			}
+		});
+
+		// 监听输入变化，检测斜杠命令
+		this.inputEl.addEventListener('input', () => {
+			const value = this.inputEl.value;
+			
+			// 检测是否输入斜杠
+			if (value.startsWith('/')) {
+				const filter = value.slice(1); // 去掉斜杠
+				this.showCommandMenu(filter);
+			} else {
+				this.hideCommandMenu();
 			}
 		});
 
@@ -906,63 +944,142 @@ export class AcpChatView extends ItemView {
 	 */
 	private handleAvailableCommandsUpdate(commands: AvailableCommand[]): void {
 		this.availableCommands = commands;
+		// 不再自动显示命令栏，改为通过斜杠唤起
+	}
 
-		// 在输入框上方显示可用命令按钮
-		if (commands.length > 0) {
-			this.renderAvailableCommands(commands);
-		} else {
-			// 移除旧的命令栏
-			const oldCommandsBar = this.inputContainerEl.querySelector('.acp-available-commands-bar');
-			if (oldCommandsBar) oldCommandsBar.remove();
+	/**
+	 * 显示斜杠命令菜单
+	 */
+	private showCommandMenu(filter = ''): void {
+		// 移除旧菜单
+		this.hideCommandMenu();
+
+		if (this.availableCommands.length === 0) {
+			return;
+		}
+
+		// 过滤命令
+		const filteredCommands = filter
+			? this.availableCommands.filter(cmd =>
+				cmd.name.toLowerCase().includes(filter.toLowerCase()) ||
+				cmd.description?.toLowerCase().includes(filter.toLowerCase()),
+			)
+			: this.availableCommands;
+
+		if (filteredCommands.length === 0) {
+			return;
+		}
+
+		// 创建命令菜单
+		this.commandMenuEl = this.inputContainerEl.createDiv({
+			cls: 'acp-command-menu',
+		});
+
+		// 计算菜单位置（在输入框上方）
+		const inputRect = this.inputEl.getBoundingClientRect();
+		const containerRect = this.inputContainerEl.getBoundingClientRect();
+		this.commandMenuEl.style.bottom = `${containerRect.bottom - inputRect.top + 5}px`;
+
+		filteredCommands.forEach((cmd, index) => {
+			const item = this.commandMenuEl!.createDiv({
+				cls: 'acp-command-menu-item',
+			});
+
+			if (index === 0) {
+				item.addClass('acp-command-menu-item-selected');
+				this.commandMenuSelectedIndex = 0;
+			}
+
+			// 命令图标
+			const iconEl = item.createDiv({ cls: 'acp-command-menu-icon' });
+			setIcon(iconEl, 'terminal');
+
+			// 命令信息
+			const infoEl = item.createDiv({ cls: 'acp-command-menu-info' });
+			infoEl.createDiv({
+				cls: 'acp-command-menu-name',
+				text: `/${cmd.name}`,
+			});
+			
+			if (cmd.description) {
+				infoEl.createDiv({
+					cls: 'acp-command-menu-desc',
+					text: cmd.description,
+				});
+			}
+
+			// 点击事件
+			item.addEventListener('click', () => {
+				void this.selectCommand(cmd);
+			});
+
+			// 鼠标悬停
+			item.addEventListener('mouseenter', () => {
+				this.commandMenuEl?.querySelectorAll('.acp-command-menu-item').forEach((el, i) => {
+					el.classList.toggle('acp-command-menu-item-selected', i === index);
+				});
+				this.commandMenuSelectedIndex = index;
+			});
+		});
+	}
+
+	/**
+	 * 隐藏命令菜单
+	 */
+	private hideCommandMenu(): void {
+		if (this.commandMenuEl) {
+			this.commandMenuEl.remove();
+			this.commandMenuEl = null;
+			this.commandMenuSelectedIndex = -1;
 		}
 	}
 
 	/**
-	 * 渲染可用命令按钮栏
+	 * 导航命令菜单（上下键）
 	 */
-	private renderAvailableCommands(commands: AvailableCommand[]): void {
-		// 移除旧的命令栏
-		const oldCommandsBar = this.inputContainerEl.querySelector('.acp-available-commands-bar');
-		if (oldCommandsBar) oldCommandsBar.remove();
+	private navigateCommandMenu(direction: 'up' | 'down'): void {
+		if (!this.commandMenuEl) return;
 
-		// 创建新的命令栏（在输入框之前）
-		const commandsBar = this.inputContainerEl.createDiv({ cls: 'acp-available-commands-bar' });
+		const items = this.commandMenuEl.querySelectorAll('.acp-command-menu-item');
+		if (items.length === 0) return;
 
-		// 标题
-		const titleEl = commandsBar.createDiv({ cls: 'acp-commands-bar-title' });
-		const iconEl = titleEl.createDiv({ cls: 'acp-commands-bar-icon' });
-		setIcon(iconEl, 'zap');
-		titleEl.createDiv({ cls: 'acp-commands-bar-text', text: '快捷命令' });
+		// 移除当前选中
+		items[this.commandMenuSelectedIndex]?.classList.remove('acp-command-menu-item-selected');
 
-		// 命令按钮容器
-		const buttonsContainer = commandsBar.createDiv({ cls: 'acp-commands-bar-buttons' });
-
-		for (const cmd of commands) {
-			const cmdButton = buttonsContainer.createEl('button', {
-				cls: 'acp-command-button',
-			});
-
-			// 命令图标
-			const cmdIconEl = cmdButton.createDiv({ cls: 'acp-command-button-icon' });
-			setIcon(cmdIconEl, 'terminal');
-
-			// 命令名称
-			cmdButton.createDiv({
-				cls: 'acp-command-button-text',
-				text: `/${cmd.name}`,
-			});
-
-			// 点击事件
-			cmdButton.addEventListener('click', () => {
-				void this.handleCommandClick(cmd);
-			});
-
-			// 悬停提示
-			cmdButton.setAttribute('aria-label', cmd.description || cmd.name);
+		// 计算新索引
+		if (direction === 'up') {
+			this.commandMenuSelectedIndex = Math.max(0, this.commandMenuSelectedIndex - 1);
+		} else {
+			this.commandMenuSelectedIndex = Math.min(items.length - 1, this.commandMenuSelectedIndex + 1);
 		}
 
-		// 将命令栏移动到输入框之前
-		this.inputContainerEl.insertBefore(commandsBar, this.inputEl);
+		// 添加新选中
+		const selectedItem = items[this.commandMenuSelectedIndex];
+		selectedItem?.classList.add('acp-command-menu-item-selected');
+		selectedItem?.scrollIntoView({ block: 'nearest' });
+	}
+
+	/**
+	 * 选择命令（回车确认）
+	 */
+	private async selectCommand(command?: AvailableCommand): Promise<void> {
+		// 如果没有传入命令，使用当前选中的
+		if (!command && this.commandMenuEl) {
+			const items = Array.from(this.commandMenuEl.querySelectorAll('.acp-command-menu-item'));
+			const selectedItem = items[this.commandMenuSelectedIndex];
+			if (selectedItem) {
+				const commandName = selectedItem.querySelector('.acp-command-menu-name')?.textContent?.slice(1); // 去掉 /
+				command = this.availableCommands.find(cmd => cmd.name === commandName);
+			}
+		}
+
+		if (!command) return;
+
+		// 隐藏菜单
+		this.hideCommandMenu();
+
+		// 执行命令
+		await this.handleCommandClick(command);
 	}
 
 	/**

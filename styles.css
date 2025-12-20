@@ -143,10 +143,12 @@
 .acp-chat-messages {
 	flex: 1;
 	overflow-y: auto;
+	overflow-x: hidden;
 	padding: 8px 12px;
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
+	min-height: 0;
 }
 
 /* 消息通用样式 */
@@ -1684,75 +1686,65 @@
 }
 
 /* ============================================================================
-   Phase 2: Available Commands
+   Phase 2: 斜杠命令菜单 (Slash Command Menu)
    ============================================================================ */
 
-/* 可用命令栏 */
-.acp-available-commands-bar {
-	padding: 10px 12px;
-	background-color: var(--background-secondary-alt);
+/* 命令菜单容器 */
+.acp-command-menu {
+	position: absolute;
+	left: 0;
+	right: 0;
+	background-color: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
-	margin-bottom: 12px;
+	box-shadow: var(--shadow-l);
+	max-height: 300px;
+	overflow-y: auto;
+	z-index: 1000;
 }
 
-.acp-commands-bar-title {
+/* 命令菜单项 */
+.acp-command-menu-item {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	margin-bottom: 8px;
-}
-
-.acp-commands-bar-icon {
-	flex-shrink: 0;
-	width: 14px;
-	height: 14px;
-	color: var(--color-yellow);
-}
-
-.acp-commands-bar-text {
-	font-size: 0.85em;
-	font-weight: 600;
-	color: var(--text-normal);
-}
-
-.acp-commands-bar-buttons {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.acp-command-button {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	padding: 6px 12px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	background-color: var(--background-primary);
-	color: var(--text-normal);
+	gap: 10px;
+	padding: 10px 12px;
 	cursor: pointer;
-	font-size: 0.85em;
-	transition: all 0.2s;
+	transition: background-color 0.15s;
 }
 
-.acp-command-button:hover {
-	background-color: var(--interactive-hover);
-	border-color: var(--interactive-accent);
-	transform: translateY(-1px);
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.acp-command-menu-item:hover,
+.acp-command-menu-item-selected {
+	background-color: var(--background-modifier-hover);
 }
 
-.acp-command-button-icon {
+/* 命令图标 */
+.acp-command-menu-icon {
 	flex-shrink: 0;
-	width: 14px;
-	height: 14px;
-	color: var(--text-muted);
+	width: 18px;
+	height: 18px;
+	color: var(--text-accent);
 }
 
-.acp-command-button-text {
-	font-family: var(--font-monospace);
+/* 命令信息 */
+.acp-command-menu-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.acp-command-menu-name {
 	font-weight: 500;
+	color: var(--text-normal);
+	font-family: var(--font-monospace);
+}
+
+.acp-command-menu-desc {
+	font-size: 0.85em;
+	color: var(--text-muted);
+	margin-top: 2px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* ============================================================================
@@ -1763,7 +1755,8 @@
 .acp-messages-container {
 	flex: 1;
 	position: relative;
-	overflow: hidden;
+	overflow: visible;
+	min-height: 0;
 }
 
 /* Turn 容器 */

@@ -97,10 +97,13 @@ export async function renderEnhancedAgentItem(
 				statusEl.style.color = 'var(--color-green)';
 
 				// 显示检测来源
-				const sourceText = getSourceText(result.source, result.envVar);
+				const sourceInfo = getSourceInfo(result.source, result.envVar);
 				const sourceEl = detectionInfoEl.createDiv({ cls: 'acp-detection-source' });
 				sourceEl.createSpan({ cls: 'acp-source-label', text: '检测来源:' });
-				sourceEl.createSpan({ cls: 'acp-source-value', text: sourceText });
+				sourceEl.createSpan({
+					cls: `acp-source-value acp-source-badge ${sourceInfo.cssClass}`,
+					text: sourceInfo.text,
+				});
 
 				// 显示检测到的路径
 				const pathEl = detectionInfoEl.createDiv({ cls: 'acp-detection-path' });
@@ -184,22 +187,40 @@ export async function renderEnhancedAgentItem(
 }
 
 /**
- * 获取来源文本
+ * 获取来源文本和样式类
  */
-function getSourceText(source: string, envVar?: string): string {
+function getSourceInfo(source: string, envVar?: string): { text: string; cssClass: string } {
 	switch (source) {
 		case 'env':
-			return `<span class="acp-source-badge acp-source-env">🔧 环境变量${envVar ? ` (${envVar})` : ''}</span>`;
+			return {
+				text: `🔧 环境变量${envVar ? ` (${envVar})` : ''}`,
+				cssClass: 'acp-source-env',
+			};
 		case 'vault-config':
-			return '<span class="acp-source-badge acp-source-vault">📁 Vault 配置</span>';
+			return {
+				text: '📁 Vault 配置',
+				cssClass: 'acp-source-vault',
+			};
 		case 'global-config':
-			return '<span class="acp-source-badge acp-source-global">🌍 全局配置 (~/.acprc)</span>';
+			return {
+				text: '🌍 全局配置 (~/.acprc)',
+				cssClass: 'acp-source-global',
+			};
 		case 'manual':
-			return '<span class="acp-source-badge acp-source-manual">✏️ 手动输入</span>';
+			return {
+				text: '✏️ 手动输入',
+				cssClass: 'acp-source-manual',
+			};
 		case 'auto':
-			return '<span class="acp-source-badge acp-source-auto">🤖 自动检测 (PATH)</span>';
+			return {
+				text: '🤖 自动检测 (PATH)',
+				cssClass: 'acp-source-auto',
+			};
 		default:
-			return '<span class="acp-source-badge">❓ 未知来源</span>';
+			return {
+				text: '❓ 未知来源',
+				cssClass: '',
+			};
 	}
 }
 
@@ -228,6 +249,7 @@ function getInstallCommand(config: AcpBackendConfig): string {
 async function testConnection(cliPath: string): Promise<boolean> {
 	try {
 		const { spawn } = await import('child_process');
+		const { access, constants } = await import('fs/promises');
 
 		// 解析命令：支持 "npx @pkg" 或 "/path/to/cli" 格式
 		const parts = cliPath.trim().split(/\s+/);
@@ -237,27 +259,51 @@ async function testConnection(cliPath: string): Promise<boolean> {
 		// Windows 下 npx 需要使用 npx.cmd
 		const actualCommand = process.platform === 'win32' && command === 'npx' ? 'npx.cmd' : command;
 
-		return new Promise((resolve) => {
-			const proc = spawn(actualCommand, [...baseArgs, '--version'], {
-				stdio: 'pipe',
-				timeout: 10000,
-			});
+		// 尝试执行命令的辅助函数
+		const tryCommand = (args: string[]): Promise<boolean> => {
+			return new Promise((resolve) => {
+				const proc = spawn(actualCommand, [...baseArgs, ...args], {
+					stdio: 'pipe',
+					timeout: 5000,
+				});
 
-			const timeout = setTimeout(() => {
-				proc.kill();
-				resolve(false);
-			}, 10000);
+				const timeout = setTimeout(() => {
+					proc.kill();
+					resolve(false);
+				}, 5000);
 
-			proc.on('error', () => {
-				clearTimeout(timeout);
-				resolve(false);
-			});
+				proc.on('error', () => {
+					clearTimeout(timeout);
+					resolve(false);
+				});
 
-			proc.on('exit', (code) => {
-				clearTimeout(timeout);
-				resolve(code === 0 || code === null);
+				proc.on('exit', (code) => {
+					clearTimeout(timeout);
+					// 退出码 0 表示成功，null 表示被信号终止（某些命令可能会这样）
+					resolve(code === 0 || code === null);
+				});
 			});
-		});
+		};
+
+		// 1. 先尝试 --version
+		const versionSuccess = await tryCommand(['--version']);
+		if (versionSuccess) return true;
+
+		// 2. 尝试 --help
+		const helpSuccess = await tryCommand(['--help']);
+		if (helpSuccess) return true;
+
+		// 3. 对于非 npx 命令，检查文件是否可执行
+		if (actualCommand !== 'npx' && actualCommand !== 'npx.cmd') {
+			try {
+				await access(actualCommand, constants.X_OK);
+				return true; // 文件存在且可执行
+			} catch {
+				return false;
+			}
+		}
+
+		return false;
 	} catch {
 		return false;
 	}

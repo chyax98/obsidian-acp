@@ -42,7 +42,11 @@ export {
 	type InitializeResponse,
 	type AuthenticateParams,
 	type AuthenticateResponse,
+	type EnvVariable,
 	type SessionNewMcpServerConfig,
+	type SessionNewMcpServerStdio,
+	type SessionNewMcpServerHttp,
+	type SessionNewMcpServerSse,
 	type SessionNewParams,
 } from './initialize';
 

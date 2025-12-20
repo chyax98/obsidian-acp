@@ -882,45 +882,71 @@ export class AcpConnection {
 		console.log(`[ACP] 准备 ${enabledServers.length} 个 MCP 服务器配置`);
 
 		return enabledServers.map(server => {
-			const config: SessionNewMcpServerConfig = {
-				name: server.name,
-				type: server.type,
-			};
+			// 根据类型构造不同的配置对象
+			let config: SessionNewMcpServerConfig;
 
-			// stdio 类型配置
 			if (server.type === 'stdio') {
-				if (server.command) {
-					config.command = this.replaceVariables(server.command);
-				}
-				if (server.args && server.args.length > 0) {
-					config.args = server.args.map(arg => this.replaceVariables(arg));
-				}
+				// stdio 类型配置
+				config = {
+					name: server.name,
+					type: 'stdio',
+					command: server.command ? this.replaceVariables(server.command) : '',
+					// args 和 env 是 required，即使为空也必须是空数组
+					args: server.args && server.args.length > 0
+						? server.args.map(arg => this.replaceVariables(arg))
+						: [],
+					env: server.env && server.env.length > 0
+						? server.env.map(envVar => ({
+							name: envVar.name,
+							value: this.replaceVariables(envVar.value),
+						}))
+						: [],
+				};
+			} else if (server.type === 'http') {
+				// http 类型配置
+				config = {
+					name: server.name,
+					type: 'http',
+					url: server.url ? this.replaceVariables(server.url) : '',
+					// env 是 required
+					env: server.env && server.env.length > 0
+						? server.env.map(envVar => ({
+							name: envVar.name,
+							value: this.replaceVariables(envVar.value),
+						}))
+						: [],
+					// headers 是可选的
+					headers: server.headers && server.headers.length > 0
+						? server.headers.map(header => ({
+							name: header.name,
+							value: this.replaceVariables(header.value),
+						}))
+						: undefined,
+				};
+			} else {
+				// sse 类型配置
+				config = {
+					name: server.name,
+					type: 'sse',
+					url: server.url ? this.replaceVariables(server.url) : '',
+					// env 是 required
+					env: server.env && server.env.length > 0
+						? server.env.map(envVar => ({
+							name: envVar.name,
+							value: this.replaceVariables(envVar.value),
+						}))
+						: [],
+					// headers 是可选的
+					headers: server.headers && server.headers.length > 0
+						? server.headers.map(header => ({
+							name: header.name,
+							value: this.replaceVariables(header.value),
+						}))
+						: undefined,
+				};
 			}
 
-			// http/sse 类型配置
-			if (server.type === 'http' || server.type === 'sse') {
-				if (server.url) {
-					config.url = this.replaceVariables(server.url);
-				}
-
-				// headers 保持数组格式（ACP 协议要求）
-				if (server.headers && server.headers.length > 0) {
-					config.headers = server.headers.map(header => ({
-						name: header.name,
-						value: this.replaceVariables(header.value),
-					}));
-				}
-			}
-
-			// env 保持数组格式（ACP 协议要求）
-			if (server.env && server.env.length > 0) {
-				config.env = server.env.map(envVar => ({
-					name: envVar.name,
-					value: this.replaceVariables(envVar.value),
-				}));
-			}
-
-			console.log(`[ACP] MCP 服务器配置: ${server.name}`, config);
+			console.log(`[ACP] MCP 服务器配置: ${server.name}`, JSON.stringify(config, null, 2));
 			return config;
 		});
 	}
@@ -941,7 +967,7 @@ export class AcpConnection {
 		};
 
 		// 调试日志
-		console.log('[ACP] session/new 参数:', params);
+		console.log('[ACP] session/new 参数:', JSON.stringify(params, null, 2));
 
 		const response = await this.sendRequest<NewSessionResponse>(
 			AcpMethod.SESSION_NEW,

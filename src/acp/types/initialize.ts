@@ -253,24 +253,64 @@ export interface EnvVariable {
 }
 
 /**
- * MCP 服务器配置
+ * MCP 服务器配置（用于 session/new）
  *
- * 在 session/new 时传递给 Agent，Agent 启动时会加载这些 MCP 服务器。
+ * 基于 ACP 协议规范：
+ * - stdio 类型：command, args, env 都是 required
+ * - http/sse 类型：url, env 是 required
+ *
+ * @see https://agentclientprotocol.com/protocol/schema
  */
-export interface SessionNewMcpServerConfig {
+export type SessionNewMcpServerConfig =
+	| SessionNewMcpServerStdio
+	| SessionNewMcpServerHttp
+	| SessionNewMcpServerSse;
+
+/**
+ * stdio 类型 MCP 服务器配置
+ */
+export interface SessionNewMcpServerStdio {
 	/** 服务器名称 */
 	name: string;
 	/** 传输类型 */
-	type: 'stdio' | 'http' | 'sse';
-	/** stdio 类型: 命令（必填） */
-	command?: string;
-	/** stdio 类型: 参数（必填） */
-	args?: string[];
-	/** http/sse 类型: URL */
-	url?: string;
-	/** 环境变量（数组格式） */
-	env?: EnvVariable[];
-	/** http/sse 类型: 请求头（数组格式） */
+	type: 'stdio';
+	/** 命令（必填） */
+	command: string;
+	/** 参数（必填，至少是空数组） */
+	args: string[];
+	/** 环境变量（必填，至少是空数组） */
+	env: EnvVariable[];
+}
+
+/**
+ * http 类型 MCP 服务器配置
+ */
+export interface SessionNewMcpServerHttp {
+	/** 服务器名称 */
+	name: string;
+	/** 传输类型 */
+	type: 'http';
+	/** URL（必填） */
+	url: string;
+	/** 环境变量（必填，至少是空数组） */
+	env: EnvVariable[];
+	/** 请求头（可选） */
+	headers?: Array<{ name: string; value: string }>;
+}
+
+/**
+ * sse 类型 MCP 服务器配置
+ */
+export interface SessionNewMcpServerSse {
+	/** 服务器名称 */
+	name: string;
+	/** 传输类型 */
+	type: 'sse';
+	/** URL（必填） */
+	url: string;
+	/** 环境变量（必填，至少是空数组） */
+	env: EnvVariable[];
+	/** 请求头（可选） */
 	headers?: Array<{ name: string; value: string }>;
 }
 

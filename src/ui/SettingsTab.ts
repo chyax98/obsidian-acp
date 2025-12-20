@@ -239,16 +239,17 @@ export class AcpSettingTab extends PluginSettingTab {
 			const { spawn } = await import('child_process');
 
 			return new Promise((resolve) => {
+				// ✅ 修复：先定义 proc，再在 timeout 中使用
+				const proc = spawn(detectedInfo.cliPath, ['--version'], {
+					stdio: 'pipe',
+					timeout: 10000,
+				});
+
 				const timeout = setTimeout(() => {
 					proc.kill();
 					new Notice(`测试超时: ${agentId}`);
 					resolve(false);
 				}, 10000); // 10 秒超时
-
-				const proc = spawn(detectedInfo.cliPath, ['--version'], {
-					stdio: 'pipe',
-					timeout: 10000,
-				});
 
 				let stdout = '';
 				let stderr = '';

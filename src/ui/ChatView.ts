@@ -139,6 +139,7 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 关闭视图
 	 */
+	// eslint-disable-next-line @typescript-eslint/require-await
 	public async onClose(): Promise<void> {
 		// 断开 ACP 连接
 		if (this.sessionManager) {

@@ -14,6 +14,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { spawn } from 'child_process';
+import { enhanceEnvForNodeScript } from './utils/env-utils';
 
 /**
  * 验证选项
@@ -303,9 +304,13 @@ export class PathValidator {
 	 */
 	private async getVersionSafe(command: string, args: string[]): Promise<string | undefined> {
 		return new Promise((resolve) => {
+			// 使用通用环境增强函数处理 nvm 等版本管理器路径
+			const env = enhanceEnvForNodeScript(command);
+
 			const proc = spawn(command, args, {
 				stdio: 'pipe',
 				timeout: 5000,
+				env, // 使用增强后的环境变量
 			});
 
 			let stdout = '';

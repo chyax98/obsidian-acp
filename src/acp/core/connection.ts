@@ -26,6 +26,7 @@ import * as path from 'path';
 
 import type { AcpBackendId } from '../backends';
 import { getBackendConfig, getBackendAcpArgs } from '../backends';
+import { enhanceEnvForNodeScript } from '../utils/env-utils';
 import type {
 	AcpRequest,
 	AcpResponse,
@@ -117,17 +118,9 @@ export function createSpawnConfig(
 	// 严格检查平台 - 确保 macOS 上绝对不使用 shell
 	const isWindows = Platform.isWin === true;
 	const isMac = Platform.isMacOS === true;
-	const env = { ...process.env, ...customEnv };
 
-	// 处理 nvm 路径：如果 CLI 路径包含 .nvm，添加其 bin 目录到 PATH
-	if (cliPath.includes('/.nvm/') && !cliPath.startsWith('npx ')) {
-		const binDirMatch = cliPath.match(/^(.+\/\.nvm\/versions\/[^/]+\/[^/]+\/bin)\//);
-		if (binDirMatch) {
-			const nvmBinDir = binDirMatch[1];
-			env.PATH = `${nvmBinDir}:${env.PATH || ''}`;
-			console.log(`[ACP] 检测到 nvm 路径，添加到 PATH: ${nvmBinDir}`);
-		}
-	}
+	// 使用通用环境增强函数处理 nvm 等版本管理器路径
+	const env = enhanceEnvForNodeScript(cliPath, { ...process.env, ...customEnv });
 
 	// ACP 参数：如果传入了空数组，表示不需要参数
 	const effectiveAcpArgs = acpArgs !== undefined ? acpArgs : ['--experimental-acp'];
@@ -409,7 +402,8 @@ export class AcpConnection {
 			spawnArgs = ['@zed-industries/claude-code-acp'];
 		}
 
-		const env = { ...process.env, ...customEnv };
+		// 使用通用环境增强函数处理 nvm 等版本管理器路径
+		const env = enhanceEnvForNodeScript(cliPath || spawnCommand, { ...process.env, ...customEnv });
 
 		console.log(`[ACP] connectClaude: command=${spawnCommand}, args=${spawnArgs.join(' ')}, cwd=${workingDir}`);
 

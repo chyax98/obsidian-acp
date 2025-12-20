@@ -12,6 +12,7 @@ import { Setting, Notice } from 'obsidian';
 import type { AcpBackendId, AcpBackendConfig } from '../acp/backends/types';
 import type { UnifiedDetector } from '../acp/unified-detector';
 import type AcpPlugin from '../main';
+import { enhanceEnvForNodeScript } from '../acp/utils/env-utils';
 
 /**
  * 渲染增强的 Agent 配置项
@@ -259,15 +260,8 @@ async function testConnection(cliPath: string): Promise<boolean> {
 		// Windows 下 npx 需要使用 npx.cmd
 		const actualCommand = process.platform === 'win32' && command === 'npx' ? 'npx.cmd' : command;
 
-		// 设置环境变量：处理 nvm 路径
-		const env = { ...process.env };
-		if (cliPath.includes('/.nvm/') && !cliPath.startsWith('npx ')) {
-			const binDirMatch = cliPath.match(/^(.+\/\.nvm\/versions\/[^/]+\/[^/]+\/bin)\//);
-			if (binDirMatch) {
-				const nvmBinDir = binDirMatch[1];
-				env.PATH = `${nvmBinDir}:${env.PATH || ''}`;
-			}
-		}
+		// 使用通用环境增强函数处理 nvm 等版本管理器路径
+		const env = enhanceEnvForNodeScript(cliPath);
 
 		// 尝试执行命令的辅助函数
 		const tryCommand = (args: string[]): Promise<boolean> => {
@@ -275,7 +269,7 @@ async function testConnection(cliPath: string): Promise<boolean> {
 				const proc = spawn(actualCommand, [...baseArgs, ...args], {
 					stdio: 'pipe',
 					timeout: 5000,
-					env, // 使用修改后的环境变量
+					env, // 使用增强后的环境变量
 				});
 
 				const timeout = setTimeout(() => {

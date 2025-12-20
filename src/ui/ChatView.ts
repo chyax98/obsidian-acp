@@ -64,8 +64,10 @@ export class AcpChatView extends ItemView {
 	private cancelButtonEl!: HTMLButtonElement;
 	private agentSelectEl!: HTMLSelectElement;
 	private connectButtonEl!: HTMLButtonElement;
-	private statusEl!: HTMLElement;
-	private modeIndicatorEl!: HTMLElement;
+	private statusIndicatorEl!: HTMLElement;
+
+	// 空状态引导
+	private emptyStateEl: HTMLElement | null = null;
 
 	// Turn 容器管理
 	private currentTurnContainer: HTMLElement | null = null;
@@ -162,37 +164,32 @@ export class AcpChatView extends ItemView {
 	// ========================================================================
 
 	/**
-	 * 创建头部区域
+	 * 创建头部区域（紧凑版）
 	 */
 	private createHeader(container: HTMLElement): void {
-		this.headerEl = container.createDiv({ cls: 'acp-chat-header' });
+		this.headerEl = container.createDiv({ cls: 'acp-chat-header-compact' });
 
-		// Agent 选择器容器
-		const selectorContainer = this.headerEl.createDiv({ cls: 'acp-agent-selector' });
+		// 左侧：状态指示器 + Agent 选择器
+		const leftSection = this.headerEl.createDiv({ cls: 'acp-header-left' });
+
+		// 连接状态指示器（小圆点）
+		this.statusIndicatorEl = leftSection.createDiv({ cls: 'acp-status-dot acp-status-disconnected' });
 
 		// Agent 下拉框
-		this.agentSelectEl = selectorContainer.createEl('select', { cls: 'acp-agent-select' });
+		this.agentSelectEl = leftSection.createEl('select', { cls: 'acp-agent-select-compact' });
 		this.agentSelectEl.createEl('option', {
 			text: '选择 Agent...',
 			value: '',
 		});
 
-		// 连接按钮
-		this.connectButtonEl = selectorContainer.createEl('button', {
-			cls: 'acp-connect-button',
+		// 右侧：连接按钮
+		this.connectButtonEl = this.headerEl.createEl('button', {
+			cls: 'acp-connect-btn',
 			text: '连接',
 		});
 		this.connectButtonEl.addEventListener('click', () => {
 			void this.handleConnect();
 		});
-
-		// 连接状态栏（Phase 4 增强）
-		this.statusEl = this.headerEl.createDiv({ cls: 'acp-connection-status' });
-		this.updateConnectionStatus('disconnected');
-
-		// 模式指示器
-		this.modeIndicatorEl = this.headerEl.createDiv({ cls: 'acp-mode-indicator' });
-		this.modeIndicatorEl.style.display = 'none'; // 初始隐藏
 	}
 
 	/**
@@ -313,8 +310,8 @@ export class AcpChatView extends ItemView {
 			void this.handleCancel();
 		});
 
-		// 初始状态禁用输入
-		this.setInputEnabled(false);
+		// 初始状态：未连接，禁用输入
+		this.updateUIState('idle');
 	}
 
 	// ========================================================================
@@ -416,14 +413,16 @@ export class AcpChatView extends ItemView {
 		try {
 			this.updateConnectionStatus('connecting', this.selectedAgent.name);
 			this.connectButtonEl.disabled = true;
+			this.agentSelectEl.disabled = true;
 
 			// 使用 ACP 模式连接
 			await this.connectWithAcp();
 
-			this.updateConnectionStatus('connected', this.selectedAgent.name);
 			this.connectButtonEl.textContent = '断开';
 			this.connectButtonEl.disabled = false;
-			this.setInputEnabled(true);
+			
+			// 使用统一的状态更新
+			this.updateUIState('idle');
 
 			this.addSystemMessage(`✅ 已连接到 ${this.selectedAgent.name}`);
 			new Notice(`已连接到 ${this.selectedAgent.name}`);
@@ -431,6 +430,8 @@ export class AcpChatView extends ItemView {
 			console.error('[ChatView] 连接失败:', error);
 			this.updateConnectionStatus('error');
 			this.connectButtonEl.disabled = false;
+			this.agentSelectEl.disabled = false;
+			this.inputEl.disabled = true;
 
 			// Phase 4: 友好化错误提示
 			this.showFriendlyError(error as Error, 'connection');
@@ -493,7 +494,10 @@ export class AcpChatView extends ItemView {
 
 		this.updateConnectionStatus('disconnected');
 		this.connectButtonEl.textContent = '连接';
-		this.setInputEnabled(false);
+		this.agentSelectEl.disabled = false;
+		
+		// 使用统一的状态更新
+		this.updateUIState('idle');
 
 		this.addSystemMessage('已断开连接');
 	}
@@ -633,28 +637,46 @@ export class AcpChatView extends ItemView {
 	 * 处理状态变更
 	 */
 	private handleStateChange(state: SessionState): void {
-		switch (state) {
-			case 'processing':
-				this.updateConnectionStatus('connected', this.selectedAgent?.name);
-				this.sendButtonEl.style.display = 'none';
-				this.cancelButtonEl.style.display = 'inline-block';
-				this.inputEl.disabled = true;
-				break;
-
-			case 'idle':
-				this.updateConnectionStatus('connected', this.selectedAgent?.name);
-				this.sendButtonEl.style.display = 'inline-block';
-				this.cancelButtonEl.style.display = 'none';
-				this.inputEl.disabled = false;
-				// Phase 4: 重置发送状态
-				this.setInputSending(false);
-				break;
-
-			case 'cancelled':
-				this.addSystemMessage('⚠️ 已取消');
-				// Phase 4: 重置发送状态
-				this.setInputSending(false);
-				break;
+		this.updateUIState(state);
+		
+		// 状态特定的消息
+		if (state === 'cancelled') {
+			this.addSystemMessage('⚠️ 已取消');
+		}
+	}
+	
+	/**
+	 * 统一的 UI 状态更新
+	 * 
+	 * 这是所有状态变化的唯一入口，确保 UI 始终与状态同步
+	 */
+	private updateUIState(sessionState?: SessionState): void {
+		// 获取当前状态（如果没有传入，默认为 idle）
+		const state = sessionState ?? 'idle';
+		const isConnected = this.connection !== null && this.sessionManager !== null;
+		
+		// 更新连接状态显示
+		if (isConnected) {
+			this.updateConnectionStatus('connected', this.selectedAgent?.name);
+		} else {
+			this.updateConnectionStatus('disconnected');
+		}
+		
+		// 计算输入框是否应该启用
+		// 规则：已连接 && 会话空闲
+		const shouldEnableInput = isConnected && state === 'idle';
+		
+		// 更新输入框状态
+		this.inputEl.disabled = !shouldEnableInput;
+		
+		// 更新按钮状态
+		const isProcessing = state === 'processing';
+		this.sendButtonEl.style.display = isProcessing ? 'none' : 'inline-block';
+		this.cancelButtonEl.style.display = isProcessing ? 'inline-block' : 'none';
+		
+		// 如果恢复到 idle 状态，重置发送状态
+		if (state === 'idle') {
+			this.setInputSending(false);
 		}
 	}
 
@@ -827,45 +849,29 @@ export class AcpChatView extends ItemView {
 	// ========================================================================
 
 	/**
-	 * 更新连接状态栏（Phase 4 增强）
+	 * 更新连接状态（简化版，配合紧凑型头部）
 	 */
 	private updateConnectionStatus(state: 'disconnected' | 'connecting' | 'connected' | 'error', agentName?: string): void {
-		this.statusEl.empty();
-		this.statusEl.className = `acp-connection-status acp-connection-status-${state}`;
-
-		// 状态图标
-		const iconEl = this.statusEl.createDiv({ cls: 'acp-connection-status-icon' });
-
-		let iconName: string;
-		let text: string;
-
+		// 更新状态指示器（小圆点）的样式
+		this.statusIndicatorEl.className = `acp-status-dot acp-status-${state}`;
+		
+		// 更新 tooltip
+		let tooltip = '';
 		switch (state) {
 			case 'disconnected':
-				iconName = 'circle';
-				text = '未连接 Agent';
+				tooltip = '未连接';
 				break;
 			case 'connecting':
-				iconName = 'loader-2';
-				text = `正在连接 ${agentName || 'Agent'}...`;
-				iconEl.addClass('acp-spinner');
+				tooltip = `连接中: ${agentName || 'Agent'}...`;
 				break;
 			case 'connected':
-				iconName = 'check-circle';
-				text = `已连接: ${agentName || 'Agent'}`;
+				tooltip = `已连接: ${agentName || 'Agent'}`;
 				break;
 			case 'error':
-				iconName = 'x-circle';
-				text = '连接失败';
+				tooltip = '连接错误';
 				break;
 		}
-
-		setIcon(iconEl, iconName);
-
-		// 状态文本
-		this.statusEl.createDiv({
-			cls: 'acp-connection-status-text',
-			text: text,
-		});
+		this.statusIndicatorEl.setAttribute('aria-label', tooltip);
 	}
 
 
@@ -917,26 +923,12 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
-	 * 处理当前模式更新
+	 * 处理当前模式更新（简化版 - 仅保存状态）
 	 */
 	private handleCurrentModeUpdate(mode: string, description?: string): void {
 		this.currentMode = mode;
-
-		// 更新模式指示器
-		this.modeIndicatorEl.style.display = 'block';
-		this.modeIndicatorEl.textContent = description ? `${mode}: ${description}` : mode;
-
-		// 根据模式设置不同颜色
-		this.modeIndicatorEl.className = 'acp-mode-indicator';
-		if (mode === 'ask') {
-			this.modeIndicatorEl.classList.add('acp-mode-ask');
-		} else if (mode === 'code') {
-			this.modeIndicatorEl.classList.add('acp-mode-code');
-		} else if (mode === 'plan') {
-			this.modeIndicatorEl.classList.add('acp-mode-plan');
-		} else {
-			this.modeIndicatorEl.classList.add('acp-mode-default');
-		}
+		// 在紧凑型头部中，模式显示已简化，这里只保存状态即可
+		// 未来可以考虑在状态指示器的 tooltip 中显示模式信息
 	}
 
 	/**
@@ -970,15 +962,11 @@ export class AcpChatView extends ItemView {
 			return;
 		}
 
-		// 创建命令菜单
+		// 创建命令菜单（作为 inputContainerEl 的直接子元素）
+		// CSS 中使用 position: absolute; bottom: 100%; 确保在输入框上方
 		this.commandMenuEl = this.inputContainerEl.createDiv({
 			cls: 'acp-command-menu',
 		});
-
-		// 计算菜单位置（在输入框上方）
-		const inputRect = this.inputEl.getBoundingClientRect();
-		const containerRect = this.inputContainerEl.getBoundingClientRect();
-		this.commandMenuEl.style.bottom = `${containerRect.bottom - inputRect.top + 5}px`;
 
 		filteredCommands.forEach((cmd, index) => {
 			const item = this.commandMenuEl!.createDiv({

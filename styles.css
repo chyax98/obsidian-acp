@@ -141,14 +141,13 @@
    ============================================================================ */
 
 .acp-chat-messages {
-	flex: 1;
-	overflow-y: auto;
-	overflow-x: hidden;
+	height: 100%;  /* 填满父容器 */
+	overflow-y: auto;  /* 垂直滚动 */
+	overflow-x: hidden;  /* 隐藏水平滚动 */
 	padding: 8px 12px;
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
-	min-height: 0;
 }
 
 /* 消息通用样式 */
@@ -353,6 +352,7 @@
 	border-top: 1px solid var(--background-modifier-border);
 	background-color: var(--background-secondary);
 	flex-shrink: 0;
+	position: relative;  /* 为斜杠命令菜单定位基准 */
 }
 
 .acp-input-textarea {
@@ -1692,8 +1692,10 @@
 /* 命令菜单容器 */
 .acp-command-menu {
 	position: absolute;
+	bottom: 100%;  /* 相对于 .acp-chat-input，始终在输入框上方 */
 	left: 0;
 	right: 0;
+	margin-bottom: 8px;  /* 与输入框的间距 */
 	background-color: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
@@ -1701,6 +1703,18 @@
 	max-height: 300px;
 	overflow-y: auto;
 	z-index: 1000;
+	animation: slideUp 0.15s ease-out;
+}
+
+@keyframes slideUp {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 /* 命令菜单项 */
@@ -1753,10 +1767,10 @@
 
 /* 消息容器包装器（包含消息区和滚动按钮） */
 .acp-messages-container {
-	flex: 1;
-	position: relative;
-	overflow: visible;
-	min-height: 0;
+	flex: 1;  /* 占据剩余空间 */
+	min-height: 0;  /* 关键！允许 flexbox 子元素正确收缩 */
+	position: relative;  /* 为"跳到底部"按钮定位 */
+	overflow: visible;  /* 不阻止子元素的滚动 */
 }
 
 /* Turn 容器 */

@@ -380,15 +380,6 @@ export class MessageRenderer {
 	}
 
 	/**
-	 * HTML 转义（用于流式显示）
-	 */
-	private static escapeHtml(text: string): string {
-		const div = document.createElement('div');
-		div.textContent = text;
-		return div.innerHTML;
-	}
-
-	/**
 	 * 添加消息操作按钮（复制等）
 	 */
 	private static addMessageActions(messageEl: HTMLElement, message: Message): void {
@@ -594,20 +585,30 @@ export class MessageRenderer {
 
 	/**
 	 * 格式化工具类型
+	 *
+	 * 匹配 ACP 协议的 ToolKind + 常见 CLI 工具名称
 	 */
 	private static formatToolKind(kind: string): string {
 		const kindMap: Record<string, string> = {
-			bash: 'Bash',
-			execute: '执行',
+			// ACP 标准 ToolKind
 			read: '读取',
-			write: '写入',
 			edit: '编辑',
+			delete: '删除',
+			move: '移动',
+			search: '搜索',
+			execute: '执行',
+			think: '思考',
+			fetch: '获取',
+			switch_mode: '切换模式',
+			other: '其他',
+			// CLI 工具常见名称
+			bash: 'Bash',
+			write: '写入',
 			patch: '编辑',
 			grep: '搜索',
 			glob: '搜索',
 			mcp: 'MCP',
 			web_search: '搜索',
-			other: '其他',
 		};
 		return kindMap[kind] || kind;
 	}
@@ -740,15 +741,6 @@ export class MessageRenderer {
 	}
 
 	/**
-	 * 缩短路径显示
-	 */
-	private static shortenPath(path: string): string {
-		const parts = path.split('/');
-		if (parts.length <= 2) return path;
-		return '.../' + parts.slice(-2).join('/');
-	}
-
-	/**
 	 * 格式化工具调用时间（T12 增强）
 	 */
 	private static formatToolCallTime(toolCall: ToolCall): string {
@@ -818,11 +810,13 @@ export class MessageRenderer {
 					this.renderDiffEnhanced(blockEl, content, app);
 					break;
 
-				case 'terminal':
+				case 'terminal': {
 					blockEl.addClass('acp-tool-call-content-terminal');
-					// T12 增强：添加复制按钮
-					this.renderTerminalOutput(blockEl, content.terminalId);
+					// T12 增强：显示命令和输出
+					const command = toolCall.rawInput?.command as string | undefined;
+					this.renderTerminalOutput(blockEl, command, content.terminalId);
 					break;
+				}
 
 				default:
 					blockEl.textContent = JSON.stringify(content, null, 2);
@@ -929,7 +923,7 @@ export class MessageRenderer {
 	}
 
 	/**
-	 * 构建 diff 字符串（保留用于向后兼容）
+	 * 构建 diff 字符串（用于复制按钮）
 	 */
 	private static buildDiffString(diffContent: { oldText?: string | null; newText?: string; path?: string }): string {
 		const lines: string[] = [];
@@ -954,28 +948,6 @@ export class MessageRenderer {
 		}
 
 		return lines.join('\n');
-	}
-
-	/**
-	 * 渲染 diff 内容（保留用于向后兼容）
-	 */
-	private static renderDiff(container: HTMLElement, diff: string): void {
-		const lines = diff.split('\n');
-		const preEl = container.createEl('pre', { cls: 'acp-diff' });
-
-		for (const line of lines) {
-			const lineEl = preEl.createEl('div', { cls: 'acp-diff-line' });
-
-			if (line.startsWith('+')) {
-				lineEl.addClass('acp-diff-added');
-			} else if (line.startsWith('-')) {
-				lineEl.addClass('acp-diff-removed');
-			} else if (line.startsWith('@@')) {
-				lineEl.addClass('acp-diff-hunk');
-			}
-
-			lineEl.textContent = line;
-		}
 	}
 
 	// ========================================================================
@@ -1164,32 +1136,52 @@ export class MessageRenderer {
 
 	/**
 	 * 渲染终端输出（带复制按钮，T12）
+	 *
+	 * @param container - 容器元素
+	 * @param command - 执行的命令（如果有）
+	 * @param terminalId - 终端会话 ID（可选显示）
 	 */
-	private static renderTerminalOutput(container: HTMLElement, terminalId: string): void {
+	private static renderTerminalOutput(container: HTMLElement, command?: string, terminalId?: string): void {
 		const wrapperEl = container.createDiv({ cls: 'acp-terminal-wrapper' });
 
 		// 终端内容
 		const preEl = wrapperEl.createEl('pre');
-		preEl.createEl('code', { text: terminalId });
+		const codeEl = preEl.createEl('code');
+
+		// 优先显示命令
+		if (command) {
+			// 命令行提示符样式
+			const promptSpan = codeEl.createSpan({ cls: 'acp-terminal-prompt', text: '$ ' });
+			promptSpan.style.color = 'var(--text-accent)';
+			codeEl.appendText(command);
+		} else if (terminalId) {
+			// 如果没有命令，显示 terminalId（作为后备）
+			codeEl.setText(`[Terminal: ${terminalId}]`);
+		} else {
+			codeEl.setText('（无命令信息）');
+		}
 
 		// 复制按钮
-		const copyBtn = wrapperEl.createDiv({ cls: 'acp-copy-button acp-copy-button-terminal' });
-		setIcon(copyBtn, 'copy');
-		copyBtn.setAttribute('aria-label', '复制终端输出');
+		const copyContent = command || terminalId || '';
+		if (copyContent) {
+			const copyBtn = wrapperEl.createDiv({ cls: 'acp-copy-button acp-copy-button-terminal' });
+			setIcon(copyBtn, 'copy');
+			copyBtn.setAttribute('aria-label', '复制命令');
 
-		copyBtn.addEventListener('click', (e) => {
-			e.stopPropagation();
-			void navigator.clipboard.writeText(terminalId).then(() => {
-				new Notice('已复制终端输出');
+			copyBtn.addEventListener('click', (e) => {
+				e.stopPropagation();
+				void navigator.clipboard.writeText(copyContent).then(() => {
+					new Notice('已复制命令');
 
-				copyBtn.empty();
-				setIcon(copyBtn, 'check');
-				setTimeout(() => {
 					copyBtn.empty();
-					setIcon(copyBtn, 'copy');
-				}, 1500);
+					setIcon(copyBtn, 'check');
+					setTimeout(() => {
+						copyBtn.empty();
+						setIcon(copyBtn, 'copy');
+					}, 1500);
+				});
 			});
-		});
+		}
 	}
 
 	/**

@@ -20,7 +20,7 @@
 
 import type { ChildProcess, SpawnOptions } from 'child_process';
 import { spawn } from 'child_process';
-import { Platform } from 'obsidian';
+import { Platform, TFile, normalizePath } from 'obsidian';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
@@ -388,7 +388,7 @@ export class AcpConnection {
 				spawnArgs = parts.slice(1);
 			}
 		} else {
-			// 默认使用 Zed wrapper（向后兼容）
+			// 默认使用 Zed 官方 ACP 适配器
 			spawnCommand = isWindows ? 'npx.cmd' : 'npx';
 			spawnArgs = ['@zed-industries/claude-code-acp'];
 		}
@@ -993,7 +993,39 @@ export class AcpConnection {
 	}
 
 	/**
+	 * 获取 Vault 基础路径
+	 */
+	private getVaultBasePath(): string | null {
+		if (!this.app?.vault?.adapter) return null;
+		const adapter = this.app.vault.adapter;
+		// 桌面版有 basePath 属性
+		if ('basePath' in adapter && typeof adapter.basePath === 'string') {
+			return adapter.basePath;
+		}
+		return null;
+	}
+
+	/**
+	 * 将绝对路径转换为 Vault 相对路径（如果在 Vault 内）
+	 */
+	private toVaultPath(absolutePath: string): string | null {
+		const vaultBase = this.getVaultBasePath();
+		if (!vaultBase) return null;
+
+		// 标准化路径分隔符
+		const normalizedAbsolute = absolutePath.replace(/\\/g, '/');
+		const normalizedBase = vaultBase.replace(/\\/g, '/');
+
+		if (normalizedAbsolute.startsWith(normalizedBase + '/')) {
+			const relativePath = normalizedAbsolute.substring(normalizedBase.length + 1);
+			return normalizePath(relativePath);
+		}
+		return null;
+	}
+
+	/**
 	 * 处理文件读取请求
+	 * 优先使用 Vault API（如果文件在 Vault 内）
 	 */
 	private async handleReadFile(params: { path: string; sessionId?: string }): Promise<{ content: string }> {
 		const resolvedPath = this.resolvePath(params.path);
@@ -1004,12 +1036,24 @@ export class AcpConnection {
 			sessionId: params.sessionId || '',
 		});
 
+		// 优先使用 Vault API
+		const vaultPath = this.toVaultPath(resolvedPath);
+		if (vaultPath && this.app?.vault) {
+			const file = this.app.vault.getAbstractFileByPath(vaultPath);
+			if (file instanceof TFile) {
+				const content = await this.app.vault.read(file);
+				return { content };
+			}
+		}
+
+		// 降级到 Node.js fs
 		const content = await fs.readFile(resolvedPath, 'utf-8');
 		return { content };
 	}
 
 	/**
 	 * 处理文件写入请求
+	 * 优先使用 Vault API（如果文件在 Vault 内）
 	 */
 	private async handleWriteFile(params: { path: string; content: string; sessionId?: string }): Promise<null> {
 		const resolvedPath = this.resolvePath(params.path);
@@ -1021,7 +1065,30 @@ export class AcpConnection {
 			sessionId: params.sessionId || '',
 		});
 
-		// 确保目录存在
+		// 优先使用 Vault API
+		const vaultPath = this.toVaultPath(resolvedPath);
+		if (vaultPath && this.app?.vault) {
+			const existingFile = this.app.vault.getAbstractFileByPath(vaultPath);
+			if (existingFile instanceof TFile) {
+				// 文件存在，使用 modify
+				await this.app.vault.modify(existingFile, params.content);
+				return null;
+			} else if (!existingFile) {
+				// 文件不存在，确保父目录存在后创建
+				const parentPath = path.dirname(vaultPath);
+				if (parentPath && parentPath !== '.') {
+					const parentFolder = this.app.vault.getAbstractFileByPath(parentPath);
+					if (!parentFolder) {
+						// 创建父目录
+						await this.app.vault.createFolder(parentPath);
+					}
+				}
+				await this.app.vault.create(vaultPath, params.content);
+				return null;
+			}
+		}
+
+		// 降级到 Node.js fs
 		await fs.mkdir(path.dirname(resolvedPath), { recursive: true });
 		await fs.writeFile(resolvedPath, params.content, 'utf-8');
 

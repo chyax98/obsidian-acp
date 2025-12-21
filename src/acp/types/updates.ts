@@ -141,8 +141,21 @@ export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
 
 /**
  * 工具调用类型
+ *
+ * 完整匹配 ACP 协议的 ToolKind 定义。
+ * @see https://agentclientprotocol.com/protocol/tool-calls#creating
  */
-export type ToolCallKind = 'read' | 'edit' | 'execute';
+export type ToolCallKind =
+	| 'read'        // 读取文件/数据
+	| 'edit'        // 修改文件/内容
+	| 'delete'      // 删除文件/数据
+	| 'move'        // 移动/重命名
+	| 'search'      // 搜索信息
+	| 'execute'     // 执行命令/代码
+	| 'think'       // 内部推理
+	| 'fetch'       // 获取外部数据
+	| 'switch_mode' // 切换模式
+	| 'other';      // 其他（默认）
 
 /**
  * 工具调用内容 - 文本

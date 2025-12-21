@@ -2,7 +2,7 @@
  * ACP 插件设置页面
  *
  * 提供：
- * - Agent 自动检测和状态显示
+ * - Claude Code 配置
  * - MCP 服务器管理
  * - 工作目录配置
  * - 权限管理
@@ -13,10 +13,7 @@ import { PluginSettingTab, Setting, Notice } from 'obsidian';
 import type AcpPlugin from '../main';
 import type { McpServerConfig } from '../main';
 import { ACP_BACKENDS } from '../acp/backends/registry';
-import type { AcpBackendId, AcpBackendConfig } from '../acp/backends/types';
 import { McpServerModal } from './McpServerModal';
-import { renderEnhancedAgentItem } from './EnhancedAgentSettings';
-import type { UnifiedDetector } from '../acp/unified-detector';
 
 /**
  * ACP 插件设置页面
@@ -39,9 +36,7 @@ export class AcpSettingTab extends PluginSettingTab {
 		// 描述
 		const descDiv = containerEl.createDiv({ cls: 'setting-item-description' });
 		descDiv.style.marginBottom = '1.5em';
-		descDiv.setText(
-			'配置 ACP 协议的 AI 编程助手（Claude、Codex、Kimi、Qwen 等）',
-		);
+		descDiv.setText('通过 ACP 协议连接 Claude Code');
 
 		// Agent 配置
 		this.renderAgentSection(containerEl);
@@ -63,199 +58,107 @@ export class AcpSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Agent 配置部分 - 使用增强UI
+	 * Agent 配置部分 - 只显示 Claude Code
 	 */
 	private renderAgentSection(containerEl: HTMLElement): void {
 		containerEl.createEl('h3', { text: 'Agent 配置' });
 
-		// 全局检测按钮
+		const config = ACP_BACKENDS.claude;
+
+		// Claude Code 配置
 		new Setting(containerEl)
-			.setName('自动检测已安装的 Agent')
-			.setDesc('扫描系统中已安装的 ACP 兼容 Agent（支持5层优先级检测）')
+			.setName(config.name)
+			.setDesc(config.description || '')
+			.addText(text => {
+				text
+					.setPlaceholder(config.defaultCliPath || '')
+					.setValue(this.plugin.settings.manualAgentPaths?.claude || '')
+					.onChange(async value => {
+						if (!this.plugin.settings.manualAgentPaths) {
+							this.plugin.settings.manualAgentPaths = {};
+						}
+						if (value.trim()) {
+							this.plugin.settings.manualAgentPaths.claude = value.trim();
+						} else {
+							delete this.plugin.settings.manualAgentPaths.claude;
+						}
+						await this.plugin.saveSettings();
+					});
+			})
 			.addButton(button => {
 				button
-					.setButtonText('重新检测')
-					.setCta()
+					.setButtonText('测试连接')
 					.onClick(async () => {
-						button.setButtonText('检测中...');
+						button.setButtonText('测试中...');
 						button.setDisabled(true);
 
 						try {
-							// 清除缓存并重新检测
-							this.plugin.detector.clearCache();
-							const result = await this.plugin.detector.detect(true, {
-								vaultPath: (this.plugin.app.vault.adapter as { basePath?: string }).basePath,
-								manualPaths: this.plugin.settings.manualAgentPaths,
-							});
-							new Notice(
-								`检测完成：发现 ${result.agents.length} 个 Agent`,
-							);
-							this.display(); // 刷新显示
+							const cliPath = this.plugin.settings.manualAgentPaths?.claude || config.defaultCliPath || '';
+							const success = await this.testAgentConnection(cliPath);
+							if (success) {
+								new Notice('✅ Claude Code 连接正常');
+							}
 						} catch (error) {
-							const errMsg =
-								error instanceof Error ? error.message : String(error);
-							new Notice('检测失败：' + errMsg);
+							const errMsg = error instanceof Error ? error.message : String(error);
+							new Notice('❌ 测试失败: ' + errMsg);
 						} finally {
-							button.setButtonText('重新检测');
+							button.setButtonText('测试连接');
 							button.setDisabled(false);
 						}
 					});
 			});
 
-		// Agent 列表容器
-		const agentListEl = containerEl.createDiv({ cls: 'acp-agent-list' });
-
-		// 使用增强的 Agent 渲染
-		for (const [agentId, config] of Object.entries(ACP_BACKENDS)) {
-			if (!config.enabled) continue; // 跳过禁用的
-
-			void renderEnhancedAgentItem(
-				agentListEl,
-				agentId as AcpBackendId,
-				config,
-				this.plugin,
-				this.plugin.detector,
-			);
-		}
-	}
-
-	/**
-	 * 检测单个 Agent 的安装状态
-	 */
-	private async detectAgentStatus(
-		agentId: AcpBackendId,
-		_config: AcpBackendConfig,
-	): Promise<{
-		installed: boolean;
-		version?: string;
-		path?: string;
-	}> {
-		// 从 detector 获取状态
-		const detectedInfo = this.plugin.detector.getBackendInfo(agentId);
-
-		if (detectedInfo) {
-			return {
-				installed: true,
-				version: detectedInfo.version,
-				path: detectedInfo.cliPath,
-			};
-		}
-
-		// 检查手动配置
-		const manualPath = this.plugin.settings.manualAgentPaths?.[agentId];
-		if (manualPath) {
-			// 验证手动路径是否有效
-			try {
-				const { promises: fs, constants } = await import('fs');
-				await fs.access(manualPath, constants.X_OK);
-				return {
-					installed: true,
-					path: manualPath,
-				};
-			} catch {
-				// 手动路径无效
-				return { installed: false };
-			}
-		}
-
-		return { installed: false };
+		// 安装说明
+		const installDiv = containerEl.createDiv({ cls: 'setting-item-description' });
+		installDiv.style.marginTop = '0.5em';
+		installDiv.style.padding = '0.5em';
+		installDiv.style.backgroundColor = 'var(--background-secondary)';
+		installDiv.style.borderRadius = '4px';
+		installDiv.innerHTML = `
+			<strong>安装方式:</strong><br>
+			<code>npx @zed-industries/claude-code-acp</code><br>
+			<small>需要 Node.js 18+，首次运行会自动安装</small>
+		`;
 	}
 
 	/**
 	 * 测试 Agent 连接
 	 */
-	private async testAgentConnection(agentId: AcpBackendId): Promise<boolean> {
+	private async testAgentConnection(cliPath: string): Promise<boolean> {
 		try {
-			// 获取 Agent 信息
-			const detectedInfo = this.plugin.detector.getBackendInfo(agentId);
-			if (!detectedInfo) {
-				new Notice('Agent 未安装');
-				return false;
-			}
-
-			// 实际测试：尝试运行 --version 命令
 			const { spawn } = await import('child_process');
 
 			return new Promise((resolve) => {
-				// ✅ 修复：先定义 proc，再在 timeout 中使用
-				const proc = spawn(detectedInfo.cliPath, ['--version'], {
+				// 解析命令
+				const parts = cliPath.split(' ');
+				const cmd = parts[0];
+				const args = [...parts.slice(1), '--version'];
+
+				const proc = spawn(cmd, args, {
 					stdio: 'pipe',
 					timeout: 10000,
 				});
 
 				const timeout = setTimeout(() => {
 					proc.kill();
-					new Notice(`测试超时: ${agentId}`);
+					new Notice('测试超时');
 					resolve(false);
-				}, 10000); // 10 秒超时
-
-				let stdout = '';
-				let stderr = '';
-
-				proc.stdout?.on('data', (data: Buffer) => {
-					stdout += data.toString();
-				});
-
-				proc.stderr?.on('data', (data: Buffer) => {
-					stderr += data.toString();
-				});
+				}, 10000);
 
 				proc.on('close', (code: number) => {
 					clearTimeout(timeout);
-					if (code === 0 || stdout || stderr) {
-						new Notice(`✅ ${detectedInfo.name} 可用${detectedInfo.version ? ` (${detectedInfo.version})` : ''}`);
-						resolve(true);
-					} else {
-						new Notice(`❌ ${detectedInfo.name} 测试失败 (退出码: ${code})`);
-						resolve(false);
-					}
+					resolve(code === 0);
 				});
 
 				proc.on('error', (error: Error) => {
 					clearTimeout(timeout);
-					new Notice(`❌ 启动失败: ${error.message}`);
+					new Notice(`启动失败: ${error.message}`);
 					resolve(false);
 				});
 			});
 		} catch (error) {
 			console.error('[Test Connection]', error);
-			const errMsg = error instanceof Error ? error.message : String(error);
-			new Notice(`测试失败: ${errMsg}`);
 			return false;
-		}
-	}
-
-	/**
-	 * 获取安装命令
-	 */
-	private getInstallCommand(config: AcpBackendConfig): string {
-		// 1. 优先使用 registry 中的 installCommand（如果存在）
-		const configWithInstall = config as { installCommand?: string };
-		if ('installCommand' in config && typeof configWithInstall.installCommand === 'string') {
-			return configWithInstall.installCommand;
-		}
-
-		// 2. 根据 command 生成安装指令
-		if (config.defaultCliPath?.startsWith('npx @')) {
-			return `npm install -g ${config.defaultCliPath.replace('npx ', '')}`;
-		}
-
-		// 3. Fallback: 特定 Agent 的安装命令
-		switch (config.id) {
-			case 'kimi':
-				return 'npm install -g @moonshot-ai/kimi-cli';
-			case 'qwen':
-				return 'npm install -g @qwenlm/qwen-code'; // ✅ 修正包名
-			case 'gemini':
-				return 'npm install -g @google/gemini-cli';
-			case 'goose':
-				return 'brew install goose';
-			case 'auggie':
-				return 'npm install -g auggie';
-			case 'opencode':
-				return 'npm install -g opencode';
-			default:
-				return `# 请手动安装 ${config.name}`;
 		}
 	}
 
@@ -547,11 +450,7 @@ export class AcpSettingTab extends PluginSettingTab {
 		const aboutDiv = containerEl.createDiv({ cls: 'acp-about-section' });
 
 		aboutDiv.createEl('p', {
-			text: '此插件通过 ACP 协议连接各种 AI 编程助手，为 Obsidian 提供智能编码功能。',
-		});
-
-		aboutDiv.createEl('p', {
-			text: '支持的 Agent：Claude Code、Codex、Kimi、Qwen、Goose、Augment 等。',
+			text: '此插件通过 ACP 协议连接 Claude Code，为 Obsidian 提供 AI 编程助手功能。',
 		});
 
 		const linkDiv = aboutDiv.createDiv({ cls: 'acp-about-links' });
@@ -564,8 +463,8 @@ export class AcpSettingTab extends PluginSettingTab {
 		acpLink.style.marginRight = '1em';
 
 		linkDiv.createEl('a', {
-			text: 'GitHub 仓库',
-			href: 'https://github.com/agent-client-protocol/agent-client-protocol',
+			text: 'Claude Code',
+			href: 'https://github.com/anthropics/claude-code',
 		});
 	}
 }

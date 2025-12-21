@@ -10,13 +10,24 @@ import type AcpPlugin from '../main';
 import { SessionManager } from '../acp/core/session-manager';
 import { AcpConnection } from '../acp/core/connection';
 import type { Message, ToolCall, PlanEntry, SessionState } from '../acp/core/session-manager';
-import type { DetectedAgent } from '../acp/detector';
+import { ACP_BACKENDS } from '../acp/backends/registry';
+import type { AcpBackendId } from '../acp/backends/types';
 import { PermissionModal } from './PermissionModal';
 import type { RequestPermissionParams, PermissionOutcome } from '../acp/types/permissions';
 import type { AvailableCommand } from '../acp/types/updates';
 import { MessageRenderer } from './MessageRenderer';
 import { SessionStorage, type SessionMeta } from '../acp/core/session-storage';
 import { SessionHistoryModal } from './SessionHistoryModal';
+
+/**
+ * Agent 信息（简化版）
+ */
+interface AgentInfo {
+	backendId: AcpBackendId;
+	name: string;
+	cliPath: string;
+	acpArgs: string[];
+}
 
 // ============================================================================
 // 常量
@@ -51,8 +62,8 @@ export class AcpChatView extends ItemView {
 	private currentSessionId: string | null = null;
 
 	// Agent 信息
-	private availableAgents: DetectedAgent[] = [];
-	private selectedAgent: DetectedAgent | null = null;
+	private availableAgents: AgentInfo[] = [];
+	private selectedAgent: AgentInfo | null = null;
 
 	// 会话状态
 	private currentMode: string | null = null;
@@ -386,38 +397,32 @@ export class AcpChatView extends ItemView {
 	// ========================================================================
 
 	/**
-	 * 加载可用 Agent
+	 * 加载可用 Agent（只有 Claude Code）
 	 */
 	private async loadAvailableAgents(): Promise<void> {
-		try {
-			// 使用 detector 检测可用的 Agent
-			await this.plugin.detector.detect();
-			this.availableAgents = this.plugin.detector.getAll();
+		const config = ACP_BACKENDS.claude;
+		const manualPath = this.plugin.settings.manualAgentPaths?.claude;
 
-			// 更新下拉框
-			this.agentSelectEl.empty();
+		// 构建 Claude Code Agent 信息
+		this.availableAgents = [{
+			backendId: 'claude',
+			name: config.name,
+			cliPath: manualPath || config.defaultCliPath || 'npx @zed-industries/claude-code-acp',
+			acpArgs: config.acpArgs || [],
+		}];
 
-			if (this.availableAgents.length === 0) {
-				this.agentSelectEl.createEl('option', {
-					text: '未找到可用 Agent',
-					value: '',
-				});
-			} else {
-				this.agentSelectEl.createEl('option', {
-					text: '选择 Agent...',
-					value: '',
-				});
+		// 更新下拉框
+		this.agentSelectEl.empty();
+		this.agentSelectEl.createEl('option', {
+			text: '选择 Agent...',
+			value: '',
+		});
 
-				for (const agent of this.availableAgents) {
-					this.agentSelectEl.createEl('option', {
-						text: agent.name,
-						value: agent.backendId,
-					});
-				}
-			}
-		} catch (error) {
-			console.error('[ChatView] 加载 Agent 失败:', error);
-			new Notice('加载 Agent 失败');
+		for (const agent of this.availableAgents) {
+			this.agentSelectEl.createEl('option', {
+				text: agent.name,
+				value: agent.backendId,
+			});
 		}
 	}
 

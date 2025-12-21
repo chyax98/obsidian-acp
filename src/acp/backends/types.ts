@@ -9,32 +9,9 @@
 // ============================================================================
 
 /**
- * 所有支持的 ACP 后端 ID
- *
- * - claude: Claude Code (ACP 模式) - 通过 @zed-industries/claude-code-acp
- * - claude-sdk: Claude Code (SDK 模式) - Electron 不兼容
- * - codex-acp: OpenAI Codex (ACP 模式) - 通过 @zed-industries/codex-acp
- * - codex: OpenAI Codex 原生 CLI - 不支持 ACP
- * - kimi: Moonshot Kimi
- * - goose: Block Goose
- * - auggie: Augment Code
- * - opencode: SST OpenCode
- * - gemini: Google Gemini CLI
- * - qwen: 阿里 Qwen Code
- * - custom: 用户自定义
+ * 只支持 Claude Code
  */
-export type AcpBackendId =
-	| 'claude'
-	| 'claude-sdk'
-	| 'codex-acp'
-	| 'codex'
-	| 'gemini'
-	| 'qwen'
-	| 'goose'
-	| 'auggie'
-	| 'kimi'
-	| 'opencode'
-	| 'custom';
+export type AcpBackendId = 'claude';
 
 // ============================================================================
 // 后端配置接口

@@ -25,7 +25,6 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 
 import type { AcpBackendId } from '../backends';
-import { getBackendConfig, getBackendAcpArgs } from '../backends';
 import { enhanceEnvForNodeScript } from '../utils/env-utils';
 import type {
 	AcpRequest,
@@ -156,34 +155,6 @@ export function createSpawnConfig(
 	return { command: spawnCommand, args: spawnArgs, options };
 }
 
-function getNpxPackageName(cliPath: string): string | null {
-	const parts = cliPath.trim().split(/\s+/);
-	if (parts.length === 0) return null;
-	if (parts[0] !== 'npx' && parts[0] !== 'npx.cmd') return null;
-	for (let i = 1; i < parts.length; i++) {
-		const arg = parts[i];
-		if (!arg.startsWith('-')) {
-			return arg;
-		}
-	}
-	return null;
-}
-
-function isLikelyCodexCli(cliPath: string): boolean {
-	const trimmed = cliPath.trim();
-	if (!trimmed) return false;
-
-	const npxPackage = getNpxPackageName(trimmed)?.toLowerCase();
-	if (npxPackage) {
-		if (npxPackage === '@zed-industries/codex-acp' || npxPackage === 'codex-acp') {
-			return false;
-		}
-		return npxPackage === 'codex';
-	}
-
-	const baseName = path.basename(trimmed).toLowerCase();
-	return baseName === 'codex' || baseName === 'codex.exe' || baseName === 'codex.cmd' || baseName === 'codex.bat';
-}
 
 // ============================================================================
 // AcpConnection 类
@@ -340,17 +311,7 @@ export class AcpConnection {
 			return createAcpError(AcpErrorType.CONNECTION_CLOSED, errorMsg, { retryable: true });
 		}
 
-		// 后端特定错误处理
-		if (backend === 'qwen') {
-			// Qwen 后端: "Internal error" 通常是认证问题
-			if (msgLower.includes('internal error') || msgLower.includes('内部错误')) {
-				console.log('[ACP] 分类结果: Qwen AUTHENTICATION_FAILED (不可重试)');
-				return createAcpError(AcpErrorType.AUTHENTICATION_FAILED, `Qwen 认证失败: ${errorMsg}`, {
-					retryable: false,
-				});
-			}
-		}
-
+		// Claude 后端特定错误处理
 		if (backend === 'claude') {
 			// Claude 后端的特殊错误模式
 			if (msgLower.includes('rate limit') || msgLower.includes('速率限制')) {
@@ -445,50 +406,6 @@ export class AcpConnection {
 		});
 	}
 
-	/**
-	 * 通用连接方式 - 用于其他后端
-	 */
-	private connectGeneric(options: ConnectionOptions): void {
-		// 获取后端配置
-		const config = getBackendConfig(options.backendId);
-		let cliPath = options.cliPath || config?.defaultCliPath;
-
-		if (!cliPath) {
-			throw new Error(`后端 ${options.backendId} 没有配置 CLI 路径`);
-		}
-
-		// 🔧 Codex 特殊处理：强制使用 ACP 适配器
-		if (options.backendId === 'codex-acp') {
-			if (isLikelyCodexCli(cliPath)) {
-				const fallback = config?.defaultCliPath || 'npx @zed-industries/codex-acp';
-				console.warn(
-					`[ACP] ⚠️ 检测到原生 Codex CLI (${cliPath})，强制回退到 ACP 适配器 (${fallback})\n` +
-					`原生 Codex CLI 不支持 ACP 协议，请在设置中清空"手动路径"或使用 ${fallback}`,
-				);
-				cliPath = fallback;
-			}
-			// 额外检查：如果 cliPath 完全为空或只是 'codex'，也强制使用适配器
-			if (!cliPath || cliPath.trim() === 'codex' || cliPath.trim() === 'codex.exe') {
-				console.warn('[ACP] ⚠️ Codex 路径无效，使用默认 ACP 适配器');
-				cliPath = config?.defaultCliPath || 'npx @zed-industries/codex-acp';
-			}
-		}
-
-		// 获取 ACP 参数
-		const acpArgs = options.acpArgs !== undefined ? options.acpArgs : getBackendAcpArgs(options.backendId);
-
-		// 创建 spawn 配置
-		const { command, args, options: spawnOptions } = createSpawnConfig(
-			cliPath,
-			this.workingDir,
-			acpArgs,
-			options.env,
-		);
-
-		console.log(`[ACP] connectGeneric: command=${command}, args=${args.join(' ')}, cwd=${this.workingDir}`);
-
-		this.child = spawn(command, args, spawnOptions);
-	}
 
 	// ========================================================================
 	// 连接管理
@@ -534,17 +451,8 @@ export class AcpConnection {
 		}
 
 		try {
-			// 根据后端类型选择连接方式（参考 AionUI 实现）
-			switch (options.backendId) {
-				case 'claude':
-					// Claude Code 单独处理，使用检测到的或配置的 cliPath
-					this.connectClaude(this.workingDir, options.cliPath, options.env);
-					break;
-				default:
-					// 其他后端使用通用连接方式
-					this.connectGeneric(options);
-					break;
-			}
+			// 连接 Claude Code
+			this.connectClaude(this.workingDir, options.cliPath, options.env);
 
 			// 设置进程处理器
 			await this.setupProcessHandlers();

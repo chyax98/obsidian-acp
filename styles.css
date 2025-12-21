@@ -37,8 +37,6 @@
 	padding: 8px 12px;
 	animation: messageSlideIn 0.2s ease-out;
 	position: relative; /* 为操作按钮定位 */
-	contain: content; /* 优化：隔离布局计算 */
-	will-change: transform; /* 优化：提示浏览器优化 */
 }
 
 @keyframes messageSlideIn {
@@ -323,21 +321,43 @@
 }
 
 /* ============================================================================
-   工具调用卡片 (Claude Code 风格)
+   工具调用卡片 (现代化可折叠卡片)
    ============================================================================ */
 
 .acp-tool-call {
 	margin: 4px 0;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
+	border-radius: 8px;
 	background-color: var(--background-secondary);
 	overflow: hidden;
-	transition: border-color 0.2s;
+	transition: all 0.25s ease;
 	contain: content; /* 优化：隔离布局计算 */
 }
 
 .acp-tool-call:hover {
 	border-color: var(--background-modifier-border-hover);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* 状态颜色（边框和背景） */
+.acp-tool-call-pending {
+	border-color: var(--background-modifier-border);
+	background-color: var(--background-secondary);
+}
+
+.acp-tool-call-in_progress {
+	border-color: var(--interactive-accent);
+	background: linear-gradient(to right, var(--background-secondary), rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.05));
+}
+
+.acp-tool-call-completed {
+	border-color: rgba(46, 160, 67, 0.3);
+	background: linear-gradient(to right, var(--background-secondary), rgba(46, 160, 67, 0.05));
+}
+
+.acp-tool-call-failed {
+	border-color: rgba(248, 81, 73, 0.3);
+	background: linear-gradient(to right, var(--background-secondary), rgba(248, 81, 73, 0.05));
 }
 
 .acp-tool-call-header {
@@ -376,28 +396,37 @@
 .acp-tool-call-icon .svg-icon {
 	width: 16px;
 	height: 16px;
+	transition: all 0.3s ease;
 }
 
-.acp-tool-call-status-pending .acp-tool-call-icon .svg-icon {
+/* 状态图标颜色和动画 */
+.acp-tool-call-icon.acp-status-pending .svg-icon {
 	color: var(--text-muted);
 }
 
-.acp-tool-call-status-in_progress .acp-tool-call-icon .svg-icon {
+.acp-tool-call-icon.acp-status-in_progress .svg-icon {
 	color: var(--interactive-accent);
-	animation: rotate 1s linear infinite;
+	animation: spin 1s linear infinite;
 }
 
-.acp-tool-call-status-completed .acp-tool-call-icon .svg-icon {
+.acp-tool-call-icon.acp-status-completed .svg-icon {
 	color: var(--color-green);
 }
 
-.acp-tool-call-status-failed .acp-tool-call-icon .svg-icon {
+.acp-tool-call-icon.acp-status-failed .svg-icon {
 	color: var(--color-red);
 }
 
-@keyframes rotate {
+/* 旋转动画（用于 in_progress 状态） */
+@keyframes spin {
 	from { transform: rotate(0deg); }
 	to { transform: rotate(360deg); }
+}
+
+/* 脉冲动画（用于 pending 状态） */
+@keyframes pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.5; }
 }
 
 .acp-tool-call-title {
@@ -474,11 +503,13 @@
 .acp-tool-call-content {
 	max-height: 0;
 	overflow: hidden;
-	transition: max-height 0.3s ease;
+	opacity: 0;
+	transition: max-height 0.3s ease, opacity 0.2s ease;
 }
 
 .acp-tool-call-content-expanded {
-	max-height: 500px;
+	max-height: 600px;
+	opacity: 1;
 	overflow-y: auto;
 }
 
@@ -519,6 +550,62 @@
 	font-style: italic;
 	font-size: 0.9em;
 	text-align: center;
+}
+
+/* ============================================================================
+   代码块（带语言标签和复制按钮）
+   ============================================================================ */
+
+.acp-code-block-wrapper {
+	margin: 8px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	overflow: hidden;
+	background-color: var(--code-background);
+}
+
+.acp-code-block-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	background-color: var(--background-modifier-border);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.acp-code-block-info {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.acp-code-block-language {
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+}
+
+.acp-code-block-filename {
+	font-size: 11px;
+	color: var(--text-faint);
+	font-family: var(--font-monospace);
+}
+
+.acp-code-block-content {
+	margin: 0;
+	padding: 12px;
+	overflow-x: auto;
+	font-family: var(--font-monospace);
+	font-size: 0.85em;
+	line-height: 1.6;
+	color: var(--code-normal);
+}
+
+.acp-code-block-content code {
+	font-family: var(--font-monospace);
+	white-space: pre;
 }
 
 /* ============================================================================
@@ -583,6 +670,18 @@
 .acp-copy-button-terminal {
 	top: 12px;
 	right: 12px;
+}
+
+.acp-copy-button-code {
+	position: static; /* 不使用绝对定位，因为在 header 中 */
+	width: 28px;
+	height: 28px;
+	opacity: 1; /* 始终可见 */
+}
+
+.acp-copy-button-code:hover {
+	background-color: var(--background-modifier-hover);
+	transform: scale(1.05);
 }
 
 /* ============================================================================
@@ -773,14 +872,19 @@
    计划显示
    ============================================================================ */
 
-/* 思考块 (Claude Code 风格) */
+/* 思考块 (现代化可折叠思考块) */
 .acp-thoughts {
 	margin: 4px 0;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
+	border: 1px solid rgba(147, 51, 234, 0.2);
+	border-radius: 8px;
 	background-color: var(--background-secondary);
 	overflow: hidden;
 	contain: content;
+	transition: all 0.25s ease;
+}
+
+.acp-thoughts:hover {
+	box-shadow: 0 2px 8px rgba(147, 51, 234, 0.1);
 }
 
 .acp-thoughts-header {
@@ -790,13 +894,13 @@
 	padding: 8px 12px;
 	cursor: pointer;
 	user-select: none;
-	background-color: rgba(147, 51, 234, 0.08);
+	background: linear-gradient(to right, rgba(147, 51, 234, 0.08), transparent);
 	border-bottom: 1px solid transparent;
-	transition: background-color 0.15s;
+	transition: background-color 0.2s ease;
 }
 
 .acp-thoughts-header:hover {
-	background-color: rgba(147, 51, 234, 0.12);
+	background: linear-gradient(to right, rgba(147, 51, 234, 0.12), transparent);
 }
 
 .acp-thoughts-left {
@@ -834,6 +938,12 @@
 	width: 14px;
 	height: 14px;
 	color: rgb(147, 51, 234);
+	transition: all 0.3s ease;
+}
+
+/* 流式思考时的脉冲动画 */
+.acp-thoughts-icon.acp-thoughts-streaming .svg-icon {
+	animation: pulse 1.5s ease-in-out infinite;
 }
 
 .acp-thoughts-title {
@@ -850,12 +960,14 @@
 .acp-thoughts-content {
 	max-height: 0;
 	overflow: hidden;
-	transition: max-height 0.3s ease;
+	opacity: 0;
+	transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
 	padding: 0;
 }
 
 .acp-thoughts-content-expanded {
 	max-height: 400px;
+	opacity: 1;
 	overflow-y: auto;
 	padding: 8px 12px;
 }
@@ -2163,3 +2275,122 @@
 	font-style: italic;
 }
 
+
+/* ============================================================================
+   会话历史面板
+   ============================================================================ */
+
+.acp-session-history-modal {
+	max-width: 600px;
+	width: 90vw;
+}
+
+.acp-history-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 16px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.acp-history-header h2 {
+	margin: 0;
+	font-size: 1.2em;
+}
+
+.acp-history-refresh {
+	padding: 4px;
+	border: none;
+	background: none;
+	cursor: pointer;
+	border-radius: 4px;
+}
+
+.acp-history-refresh:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.acp-history-list {
+	max-height: 400px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.acp-history-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 12px;
+	border-radius: 8px;
+	background-color: var(--background-secondary);
+	transition: background-color 0.15s;
+}
+
+.acp-history-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.acp-history-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.acp-history-title {
+	font-weight: 500;
+	margin-bottom: 4px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.acp-history-meta {
+	font-size: 0.85em;
+	color: var(--text-muted);
+}
+
+.acp-history-meta span {
+	white-space: nowrap;
+}
+
+.acp-history-actions {
+	display: flex;
+	gap: 4px;
+	margin-left: 12px;
+}
+
+.acp-history-actions button {
+	padding: 6px;
+	border: none;
+	background: none;
+	cursor: pointer;
+	border-radius: 4px;
+	color: var(--text-muted);
+}
+
+.acp-history-actions button:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.acp-history-delete:hover {
+	color: var(--text-error) !important;
+}
+
+.acp-history-empty {
+	text-align: center;
+	padding: 40px 20px;
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.acp-history-tip {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	font-size: 0.85em;
+	color: var(--text-muted);
+	text-align: center;
+}

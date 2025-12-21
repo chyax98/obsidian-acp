@@ -135,6 +135,8 @@ export interface SessionManagerConfig {
 	connection: AcpConnection;
 	/** 工作目录 */
 	workingDir?: string;
+	/** 权限请求回调（可选，用于避免竞态条件） */
+	onPermissionRequest?: (params: RequestPermissionParams) => Promise<PermissionOutcome>;
 }
 
 // ============================================================================
@@ -212,6 +214,11 @@ export class SessionManager {
 	constructor(config: SessionManagerConfig) {
 		this.connection = config.connection;
 		this.workingDir = config.workingDir || process.cwd();
+
+		// 如果传入了权限回调，立即设置，避免竞态条件
+		if (config.onPermissionRequest) {
+			this.onPermissionRequest = config.onPermissionRequest;
+		}
 
 		// 初始化消息缓冲器
 		this.messageBuffer = new StreamingMessageBuffer({
@@ -346,8 +353,11 @@ export class SessionManager {
 
 	/**
 	 * 发送提示并等待响应
+	 *
+	 * @param displayText - 显示给用户的文本
+	 * @param fullText - 发送给 Agent 的完整文本（可选，默认等于 displayText）
 	 */
-	public async sendPrompt(text: string): Promise<StopReason> {
+	public async sendPrompt(displayText: string, fullText?: string): Promise<StopReason> {
 		if (!this._sessionId) {
 			throw new Error('没有活动会话，请先调用 start()');
 		}
@@ -356,8 +366,11 @@ export class SessionManager {
 			throw new Error('会话正在处理中');
 		}
 
-		// 创建用户消息
-		const userMessage = this.createMessage('user', text);
+		// 实际发送给 Agent 的文本
+		const textToSend = fullText ?? displayText;
+
+		// 创建用户消息（显示给用户的文本，不包含隐藏的上下文）
+		const userMessage = this.createMessage('user', displayText);
 		this._messages.push(userMessage);
 		this.onMessage(userMessage, true);
 
@@ -374,8 +387,8 @@ export class SessionManager {
 		this.setState('processing');
 
 		try {
-			// 发送请求
-			const response = await this.connection.sendPrompt(text);
+			// 发送请求（包含完整上下文）
+			const response = await this.connection.sendPrompt(textToSend);
 
 			// 完成回合
 			const stopReason = this.parseStopReason(response);
@@ -710,4 +723,166 @@ export class SessionManager {
 	private handleAvailableCommandsUpdate(update: AvailableCommandsUpdateData): void {
 		this.onAvailableCommandsUpdate(update.availableCommands);
 	}
+
+	// ========================================================================
+	// 导出功能
+	// ========================================================================
+
+	/**
+	 * 导出会话为 JSON 格式
+	 *
+	 * 用于会话持久化和恢复
+	 */
+	public toJSON(): SessionExportData {
+		return {
+			version: 1,
+			exportedAt: Date.now(),
+			sessionId: this._sessionId,
+			messages: this._messages.map((m) => ({ ...m })),
+			turns: this._turns.map((t) => ({
+				...t,
+				toolCalls: t.toolCalls.map((tc) => ({ ...tc })),
+				thoughts: [...t.thoughts],
+				plan: t.plan ? [...t.plan] : undefined,
+			})),
+			metadata: {
+				workingDir: this.workingDir,
+				totalMessages: this._messages.length,
+				totalTurns: this._turns.length,
+			},
+		};
+	}
+
+	/**
+	 * 导出会话为 Markdown 格式
+	 *
+	 * 用于保存对话记录到笔记
+	 */
+	public toMarkdown(): string {
+		const lines: string[] = [];
+
+		// 标题
+		lines.push('# ACP 会话记录');
+		lines.push('');
+		lines.push(`> 导出时间: ${new Date().toLocaleString()}`);
+		lines.push(`> 工作目录: ${this.workingDir}`);
+		lines.push(`> 消息数: ${this._messages.length}`);
+		lines.push('');
+		lines.push('---');
+		lines.push('');
+
+		// 按回合输出
+		for (const turn of this._turns) {
+			// 用户消息
+			lines.push('## 👤 用户');
+			lines.push('');
+			lines.push(turn.userMessage.content);
+			lines.push('');
+
+			// 思考过程
+			if (turn.thoughts.length > 0) {
+				lines.push('### 💭 思考');
+				lines.push('');
+				for (const thought of turn.thoughts) {
+					lines.push(`> ${thought.replace(/\n/g, '\n> ')}`);
+				}
+				lines.push('');
+			}
+
+			// 工具调用
+			if (turn.toolCalls.length > 0) {
+				lines.push('### 🔧 工具调用');
+				lines.push('');
+				for (const toolCall of turn.toolCalls) {
+					const statusIcon = this.getToolStatusIcon(toolCall.status);
+					lines.push(`- ${statusIcon} **${toolCall.title}** (${toolCall.kind})`);
+
+					// 工具输出
+					if (toolCall.content && toolCall.content.length > 0) {
+						for (const content of toolCall.content) {
+							if (content.type === 'content' && content.content?.type === 'text') {
+								const text = content.content.text || '';
+								if (text.length > 500) {
+									lines.push('  ```');
+									lines.push('  ' + text.slice(0, 500) + '...(truncated)');
+									lines.push('  ```');
+								} else if (text) {
+									lines.push('  ```');
+									lines.push('  ' + text.replace(/\n/g, '\n  '));
+									lines.push('  ```');
+								}
+							}
+						}
+					}
+				}
+				lines.push('');
+			}
+
+			// Agent 响应
+			if (turn.assistantMessage) {
+				lines.push('## 🤖 Agent');
+				lines.push('');
+				lines.push(turn.assistantMessage.content);
+				lines.push('');
+			}
+
+			lines.push('---');
+			lines.push('');
+		}
+
+		return lines.join('\n');
+	}
+
+	/**
+	 * 获取工具状态图标
+	 */
+	private getToolStatusIcon(status: ToolCallStatus): string {
+		switch (status) {
+			case 'completed':
+				return '✅';
+			case 'failed':
+				return '❌';
+			case 'in_progress':
+				return '⏳';
+			default:
+				return '⏸️';
+		}
+	}
+
+	/**
+	 * 从 JSON 数据恢复会话
+	 *
+	 * 注意：这只恢复历史记录，不重建会话连接
+	 */
+	public static fromJSON(data: SessionExportData): { messages: Message[]; turns: Turn[] } {
+		if (data.version !== 1) {
+			throw new Error(`不支持的会话数据版本: ${data.version}`);
+		}
+		return {
+			messages: data.messages,
+			turns: data.turns,
+		};
+	}
+}
+
+/**
+ * 会话导出数据格式
+ */
+export interface SessionExportData {
+	/** 数据格式版本 */
+	version: number;
+	/** 导出时间戳 */
+	exportedAt: number;
+	/** 会话 ID */
+	sessionId: string | null;
+	/** 消息列表 */
+	messages: Message[];
+	/** 回合列表 */
+	turns: Turn[];
+	/** 元数据 */
+	metadata: {
+		workingDir: string;
+		totalMessages: number;
+		totalTurns: number;
+	};
 }

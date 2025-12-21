@@ -425,12 +425,13 @@ export class MessageRenderer {
 	// ========================================================================
 
 	/**
-	 * 渲染工具调用卡片 (Claude Code for VSCode 风格)
+	 * 渲染工具调用卡片 (现代化可折叠卡片)
 	 *
 	 * 特点:
 	 * - 清晰的操作描述标题
-	 * - 紧凑的状态指示器
-	 * - 可折叠的详情区域
+	 * - 状态指示器（带动画）
+	 * - 可折叠的详情区域（CSS transition）
+	 * - 现代化卡片设计
 	 *
 	 * @param container - 容器元素
 	 * @param toolCall - 工具调用对象
@@ -449,10 +450,13 @@ export class MessageRenderer {
 			return toolCallEl;
 		}
 
-		// 创建新卡片
+		// 创建新卡片（添加状态类）
 		toolCallEl = container.createDiv({
-			cls: `acp-tool-call acp-tool-call-status-${toolCall.status}`,
-			attr: { 'data-tool-call-id': toolCall.toolCallId },
+			cls: `acp-tool-call acp-tool-call-${toolCall.status}`,
+			attr: {
+				'data-tool-call-id': toolCall.toolCallId,
+				'data-status': toolCall.status,
+			},
 		});
 
 		// 卡片头部
@@ -461,8 +465,8 @@ export class MessageRenderer {
 		// 左侧：状态图标 + 标题
 		const leftEl = headerEl.createDiv({ cls: 'acp-tool-call-left' });
 
-		// 状态图标
-		const iconEl = leftEl.createDiv({ cls: 'acp-tool-call-icon' });
+		// 状态图标（带动画）
+		const iconEl = leftEl.createDiv({ cls: `acp-tool-call-icon acp-status-${toolCall.status}` });
 		this.setToolCallIcon(iconEl, toolCall.status);
 
 		// 获取显示内容
@@ -492,12 +496,18 @@ export class MessageRenderer {
 		// 渲染内容
 		this.renderToolCallContent(contentEl, toolCall, app);
 
-		// 点击头部切换折叠/展开
+		// 点击头部切换折叠/展开（带 CSS transition）
 		headerEl.addEventListener('click', () => {
 			const expanded = contentEl.getAttribute('data-expanded') === 'true';
 			const newExpanded = !expanded;
 			contentEl.setAttribute('data-expanded', newExpanded ? 'true' : 'false');
-			contentEl.toggleClass('acp-tool-call-content-expanded', newExpanded);
+
+			// 使用 CSS class 触发过渡动画
+			if (newExpanded) {
+				contentEl.addClass('acp-tool-call-content-expanded');
+			} else {
+				contentEl.removeClass('acp-tool-call-content-expanded');
+			}
 
 			// 旋转 chevron
 			chevronEl.empty();
@@ -517,12 +527,14 @@ export class MessageRenderer {
 			// 只在状态变化时更新状态类
 			const currentStatus = toolCallEl.getAttribute('data-status');
 			if (currentStatus !== toolCall.status) {
-				toolCallEl.className = `acp-tool-call acp-tool-call-status-${toolCall.status}`;
+				// 更新主卡片的状态类
+				toolCallEl.className = `acp-tool-call acp-tool-call-${toolCall.status}`;
 				toolCallEl.setAttribute('data-status', toolCall.status);
 
-				// 更新图标
+				// 更新图标及其状态类
 				const iconEl = toolCallEl.querySelector('.acp-tool-call-icon');
 				if (iconEl) {
+					iconEl.className = `acp-tool-call-icon acp-status-${toolCall.status}`;
 					this.setToolCallIcon(iconEl as HTMLElement, toolCall.status);
 				}
 			}
@@ -617,14 +629,18 @@ export class MessageRenderer {
 
 		// Bash / Execute / Terminal 类工具
 		if (kind === 'bash' || kind === 'execute' || kind === 'shell' || kind === 'terminal') {
-			const command = (rawInput.command as string) || title;
+			const command = rawInput.command as string;
 			if (command) {
 				// 提取命令的第一部分（如 npm, git, python 等）
 				const firstWord = command.split(/\s+/)[0];
 				const shortCmd = command.length > 60 ? command.slice(0, 57) + '...' : command;
 				return { title: `执行 ${firstWord}: ${shortCmd}` };
 			}
-			return { title: '执行命令' };
+			// 当没有具体命令时，显示更有意义的标题
+			if (title && title.toLowerCase() !== kind) {
+				return { title: `执行: ${title}` };
+			}
+			return { title: '执行终端命令' };
 		}
 
 		// Read 类工具
@@ -964,6 +980,60 @@ export class MessageRenderer {
 	// ========================================================================
 
 	/**
+	 * 渲染代码块（带语言标签和复制按钮）
+	 *
+	 * @param container - 容器元素
+	 * @param code - 代码内容
+	 * @param language - 语言标识（如 'typescript', 'javascript'）
+	 * @param filename - 可选文件名
+	 */
+	public static renderCodeBlock(
+		container: HTMLElement,
+		code: string,
+		language: string = 'text',
+		filename?: string,
+	): void {
+		const codeWrapper = container.createDiv({ cls: 'acp-code-block-wrapper' });
+
+		// 头部：语言标签 + 文件名 + 复制按钮
+		const headerEl = codeWrapper.createDiv({ cls: 'acp-code-block-header' });
+
+		// 左侧信息
+		const infoEl = headerEl.createDiv({ cls: 'acp-code-block-info' });
+		infoEl.createDiv({ cls: 'acp-code-block-language', text: language.toUpperCase() });
+		if (filename) {
+			infoEl.createDiv({ cls: 'acp-code-block-filename', text: filename });
+		}
+
+		// 复制按钮
+		const copyBtn = headerEl.createDiv({ cls: 'acp-copy-button acp-copy-button-code' });
+		setIcon(copyBtn, 'copy');
+		copyBtn.setAttribute('aria-label', '复制代码');
+
+		copyBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			void navigator.clipboard.writeText(code).then(() => {
+				new Notice('已复制代码');
+
+				// 临时切换图标
+				copyBtn.empty();
+				setIcon(copyBtn, 'check');
+				setTimeout(() => {
+					copyBtn.empty();
+					setIcon(copyBtn, 'copy');
+				}, 2000);
+			});
+		});
+
+		// 代码内容
+		const preEl = codeWrapper.createEl('pre', { cls: 'acp-code-block-content' });
+		const codeEl = preEl.createEl('code', {
+			cls: `language-${language}`,
+			text: code,
+		});
+	}
+
+	/**
 	 * 渲染带复制按钮的文本内容（T12）
 	 */
 	private static renderTextContentWithCopy(container: HTMLElement, text: string): void {
@@ -1230,29 +1300,49 @@ export class MessageRenderer {
 	// ========================================================================
 
 	/**
-	 * 渲染思考块 (Claude Code 风格)
+	 * 渲染思考块 (现代化可折叠思考块)
 	 *
 	 * 特点：
 	 * - 显示思考条数
-	 * - 默认折叠，点击展开
-	 * - 使用 requestAnimationFrame 优化更新
+	 * - 默认折叠，点击展开（CSS transition）
+	 * - 支持流式更新（增量添加思考项）
+	 * - 流式进行中时显示"正在思考..."，结束后显示"思考过程"
 	 *
 	 * @param container - 容器元素（应该是 turn 容器）
 	 * @param thoughts - 思考内容列表
+	 * @param isStreaming - 是否正在流式输出（可选）
 	 * @returns 思考块元素
 	 */
-	public static renderThoughts(container: HTMLElement, thoughts: string[]): HTMLElement {
+	public static renderThoughts(container: HTMLElement, thoughts: string[], isStreaming = false): HTMLElement {
 		// 在当前容器内查找是否已存在（限定在 turn 内）
 		let thoughtsEl = container.querySelector('.acp-thoughts') as HTMLElement;
 
 		if (thoughtsEl) {
 			// 增量更新：只更新有变化的部分
 			requestAnimationFrame(() => {
+				// 更新计数
 				const countEl = thoughtsEl.querySelector('.acp-thoughts-count');
 				if (countEl) {
 					countEl.textContent = `(${thoughts.length})`;
 				}
 
+				// 更新标题（流式 vs 完成）
+				const titleEl = thoughtsEl.querySelector('.acp-thoughts-title');
+				if (titleEl) {
+					titleEl.textContent = isStreaming ? '正在思考...' : '思考过程';
+				}
+
+				// 更新思考图标（流式时添加脉冲动画）
+				const iconEl = thoughtsEl.querySelector('.acp-thoughts-icon');
+				if (iconEl) {
+					if (isStreaming) {
+						iconEl.addClass('acp-thoughts-streaming');
+					} else {
+						iconEl.removeClass('acp-thoughts-streaming');
+					}
+				}
+
+				// 增量添加新的思考项
 				const contentEl = thoughtsEl.querySelector('.acp-thoughts-content');
 				if (contentEl) {
 					const existingCount = contentEl.querySelectorAll('.acp-thought-item').length;
@@ -1279,12 +1369,17 @@ export class MessageRenderer {
 		const toggleIcon = leftEl.createDiv({ cls: 'acp-thoughts-toggle' });
 		setIcon(toggleIcon, 'chevron-right'); // 默认折叠
 
-		// 思考图标
-		const thinkIcon = leftEl.createDiv({ cls: 'acp-thoughts-icon' });
+		// 思考图标（流式时添加动画）
+		const thinkIcon = leftEl.createDiv({
+			cls: isStreaming ? 'acp-thoughts-icon acp-thoughts-streaming' : 'acp-thoughts-icon',
+		});
 		setIcon(thinkIcon, 'brain');
 
-		// 标题
-		leftEl.createDiv({ cls: 'acp-thoughts-title', text: '思考过程' });
+		// 标题（根据流式状态显示不同文本）
+		leftEl.createDiv({
+			cls: 'acp-thoughts-title',
+			text: isStreaming ? '正在思考...' : '思考过程',
+		});
 
 		// 数量
 		leftEl.createDiv({ cls: 'acp-thoughts-count', text: `(${thoughts.length})` });
@@ -1301,15 +1396,22 @@ export class MessageRenderer {
 			thoughtEl.textContent = thought;
 		}
 
-		// 点击头部切换展开/折叠
+		// 点击头部切换展开/折叠（CSS transition）
 		headerEl.addEventListener('click', () => {
 			const expanded = contentEl.getAttribute('data-expanded') === 'true';
-			contentEl.setAttribute('data-expanded', expanded ? 'false' : 'true');
-			contentEl.toggleClass('acp-thoughts-content-expanded', !expanded);
+			const newExpanded = !expanded;
+			contentEl.setAttribute('data-expanded', newExpanded ? 'true' : 'false');
+
+			// 使用 CSS class 触发过渡动画
+			if (newExpanded) {
+				contentEl.addClass('acp-thoughts-content-expanded');
+			} else {
+				contentEl.removeClass('acp-thoughts-content-expanded');
+			}
 
 			// 切换图标：折叠时显示 chevron-right，展开时显示 chevron-down
 			toggleIcon.empty();
-			setIcon(toggleIcon, expanded ? 'chevron-right' : 'chevron-down');
+			setIcon(toggleIcon, newExpanded ? 'chevron-down' : 'chevron-right');
 		});
 
 		return thoughtsEl;

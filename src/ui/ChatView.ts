@@ -15,6 +15,8 @@ import { PermissionModal } from './PermissionModal';
 import type { RequestPermissionParams, PermissionOutcome } from '../acp/types/permissions';
 import type { AvailableCommand } from '../acp/types/updates';
 import { MessageRenderer } from './MessageRenderer';
+import { SessionStorage, type SessionMeta } from '../acp/core/session-storage';
+import { SessionHistoryModal } from './SessionHistoryModal';
 
 // ============================================================================
 // 常量
@@ -44,6 +46,10 @@ export class AcpChatView extends ItemView {
 	private connection: AcpConnection | null = null;
 	private sessionManager: SessionManager | null = null;
 
+	// 会话持久化
+	private sessionStorage: SessionStorage;
+	private currentSessionId: string | null = null;
+
 	// Agent 信息
 	private availableAgents: DetectedAgent[] = [];
 	private selectedAgent: DetectedAgent | null = null;
@@ -65,6 +71,8 @@ export class AcpChatView extends ItemView {
 	private agentSelectEl!: HTMLSelectElement;
 	private connectButtonEl!: HTMLButtonElement;
 	private newChatButtonEl!: HTMLButtonElement;
+	private exportButtonEl!: HTMLButtonElement;
+	private historyButtonEl!: HTMLButtonElement;
 	private statusIndicatorEl!: HTMLElement;
 
 	// 空状态引导
@@ -96,6 +104,7 @@ export class AcpChatView extends ItemView {
 	constructor(leaf: WorkspaceLeaf, plugin: AcpPlugin) {
 		super(leaf);
 		this.plugin = plugin;
+		this.sessionStorage = new SessionStorage(this.app);
 	}
 
 	// ========================================================================
@@ -130,6 +139,9 @@ export class AcpChatView extends ItemView {
 		// 加载 Markdown 组件
 		this.markdownComponent.load();
 
+		// 初始化会话存储
+		await this.sessionStorage.initialize();
+
 		// 创建基础结构
 		const container = this.contentEl;
 		container.empty();
@@ -151,8 +163,10 @@ export class AcpChatView extends ItemView {
 	/**
 	 * 关闭视图
 	 */
-	// eslint-disable-next-line @typescript-eslint/require-await
 	public async onClose(): Promise<void> {
+		// 自动保存当前会话
+		await this.autoSaveSession();
+
 		// 断开 ACP 连接
 		if (this.sessionManager) {
 			this.sessionManager.end();
@@ -193,6 +207,26 @@ export class AcpChatView extends ItemView {
 
 		// 右侧：按钮组
 		const rightSection = this.headerEl.createDiv({ cls: 'acp-header-right' });
+
+		// 历史按钮
+		this.historyButtonEl = rightSection.createEl('button', {
+			cls: 'acp-history-btn clickable-icon',
+			attr: { 'aria-label': '会话历史' },
+		});
+		setIcon(this.historyButtonEl, 'history');
+		this.historyButtonEl.addEventListener('click', () => {
+			void this.showSessionHistory();
+		});
+
+		// 导出按钮
+		this.exportButtonEl = rightSection.createEl('button', {
+			cls: 'acp-export-btn clickable-icon',
+			attr: { 'aria-label': '导出对话' },
+		});
+		setIcon(this.exportButtonEl, 'download');
+		this.exportButtonEl.addEventListener('click', () => {
+			void this.handleExport();
+		});
 
 		// 新对话按钮
 		this.newChatButtonEl = rightSection.createEl('button', {
@@ -486,10 +520,13 @@ export class AcpChatView extends ItemView {
 			mcpServers: this.plugin.settings.mcpServers,
 		});
 
-		// 创建会话管理器
+		// 创建会话管理器（传入权限回调，避免竞态条件）
 		this.sessionManager = new SessionManager({
 			connection: this.connection,
 			workingDir,
+			onPermissionRequest: async (params: RequestPermissionParams) => {
+				return await this.handlePermissionRequest(params);
+			},
 		});
 
 		// 绑定会话回调
@@ -555,6 +592,49 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
+	 * 处理导出对话
+	 */
+	private async handleExport(): Promise<void> {
+		if (!this.sessionManager) {
+			new Notice('没有可导出的对话');
+			return;
+		}
+
+		const turns = this.sessionManager.turns;
+		if (turns.length === 0) {
+			new Notice('对话为空，无法导出');
+			return;
+		}
+
+		try {
+			// 生成 Markdown 内容
+			const markdown = this.sessionManager.toMarkdown();
+
+			// 生成文件名
+			const timestamp = new Date().toISOString().slice(0, 10);
+			const firstMessage = turns[0]?.userMessage.content.slice(0, 30).replace(/[/\\?%*:|"<>]/g, '-') || 'chat';
+			const fileName = `ACP-${timestamp}-${firstMessage}.md`;
+
+			// 保存到 Vault
+			const filePath = `${fileName}`;
+			const existingFile = this.app.vault.getAbstractFileByPath(filePath);
+
+			if (existingFile) {
+				// 文件已存在，追加时间戳
+				const uniquePath = `ACP-${Date.now()}-${firstMessage.slice(0, 20)}.md`;
+				await this.app.vault.create(uniquePath, markdown);
+				new Notice(`对话已导出到: ${uniquePath}`);
+			} else {
+				await this.app.vault.create(filePath, markdown);
+				new Notice(`对话已导出到: ${filePath}`);
+			}
+		} catch (error) {
+			console.error('[ChatView] 导出失败:', error);
+			new Notice('导出失败: ' + (error as Error).message);
+		}
+	}
+
+	/**
 	 * 清空消息区域
 	 */
 	private clearMessages(): void {
@@ -563,6 +643,107 @@ export class AcpChatView extends ItemView {
 		this.inputHistory = [];
 		this.inputHistoryIndex = -1;
 		this.isFirstMessage = true; // 重置首条消息标记
+	}
+
+	/**
+	 * 自动保存当前会话
+	 */
+	private async autoSaveSession(): Promise<void> {
+		if (!this.sessionManager) {
+			return;
+		}
+
+		const turns = this.sessionManager.turns;
+		if (turns.length === 0) {
+			return; // 空会话不保存
+		}
+
+		try {
+			const data = this.sessionManager.toJSON();
+			const agentName = this.selectedAgent?.name;
+			this.currentSessionId = await this.sessionStorage.saveSession(data, agentName);
+		} catch (error) {
+			console.error('[ChatView] 自动保存会话失败:', error);
+		}
+	}
+
+	/**
+	 * 获取会话历史列表
+	 */
+	public async getSessionHistory(): Promise<SessionMeta[]> {
+		return await this.sessionStorage.listSessions();
+	}
+
+	/**
+	 * 加载历史会话
+	 */
+	public async loadHistorySession(sessionId: string): Promise<boolean> {
+		try {
+			const storedSession = await this.sessionStorage.loadSession(sessionId);
+			if (!storedSession) {
+				new Notice('会话不存在');
+				return false;
+			}
+
+			// 清空当前消息
+			this.clearMessages();
+
+			// 渲染历史消息
+			for (const turn of storedSession.turns) {
+				// 渲染用户消息
+				this.handleMessage(turn.userMessage, true);
+
+				// 渲染 Agent 消息
+				if (turn.assistantMessage) {
+					this.handleMessage(turn.assistantMessage, true);
+				}
+			}
+
+			this.currentSessionId = sessionId;
+			new Notice('会话已加载');
+			return true;
+		} catch (error) {
+			console.error('[ChatView] 加载会话失败:', error);
+			new Notice('加载会话失败');
+			return false;
+		}
+	}
+
+	/**
+	 * 删除历史会话
+	 */
+	public async deleteHistorySession(sessionId: string): Promise<boolean> {
+		const success = await this.sessionStorage.deleteSession(sessionId);
+		if (success) {
+			new Notice('会话已删除');
+		}
+		return success;
+	}
+
+	/**
+	 * 显示会话历史面板
+	 */
+	private async showSessionHistory(): Promise<void> {
+		try {
+			const sessions = await this.sessionStorage.listSessions();
+
+			const modal = new SessionHistoryModal(this.app, sessions, {
+				onSelect: async (sessionId: string) => {
+					await this.loadHistorySession(sessionId);
+				},
+				onDelete: async (sessionId: string) => {
+					return await this.deleteHistorySession(sessionId);
+				},
+				onRefresh: async () => {
+					return await this.sessionStorage.listSessions();
+				},
+			});
+
+			modal.open();
+		} catch (error) {
+			console.error('[ChatView] 打开会话历史失败:', error);
+			new Notice('无法打开会话历史');
+		}
 	}
 
 	// ========================================================================
@@ -605,10 +786,7 @@ export class AcpChatView extends ItemView {
 			this.handleTurnEnd();
 		};
 
-		// 权限请求
-		this.sessionManager.onPermissionRequest = async (params: RequestPermissionParams) => {
-			return await this.handlePermissionRequest(params);
-		};
+		// 权限请求（已在构造函数中设置，避免竞态条件）
 
 		// 错误
 		this.sessionManager.onError = (error: Error) => {
@@ -746,6 +924,9 @@ export class AcpChatView extends ItemView {
 
 		// 自动滚动到底部
 		this.smartScroll();
+
+		// 自动保存会话
+		void this.autoSaveSession();
 	}
 
 	/**
@@ -808,8 +989,8 @@ export class AcpChatView extends ItemView {
 	 * 处理发送
 	 */
 	private async handleSend(): Promise<void> {
-		let text = this.inputEl.value.trim();
-		if (!text) {
+		const displayText = this.inputEl.value.trim();
+		if (!displayText) {
 			return;
 		}
 
@@ -820,16 +1001,17 @@ export class AcpChatView extends ItemView {
 		}
 
 		// Phase 4: 保存到历史
-		this.addToInputHistory(text);
+		this.addToInputHistory(displayText);
 
 		// 清空输入框
 		this.inputEl.value = '';
 
-		// 首条消息注入 Obsidian 上下文
+		// 首条消息注入 Obsidian 上下文（只发送给 Agent，不显示给用户）
+		let fullText: string | undefined;
 		if (this.isFirstMessage) {
 			const context = this.getObsidianContext();
 			if (context) {
-				text = `${context}\n\n---\n\n${text}`;
+				fullText = `${context}\n\n---\n\n${displayText}`;
 			}
 			this.isFirstMessage = false;
 		}
@@ -839,7 +1021,9 @@ export class AcpChatView extends ItemView {
 
 		try {
 			// 使用 SessionManager 发送
-			await this.sessionManager.sendPrompt(text);
+			// displayText: 显示给用户的文本
+			// fullText: 发送给 Agent 的完整文本（包含上下文）
+			await this.sessionManager.sendPrompt(displayText, fullText);
 		} catch (error) {
 			console.error('[ChatView] 发送失败:', error);
 			this.showFriendlyError(error as Error, 'send');

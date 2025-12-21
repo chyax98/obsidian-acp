@@ -23,13 +23,27 @@ export interface PermissionResponse {
 }
 
 /**
+ * 权限请求队列项
+ */
+interface QueuedRequest {
+	request: PermissionRequest;
+	resolve: (response: PermissionResponse) => void;
+}
+
+/**
  * 权限管理器
  *
  * @remarks
  * 拦截 ACP 协议的 session/request_permission 请求
  * 根据设置决定自动批准或弹窗询问
+ * 使用队列机制确保一次只处理一个权限弹窗，避免并发问题
  */
 export class PermissionManager {
+	/** 权限请求队列 */
+	private requestQueue: QueuedRequest[] = [];
+	/** 是否正在处理请求 */
+	private isProcessing = false;
+
 	constructor(
 		private app: App,
 		private settings: PermissionSettings,
@@ -38,6 +52,8 @@ export class PermissionManager {
 
 	/**
 	 * 处理权限请求
+	 *
+	 * 使用队列机制确保一次只显示一个权限弹窗
 	 */
 	public async handlePermissionRequest(
 		request: PermissionRequest,
@@ -48,9 +64,11 @@ export class PermissionManager {
 			toolName,
 			mode: this.settings.mode,
 			alwaysAllowed: this.settings.alwaysAllowedTools,
+			queueLength: this.requestQueue.length,
+			isProcessing: this.isProcessing,
 		});
 
-		// 模式 1: 完全信任 - 自动批准所有请求
+		// 模式 1: 完全信任 - 自动批准所有请求（不需要排队）
 		if (this.settings.mode === 'trustAll') {
 			console.log('[PermissionManager] trustAll 模式，自动批准');
 			return {
@@ -59,7 +77,7 @@ export class PermissionManager {
 			};
 		}
 
-		// 模式 2: 每次询问 - 检查是否已记录"始终允许"
+		// 检查是否已记录"始终允许"（不需要排队）
 		if (this.settings.alwaysAllowedTools[toolName]) {
 			console.log('[PermissionManager] 工具已在始终允许列表');
 			return {
@@ -68,9 +86,37 @@ export class PermissionManager {
 			};
 		}
 
-		// 弹出权限对话框
-		console.log('[PermissionManager] 显示权限对话框');
-		return await this.showPermissionDialog(request);
+		// 需要显示弹窗的请求加入队列
+		return new Promise((resolve) => {
+			this.requestQueue.push({ request, resolve });
+			console.log('[PermissionManager] 请求加入队列，当前队列长度:', this.requestQueue.length);
+			this.processNextRequest();
+		});
+	}
+
+	/**
+	 * 处理队列中的下一个请求
+	 */
+	private processNextRequest(): void {
+		// 如果正在处理或队列为空，直接返回
+		if (this.isProcessing || this.requestQueue.length === 0) {
+			return;
+		}
+
+		this.isProcessing = true;
+		const queued = this.requestQueue.shift()!;
+
+		console.log('[PermissionManager] 开始处理队列请求:', queued.request.toolName);
+
+		// 显示对话框并等待响应
+		void this.showPermissionDialog(queued.request).then((response) => {
+			console.log('[PermissionManager] 对话框响应:', response);
+			queued.resolve(response);
+			this.isProcessing = false;
+
+			// 处理下一个请求
+			this.processNextRequest();
+		});
 	}
 
 	/**

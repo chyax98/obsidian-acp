@@ -68,8 +68,9 @@ export class AcpSettingTab extends PluginSettingTab {
 		// Claude Code 配置
 		new Setting(containerEl)
 			.setName(config.name)
-			.setDesc(config.description || '')
+			.setDesc('自定义启动命令（留空使用默认）')
 			.addText(text => {
+				text.inputEl.style.width = '300px';
 				text
 					.setPlaceholder(config.defaultCliPath || '')
 					.setValue(this.plugin.settings.manualAgentPaths?.claude || '')
@@ -84,28 +85,6 @@ export class AcpSettingTab extends PluginSettingTab {
 						}
 						await this.plugin.saveSettings();
 					});
-			})
-			.addButton(button => {
-				button
-					.setButtonText('测试连接')
-					.onClick(async () => {
-						button.setButtonText('测试中...');
-						button.setDisabled(true);
-
-						try {
-							const cliPath = this.plugin.settings.manualAgentPaths?.claude || config.defaultCliPath || '';
-							const success = await this.testAgentConnection(cliPath);
-							if (success) {
-								new Notice('✅ Claude Code 连接正常');
-							}
-						} catch (error) {
-							const errMsg = error instanceof Error ? error.message : String(error);
-							new Notice('❌ 测试失败: ' + errMsg);
-						} finally {
-							button.setButtonText('测试连接');
-							button.setDisabled(false);
-						}
-					});
 			});
 
 		// 安装说明
@@ -115,51 +94,13 @@ export class AcpSettingTab extends PluginSettingTab {
 		installDiv.style.backgroundColor = 'var(--background-secondary)';
 		installDiv.style.borderRadius = '4px';
 		installDiv.innerHTML = `
-			<strong>安装方式:</strong><br>
-			<code>npx @zed-industries/claude-code-acp</code><br>
-			<small>需要 Node.js 18+，首次运行会自动安装</small>
+			<strong>默认命令:</strong> <code>npx @zed-industries/claude-code-acp</code><br>
+			<small>需要 Node.js 18+，首次运行会自动安装</small><br><br>
+			<strong>⚠️ 如果连接失败 (ENOENT):</strong><br>
+			<small>Obsidian 无法访问 shell 环境变量，需要使用 <strong>绝对路径</strong>。</small><br>
+			<small>在终端运行 <code>which npx</code> 获取路径，然后填写：</small><br>
+			<code>/完整路径/npx @zed-industries/claude-code-acp</code>
 		`;
-	}
-
-	/**
-	 * 测试 Agent 连接
-	 */
-	private async testAgentConnection(cliPath: string): Promise<boolean> {
-		try {
-			const { spawn } = await import('child_process');
-
-			return new Promise((resolve) => {
-				// 解析命令
-				const parts = cliPath.split(' ');
-				const cmd = parts[0];
-				const args = [...parts.slice(1), '--version'];
-
-				const proc = spawn(cmd, args, {
-					stdio: 'pipe',
-					timeout: 10000,
-				});
-
-				const timeout = setTimeout(() => {
-					proc.kill();
-					new Notice('测试超时');
-					resolve(false);
-				}, 10000);
-
-				proc.on('close', (code: number) => {
-					clearTimeout(timeout);
-					resolve(code === 0);
-				});
-
-				proc.on('error', (error: Error) => {
-					clearTimeout(timeout);
-					new Notice(`启动失败: ${error.message}`);
-					resolve(false);
-				});
-			});
-		} catch (error) {
-			console.error('[Test Connection]', error);
-			return false;
-		}
 	}
 
 	/**

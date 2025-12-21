@@ -1356,6 +1356,8 @@ export class AcpChatView extends ItemView {
 		// 更新连接按钮显示状态
 		if (state === 'connected') {
 			this.connectButtonEl.style.display = 'none';
+			// 清除之前的错误卡片
+			this.clearErrorCards();
 		} else if (state === 'connecting') {
 			this.connectButtonEl.textContent = '连接中...';
 			this.connectButtonEl.disabled = true;
@@ -1706,6 +1708,14 @@ export class AcpChatView extends ItemView {
 
 		// 重置索引
 		this.inputHistoryIndex = -1;
+	}
+
+	/**
+	 * 清除所有错误卡片（连接成功时调用）
+	 */
+	private clearErrorCards(): void {
+		const errorCards = this.messagesEl.querySelectorAll('.acp-error-card');
+		errorCards.forEach(card => card.remove());
 	}
 
 	/**

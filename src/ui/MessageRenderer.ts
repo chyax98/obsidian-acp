@@ -72,15 +72,18 @@ export class MessageRenderer {
 			const imagePattern = /!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
 			const hasImages = imagePattern.test(message.content);
 
+			// 折叠多余的连续空行（3+ 个换行 → 2 个换行）
+			const normalizedContent = message.content.replace(/\n{3,}/g, '\n\n');
+
 			if (hasImages) {
 				// 如果有图片，需要特殊处理
-				await this.renderContentWithImages(contentEl, message.content, app, sourcePath, component);
+				await this.renderContentWithImages(contentEl, normalizedContent, app, sourcePath, component);
 			} else {
 				try {
 					// 使用 Obsidian MarkdownRenderer 渲染
 					await MarkdownRenderer.render(
 						app,
-						message.content,
+						normalizedContent,
 						contentEl,
 						sourcePath,
 						component,
@@ -88,7 +91,7 @@ export class MessageRenderer {
 				} catch (error) {
 					console.error('[MessageRenderer] Markdown 渲染失败:', error);
 					// 降级：直接显示文本
-					contentEl.textContent = message.content;
+					contentEl.textContent = normalizedContent;
 				}
 			}
 		}

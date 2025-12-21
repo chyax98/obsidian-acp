@@ -1128,32 +1128,62 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
-	 * 获取 Obsidian 上下文信息
+	 * 获取 Obsidian 上下文信息（系统提示）
 	 */
 	private getObsidianContext(): string {
+		const vault = this.app.vault;
 		const parts: string[] = [];
 
-		// Vault 名称
-		const vaultName = this.app.vault.getName();
-		parts.push('[Obsidian Context]');
-		parts.push(`- Vault: ${vaultName}`);
+		// 系统角色说明
+		parts.push('[System Context]');
+		parts.push('You are working in an Obsidian vault - a local knowledge base with interconnected markdown notes.');
+		parts.push('The user may reference files using @path syntax. You can read and write files in this vault.');
+		parts.push('');
+
+		// Vault 信息
+		parts.push('[Vault Info]');
+		parts.push(`- Name: ${vault.getName()}`);
 
 		// 工作目录
 		try {
 			const workingDir = this.getWorkingDirectory();
-			parts.push(`- Working Directory: ${workingDir}`);
+			parts.push(`- Path: ${workingDir}`);
 		} catch {
 			// 忽略
 		}
 
-		// 当前打开的文件
-		const activeFile = this.app.workspace.getActiveFile();
-		if (activeFile) {
-			parts.push(`- Active File: ${activeFile.path}`);
+		// 统计
+		const allFiles = vault.getFiles();
+		const mdFiles = allFiles.filter(f => f.extension === 'md');
+		const folders = vault.getAllLoadedFiles().filter(f => f instanceof TFolder);
+		parts.push(`- Stats: ${mdFiles.length} notes, ${allFiles.length - mdFiles.length} attachments, ${folders.length} folders`);
+
+		// 顶级目录结构
+		const topFolders = vault.getAllLoadedFiles()
+			.filter((f): f is TFolder => f instanceof TFolder && f.parent?.path === '/')
+			.map(f => f.name)
+			.slice(0, 10);
+		if (topFolders.length > 0) {
+			parts.push(`- Top folders: ${topFolders.join(', ')}`);
 		}
 
-		// Obsidian 特有语法提示
-		parts.push('- Note: This vault uses Obsidian\'s [[wikilinks]] syntax for internal links.');
+		parts.push('');
+
+		// 当前上下文
+		parts.push('[Current Context]');
+		const activeFile = this.app.workspace.getActiveFile();
+		if (activeFile) {
+			parts.push(`- Active file: ${activeFile.path}`);
+		} else {
+			parts.push('- No file currently open');
+		}
+
+		// Obsidian 语法提示
+		parts.push('');
+		parts.push('[Obsidian Syntax]');
+		parts.push('- Internal links: [[note]] or [[folder/note]]');
+		parts.push('- Tags: #tag or #nested/tag');
+		parts.push('- Frontmatter: YAML between --- at file start');
 
 		return parts.join('\n');
 	}

@@ -1280,7 +1280,32 @@ export class AcpChatView extends ItemView {
 		// 移除旧菜单
 		this.hideCommandMenu();
 
+		// 如果命令列表为空，可能是因为还没连接
 		if (this.availableCommands.length === 0) {
+			// 检查是否已连接
+			if (!this.connection?.isConnected) {
+				// 显示"正在连接..."提示
+				this.commandMenuEl = this.inputContainerEl.createDiv({
+					cls: 'acp-command-menu',
+				});
+				const loadingItem = this.commandMenuEl.createDiv({
+					cls: 'acp-command-menu-item acp-command-menu-loading',
+				});
+				loadingItem.createDiv({
+					cls: 'acp-command-menu-info',
+					text: '正在连接 Agent...',
+				});
+
+				// 触发连接，连接后命令会通过 handleAvailableCommandsUpdate 更新
+				void this.ensureConnected().then(() => {
+					// 连接成功后，如果用户还在输入 /，刷新菜单
+					if (this.inputEl.value.startsWith('/')) {
+						this.showCommandMenu(this.inputEl.value.slice(1));
+					}
+				});
+				return;
+			}
+			// 已连接但没有命令，直接返回
 			return;
 		}
 

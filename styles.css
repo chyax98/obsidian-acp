@@ -1802,6 +1802,23 @@
 	white-space: nowrap;
 }
 
+/* 命令菜单加载状态 */
+.acp-command-menu-loading {
+	justify-content: center;
+	padding: 12px 16px;
+	cursor: default;
+}
+
+.acp-command-menu-loading:hover {
+	background-color: transparent;
+}
+
+.acp-command-menu-loading .acp-command-menu-info {
+	text-align: center;
+	color: var(--text-muted);
+	font-style: italic;
+}
+
 /* ============================================================================
    Turn 容器和智能滚动
    ============================================================================ */

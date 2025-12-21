@@ -70,6 +70,7 @@ export class AcpChatView extends ItemView {
 	private cancelButtonEl!: HTMLButtonElement;
 	private agentSelectEl!: HTMLSelectElement;
 	private connectButtonEl!: HTMLButtonElement;
+	private cancelConnectButtonEl!: HTMLButtonElement; // 取消连接按钮
 	private newChatButtonEl!: HTMLButtonElement;
 	private exportButtonEl!: HTMLButtonElement;
 	private historyButtonEl!: HTMLButtonElement;
@@ -245,6 +246,16 @@ export class AcpChatView extends ItemView {
 		});
 		this.connectButtonEl.addEventListener('click', () => {
 			void this.handleConnect();
+		});
+
+		// 取消连接按钮（初始隐藏）
+		this.cancelConnectButtonEl = rightSection.createEl('button', {
+			cls: 'acp-cancel-connect-btn',
+			text: '取消',
+		});
+		this.cancelConnectButtonEl.style.display = 'none';
+		this.cancelConnectButtonEl.addEventListener('click', () => {
+			this.handleCancelConnect();
 		});
 	}
 
@@ -468,9 +479,16 @@ export class AcpChatView extends ItemView {
 			this.connectButtonEl.disabled = true;
 			this.agentSelectEl.disabled = true;
 
+			// 显示取消按钮，隐藏连接按钮
+			this.connectButtonEl.style.display = 'none';
+			this.cancelConnectButtonEl.style.display = '';
+
 			// 使用 ACP 模式连接
 			await this.connectWithAcp();
 
+			// 连接成功，隐藏取消按钮，显示断开按钮
+			this.cancelConnectButtonEl.style.display = 'none';
+			this.connectButtonEl.style.display = '';
 			this.connectButtonEl.textContent = '断开';
 			this.connectButtonEl.disabled = false;
 
@@ -485,6 +503,10 @@ export class AcpChatView extends ItemView {
 		} catch (error) {
 			console.error('[ChatView] 连接失败:', error);
 			this.updateConnectionStatus('error');
+
+			// 恢复按钮状态
+			this.cancelConnectButtonEl.style.display = 'none';
+			this.connectButtonEl.style.display = '';
 			this.connectButtonEl.disabled = false;
 			this.agentSelectEl.disabled = false;
 			this.inputEl.disabled = true;
@@ -534,6 +556,28 @@ export class AcpChatView extends ItemView {
 
 		// 创建新会话
 		await this.sessionManager.start();
+	}
+
+	/**
+	 * 取消连接（用户主动取消）
+	 */
+	private handleCancelConnect(): void {
+		console.log('[ChatView] 用户取消连接');
+
+		// 调用连接的取消方法
+		if (this.connection) {
+			this.connection.cancelConnection();
+		}
+
+		// 更新 UI 状态
+		this.updateConnectionStatus('disconnected');
+		this.cancelConnectButtonEl.style.display = 'none';
+		this.connectButtonEl.style.display = '';
+		this.connectButtonEl.textContent = '连接';
+		this.connectButtonEl.disabled = false;
+		this.agentSelectEl.disabled = false;
+
+		new Notice('已取消连接');
 	}
 
 	/**

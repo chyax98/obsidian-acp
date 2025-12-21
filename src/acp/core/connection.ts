@@ -156,6 +156,35 @@ export function createSpawnConfig(
 	return { command: spawnCommand, args: spawnArgs, options };
 }
 
+function getNpxPackageName(cliPath: string): string | null {
+	const parts = cliPath.trim().split(/\s+/);
+	if (parts.length === 0) return null;
+	if (parts[0] !== 'npx' && parts[0] !== 'npx.cmd') return null;
+	for (let i = 1; i < parts.length; i++) {
+		const arg = parts[i];
+		if (!arg.startsWith('-')) {
+			return arg;
+		}
+	}
+	return null;
+}
+
+function isLikelyCodexCli(cliPath: string): boolean {
+	const trimmed = cliPath.trim();
+	if (!trimmed) return false;
+
+	const npxPackage = getNpxPackageName(trimmed)?.toLowerCase();
+	if (npxPackage) {
+		if (npxPackage === '@zed-industries/codex-acp' || npxPackage === 'codex-acp') {
+			return false;
+		}
+		return npxPackage === 'codex';
+	}
+
+	const baseName = path.basename(trimmed).toLowerCase();
+	return baseName === 'codex' || baseName === 'codex.exe' || baseName === 'codex.cmd' || baseName === 'codex.bat';
+}
+
 // ============================================================================
 // AcpConnection 类
 // ============================================================================
@@ -169,6 +198,7 @@ export class AcpConnection {
 	// 进程状态
 	private child: ChildProcess | null = null;
 	private state: ConnectionState = 'disconnected';
+	private isCancelling = false; // 连接取消标志
 
 	// 请求队列
 	private requestQueue = new RequestQueue();
@@ -421,10 +451,27 @@ export class AcpConnection {
 	private connectGeneric(options: ConnectionOptions): void {
 		// 获取后端配置
 		const config = getBackendConfig(options.backendId);
-		const cliPath = options.cliPath || config?.defaultCliPath;
+		let cliPath = options.cliPath || config?.defaultCliPath;
 
 		if (!cliPath) {
 			throw new Error(`后端 ${options.backendId} 没有配置 CLI 路径`);
+		}
+
+		// 🔧 Codex 特殊处理：强制使用 ACP 适配器
+		if (options.backendId === 'codex-acp') {
+			if (isLikelyCodexCli(cliPath)) {
+				const fallback = config?.defaultCliPath || 'npx @zed-industries/codex-acp';
+				console.warn(
+					`[ACP] ⚠️ 检测到原生 Codex CLI (${cliPath})，强制回退到 ACP 适配器 (${fallback})\n` +
+					`原生 Codex CLI 不支持 ACP 协议，请在设置中清空"手动路径"或使用 ${fallback}`,
+				);
+				cliPath = fallback;
+			}
+			// 额外检查：如果 cliPath 完全为空或只是 'codex'，也强制使用适配器
+			if (!cliPath || cliPath.trim() === 'codex' || cliPath.trim() === 'codex.exe') {
+				console.warn('[ACP] ⚠️ Codex 路径无效，使用默认 ACP 适配器');
+				cliPath = config?.defaultCliPath || 'npx @zed-industries/codex-acp';
+			}
 		}
 
 		// 获取 ACP 参数
@@ -451,6 +498,9 @@ export class AcpConnection {
 	 * 连接到 ACP Agent
 	 */
 	public async connect(options: ConnectionOptions): Promise<void> {
+		// 重置取消标志
+		this.isCancelling = false;
+
 		// 保存连接配置用于重连
 		this.lastConnectionOptions = options;
 
@@ -510,6 +560,11 @@ export class AcpConnection {
 			this.state = 'error';
 			this.disconnect();
 
+			// 如果是用户主动取消，直接抛出取消错误，不重试
+			if (this.isCancelling) {
+				throw new Error('连接已被取消');
+			}
+
 			// 错误分类
 			const errorMsg = error instanceof Error ? error.message : String(error);
 			const classifiedError = this.classifyError(errorMsg, this.backend);
@@ -553,6 +608,15 @@ export class AcpConnection {
 		this.messageBuffer = '';
 		this.state = 'disconnected';
 		// console.log('[ACP] 连接已断开，状态已重置');
+	}
+
+	/**
+	 * 取消连接（用户主动取消）
+	 */
+	public cancelConnection(): void {
+		console.log('[ACP] 用户取消连接');
+		this.isCancelling = true;
+		this.disconnect();
 	}
 
 	/**
@@ -724,8 +788,10 @@ export class AcpConnection {
 	 * 发送请求并等待响应
 	 */
 	private sendRequest<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> {
-		// 超时时间: session/prompt 2 分钟，其他 1 分钟
-		const timeoutDuration = method === AcpMethod.SESSION_PROMPT ? 120000 : 60000;
+		// 超时时间: session/prompt 2 分钟，initialize 15 秒，其他 20 秒
+		const timeoutDuration = method === AcpMethod.SESSION_PROMPT ? 120000
+			: method === AcpMethod.INITIALIZE ? 15000
+				: 20000;
 
 		// 创建请求
 		const { id, promise } = this.requestQueue.create<T>(method, timeoutDuration);
@@ -832,7 +898,7 @@ export class AcpConnection {
 		const response = await Promise.race([
 			this.sendRequest<InitializeResponse>(AcpMethod.INITIALIZE, params),
 			new Promise<never>((_, reject) =>
-				setTimeout(() => reject(new Error('初始化超时 (60s)')), 60000),
+				setTimeout(() => reject(new Error('初始化超时 (15s)')), 15000),
 			),
 		]);
 

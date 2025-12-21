@@ -2089,6 +2089,28 @@
 	gap: 6px;
 }
 
+/* 连接按钮 */
+.acp-connect-btn {
+	padding: 4px 12px;
+	font-size: 0.85em;
+	border: 1px solid var(--interactive-accent);
+	border-radius: 4px;
+	background: transparent;
+	color: var(--interactive-accent);
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.acp-connect-btn:hover {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.acp-connect-btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
 /* 新对话按钮 */
 .acp-new-chat-btn {
 	display: flex;

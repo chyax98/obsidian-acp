@@ -72,6 +72,7 @@ export class AcpChatView extends ItemView {
 	private newChatButtonEl!: HTMLButtonElement;
 	private exportButtonEl!: HTMLButtonElement;
 	private historyButtonEl!: HTMLButtonElement;
+	private connectButtonEl!: HTMLButtonElement;
 	private statusIndicatorEl!: HTMLElement;
 
 	// 空状态引导
@@ -201,6 +202,15 @@ export class AcpChatView extends ItemView {
 		leftSection.createDiv({
 			cls: 'acp-header-title',
 			text: 'Claude Code',
+		});
+
+		// 连接按钮（断开时显示）
+		this.connectButtonEl = leftSection.createEl('button', {
+			cls: 'acp-connect-btn',
+			text: '连接',
+		});
+		this.connectButtonEl.addEventListener('click', () => {
+			void this.handleManualConnect();
 		});
 
 		// 右侧：按钮组
@@ -543,6 +553,16 @@ export class AcpChatView extends ItemView {
 		} finally {
 			this.isConnecting = false;
 			this.setInputSending(false);
+		}
+	}
+
+	/**
+	 * 手动连接（用户点击连接按钮）
+	 */
+	private async handleManualConnect(): Promise<void> {
+		const success = await this.ensureConnected();
+		if (success) {
+			new Notice('已连接到 Claude Code');
 		}
 	}
 
@@ -1145,7 +1165,7 @@ export class AcpChatView extends ItemView {
 	private updateConnectionStatus(state: 'disconnected' | 'connecting' | 'connected' | 'error', agentName?: string): void {
 		// 更新状态指示器（小圆点）的样式
 		this.statusIndicatorEl.className = `acp-status-dot acp-status-${state}`;
-		
+
 		// 更新 tooltip
 		let tooltip = '';
 		switch (state) {
@@ -1163,6 +1183,19 @@ export class AcpChatView extends ItemView {
 				break;
 		}
 		this.statusIndicatorEl.setAttribute('aria-label', tooltip);
+
+		// 更新连接按钮显示状态
+		if (state === 'connected') {
+			this.connectButtonEl.style.display = 'none';
+		} else if (state === 'connecting') {
+			this.connectButtonEl.textContent = '连接中...';
+			this.connectButtonEl.disabled = true;
+			this.connectButtonEl.style.display = '';
+		} else {
+			this.connectButtonEl.textContent = '连接';
+			this.connectButtonEl.disabled = false;
+			this.connectButtonEl.style.display = '';
+		}
 	}
 
 

@@ -105,15 +105,14 @@ export class FileInputSuggest {
 		const atIndex = beforeCursor.lastIndexOf('@');
 
 		if (atIndex !== -1) {
-			// 替换 @ 为 file: path
+			// 替换 @ 为路径
 			const before = value.slice(0, atIndex);
 			const after = value.slice(cursorPos);
-			const reference = `file: ${item.path}`;
 
-			this.inputEl.value = before + reference + after;
+			this.inputEl.value = before + item.path + after;
 
-			// 移动光标到引用后面
-			const newCursorPos = before.length + reference.length;
+			// 移动光标到路径后面
+			const newCursorPos = before.length + item.path.length;
 			this.inputEl.setSelectionRange(newCursorPos, newCursorPos);
 		}
 

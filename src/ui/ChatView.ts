@@ -413,8 +413,8 @@ export class AcpChatView extends ItemView {
 			if (obsidianFiles) {
 				const paths = obsidianFiles.split('\n').filter(p => p.trim());
 				if (paths.length > 0) {
-					// 追加到输入框（简单路径格式）
-					const references = paths.map(p => `file: ${p}`).join('\n');
+					// 追加到输入框（纯路径）
+					const references = paths.join('\n');
 					this.inputEl.value = this.inputEl.value
 						? `${this.inputEl.value}\n${references}`
 						: references;
@@ -434,7 +434,7 @@ export class AcpChatView extends ItemView {
 						const url = new URL(text);
 						const filePath = url.searchParams.get('file');
 						if (filePath) {
-							processedText = `file: ${decodeURIComponent(filePath)}`;
+							processedText = decodeURIComponent(filePath);
 						}
 					} catch {
 						// URL 解析失败，保持原文本

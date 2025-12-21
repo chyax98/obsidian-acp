@@ -100,6 +100,11 @@ export class AcpChatView extends ItemView {
 	// @ 文件引用建议
 	private fileInputSuggest: FileInputSuggest | null = null;
 
+	// 历史查看模式
+	private isViewingHistory: boolean = false;
+	private savedMessagesHtml: string | null = null;
+	private backToCurrentButton: HTMLButtonElement | null = null;
+
 	// ========================================================================
 	// 构造函数
 	// ========================================================================
@@ -363,6 +368,16 @@ export class AcpChatView extends ItemView {
 		this.cancelButtonEl.style.display = 'none';
 		this.cancelButtonEl.addEventListener('click', () => {
 			void this.handleCancel();
+		});
+
+		// 返回当前对话按钮（初始隐藏）
+		this.backToCurrentButton = buttonContainer.createEl('button', {
+			cls: 'acp-back-button mod-cta',
+			text: '返回当前对话',
+		});
+		this.backToCurrentButton.style.display = 'none';
+		this.backToCurrentButton.addEventListener('click', () => {
+			this.exitHistoryViewMode();
 		});
 
 		// 初始状态：未连接，禁用输入
@@ -664,6 +679,8 @@ export class AcpChatView extends ItemView {
 		// 如果已连接，只重建会话
 		if (this.sessionManager) {
 			try {
+				// 先结束当前会话
+				this.sessionManager.end();
 				await this.sessionManager.start();
 				this.hideEmptyState();
 				this.addSystemMessage('✨ 新对话已开始');
@@ -762,7 +779,7 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
-	 * 加载历史会话
+	 * 加载历史会话（只读模式）
 	 */
 	public async loadHistorySession(sessionId: string): Promise<boolean> {
 		try {
@@ -771,6 +788,14 @@ export class AcpChatView extends ItemView {
 				new Notice('会话不存在');
 				return false;
 			}
+
+			// 保存当前对话的消息（如果有）
+			if (!this.isViewingHistory && this.messagesEl.innerHTML) {
+				this.savedMessagesHtml = this.messagesEl.innerHTML;
+			}
+
+			// 进入历史查看模式
+			this.isViewingHistory = true;
 
 			// 清空当前消息
 			this.clearMessages();
@@ -786,14 +811,62 @@ export class AcpChatView extends ItemView {
 				}
 			}
 
-			this.currentSessionId = sessionId;
-			new Notice('会话已加载');
+			// 更新 UI 为只读模式
+			this.enterHistoryViewMode();
+
+			new Notice('查看历史会话（只读）');
 			return true;
 		} catch (error) {
 			console.error('[ChatView] 加载会话失败:', error);
 			new Notice('加载会话失败');
 			return false;
 		}
+	}
+
+	/**
+	 * 进入历史查看模式（只读）
+	 */
+	private enterHistoryViewMode(): void {
+		// 禁用输入框
+		this.inputEl.disabled = true;
+		this.inputEl.placeholder = '历史会话（只读）';
+		this.inputContainerEl.addClass('acp-history-readonly');
+
+		// 隐藏发送按钮，显示返回按钮
+		this.sendButtonEl.style.display = 'none';
+		if (this.backToCurrentButton) {
+			this.backToCurrentButton.style.display = '';
+		}
+	}
+
+	/**
+	 * 退出历史查看模式
+	 */
+	private exitHistoryViewMode(): void {
+		this.isViewingHistory = false;
+
+		// 恢复输入框
+		this.inputEl.disabled = false;
+		this.inputEl.placeholder = '输入消息，/ 查看命令';
+		this.inputContainerEl.removeClass('acp-history-readonly');
+
+		// 隐藏返回按钮，显示发送按钮
+		if (this.backToCurrentButton) {
+			this.backToCurrentButton.style.display = 'none';
+		}
+		this.sendButtonEl.style.display = '';
+
+		// 恢复当前对话消息
+		this.clearMessages();
+		if (this.savedMessagesHtml) {
+			this.messagesEl.innerHTML = this.savedMessagesHtml;
+			this.savedMessagesHtml = null;
+		} else {
+			// 没有保存的对话，显示空状态
+			this.showEmptyState();
+		}
+
+		new Notice('已返回当前对话');
 	}
 
 	/**

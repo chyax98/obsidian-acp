@@ -107,8 +107,20 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
 	debugMode: false,
 	mcpServers: [
 		{
+			id: 'vault',
+			name: 'Obsidian Vault (BM25)',
+			type: 'stdio',
+			command: 'npx',
+			args: [
+				'obsidian-vault-mcp',
+				'--vault',
+				'{VAULT_PATH}',
+			],
+			enabled: true,
+		},
+		{
 			id: 'filesystem',
-			name: 'Obsidian Filesystem',
+			name: 'Filesystem (基础)',
 			type: 'stdio',
 			command: 'npx',
 			args: [
@@ -116,7 +128,7 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
 				'--root',
 				'{VAULT_PATH}',
 			],
-			enabled: true,
+			enabled: false,  // Claude Code 已有文件访问能力，默认禁用
 		},
 	],
 };

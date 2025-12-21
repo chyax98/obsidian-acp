@@ -2357,7 +2357,7 @@
    ============================================================================ */
 
 .acp-session-history-modal {
-	max-width: 600px;
+	max-width: 800px;
 	width: 90vw;
 }
 
@@ -2469,6 +2469,33 @@
 	font-size: 0.85em;
 	color: var(--text-muted);
 	text-align: center;
+}
+
+/* ============================================================================
+   历史查看只读模式
+   ============================================================================ */
+
+.acp-chat-input.acp-history-readonly {
+	opacity: 0.8;
+}
+
+.acp-chat-input.acp-history-readonly .acp-input-textarea {
+	background-color: var(--background-secondary);
+	cursor: not-allowed;
+}
+
+.acp-back-button {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+	border-radius: 4px;
+	padding: 8px 16px;
+	cursor: pointer;
+	font-weight: 500;
+}
+
+.acp-back-button:hover {
+	background-color: var(--interactive-accent-hover);
 }
 
 /* ============================================================================

@@ -19,7 +19,7 @@ export interface PermissionRequest {
  */
 export interface PermissionResponse {
 	outcome: 'selected' | 'cancelled';
-	optionId?: string;  // 'allow-once' | 'allow-always' | 'reject-once'
+	optionId?: string;  // 'allow' | 'allow_always' | 'reject' (ACP 标准格式)
 }
 
 /**
@@ -60,31 +60,46 @@ export class PermissionManager {
 	): Promise<PermissionResponse> {
 		const { toolName } = request;
 
-		console.log('[PermissionManager] 权限请求:', {
-			toolName,
-			mode: this.settings.mode,
-			alwaysAllowed: this.settings.alwaysAllowedTools,
-			queueLength: this.requestQueue.length,
-			isProcessing: this.isProcessing,
-		});
+		// 🔍 详细调试日志
+		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+		console.log('[PermissionManager] 🚨 权限请求详情:');
+		console.log('  toolName:', toolName);
+		console.log('  title:', request.title);
+		console.log('  kind:', request.kind);
+		console.log('  rawInput:', request.rawInput);
+		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+		console.log('[PermissionManager] 🔧 当前设置:');
+		console.log('  settings 对象:', this.settings);
+		console.log('  mode 值:', this.settings.mode);
+		console.log('  mode 类型:', typeof this.settings.mode);
+		console.log('  mode === "trustAll":', this.settings.mode === 'trustAll');
+		console.log('  alwaysAllowedTools:', JSON.stringify(this.settings.alwaysAllowedTools, null, 2));
+		console.log('  alwaysAllowedTools[toolName]:', this.settings.alwaysAllowedTools[toolName]);
+		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+		console.log('[PermissionManager] 📊 队列状态:');
+		console.log('  队列长度:', this.requestQueue.length);
+		console.log('  正在处理:', this.isProcessing);
+		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
 		// 模式 1: 完全信任 - 自动批准所有请求（不需要排队）
 		if (this.settings.mode === 'trustAll') {
-			console.log('[PermissionManager] trustAll 模式，自动批准');
+			console.log('[PermissionManager] ✅ trustAll 模式，自动批准');
 			return {
 				outcome: 'selected',
-				optionId: 'allow-once',
+				optionId: 'allow',  // ACP 标准格式
 			};
 		}
 
 		// 检查是否已记录"始终允许"（不需要排队）
 		if (this.settings.alwaysAllowedTools[toolName]) {
-			console.log('[PermissionManager] 工具已在始终允许列表');
+			console.log('[PermissionManager] ✅ 工具已在始终允许列表');
 			return {
 				outcome: 'selected',
-				optionId: 'allow-once',
+				optionId: 'allow',  // ACP 标准格式
 			};
 		}
+
+		console.log('[PermissionManager] ⚠️ 需要用户确认，加入队列');
 
 		// 需要显示弹窗的请求加入队列
 		return new Promise((resolve) => {
@@ -131,16 +146,16 @@ export class PermissionManager {
 				request,
 				(response: PermissionResponse) => {
 					// 如果用户选择"始终允许"，记录到设置
-					if (response.optionId === 'allow-always') {
+					if (response.optionId === 'allow_always') {
 						this.settings.alwaysAllowedTools[request.toolName] = true;
 						void this.saveSettings().then(() => {
 							new Notice(`已记住：始终允许 ${request.toolName}`);
 						});
 
-						// 转换为 allow-once 返回给 Agent
+						// 转换为 allow 返回给 Agent（ACP 标准格式）
 						resolve({
 							outcome: 'selected',
-							optionId: 'allow-once',
+							optionId: 'allow',
 						});
 					} else {
 						resolve(response);

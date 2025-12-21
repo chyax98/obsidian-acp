@@ -65,7 +65,7 @@ export class PermissionModal extends Modal {
 		// 拒绝
 		const rejectBtn = buttonsEl.createEl('button', { text: '拒绝' });
 		rejectBtn.addEventListener('click', () => {
-			this.respond({ outcome: 'selected', optionId: 'reject-once' });
+			this.respond({ outcome: 'selected', optionId: 'reject' });  // ACP 标准格式
 		});
 
 		// 允许一次
@@ -74,7 +74,7 @@ export class PermissionModal extends Modal {
 			cls: 'mod-cta',
 		});
 		allowOnceBtn.addEventListener('click', () => {
-			this.respond({ outcome: 'selected', optionId: 'allow-once' });
+			this.respond({ outcome: 'selected', optionId: 'allow' });  // ACP 标准格式
 		});
 
 		// 始终允许
@@ -82,12 +82,12 @@ export class PermissionModal extends Modal {
 			text: '始终允许此工具',
 		});
 		alwaysBtn.addEventListener('click', () => {
-			this.respond({ outcome: 'selected', optionId: 'allow-always' });
+			this.respond({ outcome: 'selected', optionId: 'allow_always' });  // ACP 标准格式
 		});
 
 		// 键盘快捷键
 		this.scope.register([], 'Enter', () => {
-			this.respond({ outcome: 'selected', optionId: 'allow-once' });
+			this.respond({ outcome: 'selected', optionId: 'allow' });  // ACP 标准格式
 			return false;
 		});
 	}
@@ -104,7 +104,7 @@ export class PermissionModal extends Modal {
 		// 如果用户关闭弹窗但没有点击任何按钮，默认允许一次（避免阻塞）
 		if (!this.responded) {
 			this.responded = true;
-			this.onResponse({ outcome: 'selected', optionId: 'allow-once' });
+			this.onResponse({ outcome: 'selected', optionId: 'allow' });  // ACP 标准格式
 		}
 		this.contentEl.empty();
 	}

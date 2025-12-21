@@ -217,6 +217,8 @@
 .acp-message-streaming {
 	/* 流式期间使用固定最小高度，避免内容增长时的抖动 */
 	min-height: 2em;
+	/* 保留换行符和空格，但允许自动换行 */
+	white-space: pre-wrap;
 }
 
 @keyframes blink {

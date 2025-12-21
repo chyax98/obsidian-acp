@@ -506,6 +506,15 @@ export class AcpChatView extends ItemView {
 		// 连接到 Agent
 		const workingDir = this.getWorkingDirectory();
 
+		// 🔍 调试：检查传递给 connection 的权限设置
+		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+		console.log('[ChatView] 🔌 准备连接 Agent');
+		console.log('[ChatView] 📋 权限设置:');
+		console.log('  plugin.settings.permission:', this.plugin.settings.permission);
+		console.log('  mode:', this.plugin.settings.permission.mode);
+		console.log('  alwaysAllowedTools:', this.plugin.settings.permission.alwaysAllowedTools);
+		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
 		// 注意：传入检测到的 cliPath，让 connection 使用正确的 wrapper
 		await this.connection.connect({
 			backendId: this.selectedAgent.backendId,

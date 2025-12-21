@@ -464,23 +464,11 @@ export class AcpConnection {
 
 		// 初始化权限管理器
 		if (options.app && options.permissionSettings && options.saveSettings) {
-			console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-			console.log('[ACP Connection] 🔧 创建 PermissionManager');
-			console.log('[ACP Connection] 📋 permissionSettings:', options.permissionSettings);
-			console.log('[ACP Connection] 📋 mode:', options.permissionSettings.mode);
-			console.log('[ACP Connection] 📋 alwaysAllowedTools:', options.permissionSettings.alwaysAllowedTools);
-			console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 			this.permissionManager = new PermissionManager(
 				options.app,
 				options.permissionSettings,
 				options.saveSettings,
 			);
-			console.log('[ACP Connection] ✅ PermissionManager 创建完成');
-		} else {
-			console.log('[ACP Connection] ⚠️ 未创建 PermissionManager (缺少必要参数)');
-			console.log('  app:', !!options.app);
-			console.log('  permissionSettings:', !!options.permissionSettings);
-			console.log('  saveSettings:', !!options.saveSettings);
 		}
 
 		// 断开现有连接
@@ -718,14 +706,7 @@ export class AcpConnection {
 
 			// 如果是请求 (有 id)，发送响应
 			if ('id' in message && message.id !== undefined) {
-				console.log('[ACP] 🔍 准备发送响应:');
-				console.log('  method:', method);
-				console.log('  messageId:', message.id);
-				console.log('  result:', result);
 				this.sendResponse(message.id, result);
-			} else {
-				console.log('[ACP] ⚠️ 无需响应 (notification):');
-				console.log('  method:', method);
 			}
 		} catch (error) {
 			// 发送错误响应
@@ -786,12 +767,7 @@ export class AcpConnection {
 		};
 
 		const json = JSON.stringify(response);
-		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-		console.log('[ACP] 📤 发送响应给 Agent:');
-		console.log('  id:', id);
-		console.log('  result:', result);
-		console.log('  完整 JSON:', json);
-		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+		// console.log('[ACP] 发送响应:', json);
 		const lineEnding = Platform.isWin ? '\r\n' : '\n';
 		this.child.stdin.write(json + lineEnding);
 	}
@@ -1086,11 +1062,7 @@ export class AcpConnection {
 	private async handlePermissionRequest(
 		params: RequestPermissionParams,
 	): Promise<{ outcome: { outcome: string; optionId: string } }> {
-		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-		console.log('[ACP Connection] 🔔 收到权限请求:', params.toolCall?.title);
-		console.log('[ACP Connection] 📋 params:', params);
-		console.log('[ACP Connection] 🔧 permissionManager 存在:', !!this.permissionManager);
-		console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+		console.log('[ACP] 收到权限请求:', params.toolCall?.title);
 
 		// 暂停 prompt 超时
 		this.pausePromptTimeouts();
@@ -1098,7 +1070,6 @@ export class AcpConnection {
 		try {
 			// 使用 PermissionManager 处理权限请求
 			if (this.permissionManager) {
-				console.log('[ACP Connection] ✅ 使用 PermissionManager 处理');
 				const request = {
 					toolCallId: params.toolCall?.toolCallId || '',
 					toolName: params.toolCall?.kind || '',
@@ -1109,7 +1080,7 @@ export class AcpConnection {
 
 				const response = await this.permissionManager.handlePermissionRequest(request);
 
-				console.log('[ACP Connection] 📤 PermissionManager 响应:', response);
+				console.log('[ACP] PermissionManager 响应:', response);
 
 				// 将 PermissionResponse 转换为 ACP 协议格式
 				if (response.outcome === 'cancelled') {

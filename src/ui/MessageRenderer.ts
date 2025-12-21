@@ -351,8 +351,9 @@ export class MessageRenderer {
 				if (newContent !== existingText) {
 					// 存储原始内容供后续使用
 					contentEl.setAttribute('data-raw-content', newContent);
-					// 流式期间使用纯文本显示，CSS 控制换行（white-space: pre-wrap）
-					contentEl.textContent = newContent;
+					// 流式期间使用纯文本显示，折叠多余的连续换行（3+ 个换行 → 2 个换行）
+					const displayContent = newContent.replace(/\n{3,}/g, '\n\n');
+					contentEl.textContent = displayContent;
 					contentEl.addClass('acp-message-streaming');
 				}
 			} else {

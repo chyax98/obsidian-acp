@@ -5,7 +5,7 @@
  */
 
 import type { WorkspaceLeaf } from 'obsidian';
-import { ItemView, Notice, Component, setIcon } from 'obsidian';
+import { ItemView, Notice, Component, setIcon, TFolder } from 'obsidian';
 import type AcpPlugin from '../main';
 import { SessionManager } from '../acp/core/session-manager';
 import { AcpConnection } from '../acp/core/connection';
@@ -424,10 +424,11 @@ export class AcpChatView extends ItemView {
 				return;
 			}
 
-			// 处理纯文本拖拽（可能是 obsidian:// URL）
+			// 处理纯文本拖拽（可能是 obsidian:// URL 或文件夹名）
 			const text = dataTransfer.getData('text/plain');
 			if (text) {
 				let processedText = text;
+
 				// 解析 obsidian:// URL
 				if (text.startsWith('obsidian://open?')) {
 					try {
@@ -439,13 +440,58 @@ export class AcpChatView extends ItemView {
 					} catch {
 						// URL 解析失败，保持原文本
 					}
+				} else if (!text.includes('/') && !text.includes('\\')) {
+					// 可能是文件夹名，尝试在 Vault 中查找完整路径
+					const resolved = this.resolvePathInVault(text);
+					if (resolved) {
+						processedText = resolved;
+					}
 				}
+
 				this.inputEl.value = this.inputEl.value
 					? `${this.inputEl.value}\n${processedText}`
 					: processedText;
 				this.inputEl.focus();
 			}
 		});
+	}
+
+	/**
+	 * 在 Vault 中查找文件/文件夹的完整路径
+	 * @param name 文件或文件夹名称
+	 * @returns 完整路径，如果找不到或有多个匹配则返回 undefined
+	 */
+	private resolvePathInVault(name: string): string | undefined {
+		const vault = this.plugin.app.vault;
+
+		// 查找匹配的文件夹
+		const folders = vault.getAllLoadedFiles().filter(
+			(f): f is TFolder => f instanceof TFolder && f.name === name,
+		);
+
+		if (folders.length === 1) {
+			return folders[0].path;
+		}
+
+		if (folders.length > 1) {
+			// 多个同名文件夹，使用第一个并提示
+			new Notice(`找到 ${folders.length} 个同名文件夹，使用: ${folders[0].path}`);
+			return folders[0].path;
+		}
+
+		// 查找匹配的文件
+		const files = vault.getFiles().filter(f => f.name === name || f.basename === name);
+
+		if (files.length === 1) {
+			return files[0].path;
+		}
+
+		if (files.length > 1) {
+			new Notice(`找到 ${files.length} 个同名文件，使用: ${files[0].path}`);
+			return files[0].path;
+		}
+
+		return undefined;
 	}
 
 	// ========================================================================

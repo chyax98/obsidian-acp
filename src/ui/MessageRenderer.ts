@@ -628,15 +628,17 @@ export class MessageRenderer {
 		const rawInput = toolCall.rawInput || {};
 		const title = toolCall.title || '';
 
-		// Bash / Execute / Terminal 类工具
+		// 优先检查 rawInput.command（不管 kind 是什么）
+		const command = rawInput.command as string;
+		if (command) {
+			// 提取命令的第一部分（如 npm, git, python 等）
+			const firstWord = command.split(/\s+/)[0];
+			// 不截断，显示完整命令
+			return { title: `执行 ${firstWord}: ${command}` };
+		}
+
+		// Bash / Execute / Terminal 类工具（降级处理）
 		if (kind === 'bash' || kind === 'execute' || kind === 'shell' || kind === 'terminal') {
-			const command = rawInput.command as string;
-			if (command) {
-				// 提取命令的第一部分（如 npm, git, python 等）
-				const firstWord = command.split(/\s+/)[0];
-				const shortCmd = command.length > 60 ? command.slice(0, 57) + '...' : command;
-				return { title: `执行 ${firstWord}: ${shortCmd}` };
-			}
 			// 当没有具体命令时，显示更有意义的标题
 			if (title && title.toLowerCase() !== kind) {
 				return { title: `执行: ${title}` };

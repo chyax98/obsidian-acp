@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import { Notice } from 'obsidian';
 import type { PermissionSettings } from '../main';
+import type { PermissionOption } from './types/permissions';
 import { PermissionModal } from '../ui/PermissionModal';
 
 /**
@@ -12,6 +13,8 @@ export interface PermissionRequest {
 	title: string;         // 如 "Reading configuration file"
 	kind: string;          // 如 "read", "write", "execute"
 	rawInput: Record<string, unknown>;
+	/** Agent 提供的权限选项（用于返回正确的 optionId） */
+	options?: PermissionOption[];
 }
 
 /**
@@ -58,25 +61,29 @@ export class PermissionManager {
 	public async handlePermissionRequest(
 		request: PermissionRequest,
 	): Promise<PermissionResponse> {
-		const { toolName } = request;
+		const { toolName, options } = request;
 
 		console.log('[PermissionManager] 权限请求:', toolName);
 
 		// 模式 1: 完全信任 - 自动批准所有请求（不需要排队）
 		if (this.settings.mode === 'trustAll') {
 			console.log('[PermissionManager] trustAll 模式，自动批准');
+			// 使用 Agent 提供的 allow_once optionId
+			const allowOptionId = this.findOptionId(options, 'allow_once') || 'allow';
 			return {
 				outcome: 'selected',
-				optionId: 'allow',  // ACP 标准格式
+				optionId: allowOptionId,
 			};
 		}
 
 		// 检查是否已记录"始终允许"（不需要排队）
 		if (this.settings.alwaysAllowedTools[toolName]) {
 			console.log('[PermissionManager] 工具已在始终允许列表');
+			// 使用 Agent 提供的 allow_once optionId
+			const allowOptionId = this.findOptionId(options, 'allow_once') || 'allow';
 			return {
 				outcome: 'selected',
-				optionId: 'allow',  // ACP 标准格式
+				optionId: allowOptionId,
 			};
 		}
 
@@ -86,6 +93,17 @@ export class PermissionManager {
 			console.log('[PermissionManager] 请求加入队列，当前队列长度:', this.requestQueue.length);
 			this.processNextRequest();
 		});
+	}
+
+	/**
+	 * 从 Agent 的 options 中找到指定 kind 的 optionId
+	 */
+	private findOptionId(options: PermissionOption[] | undefined, kind: string): string | undefined {
+		if (!options || options.length === 0) {
+			return undefined;
+		}
+		const option = options.find(opt => opt.kind === kind);
+		return option?.optionId;
 	}
 
 	/**
@@ -131,10 +149,25 @@ export class PermissionManager {
 							new Notice(`已记住：始终允许 ${request.toolName}`);
 						});
 
-						// 转换为 allow 返回给 Agent（ACP 标准格式）
+						// 返回 Agent 的 allow_once optionId（ACP 标准格式）
+						const allowOptionId = this.findOptionId(request.options, 'allow_once') || 'allow';
 						resolve({
 							outcome: 'selected',
-							optionId: 'allow',
+							optionId: allowOptionId,
+						});
+					} else if (response.optionId === 'allow') {
+						// 用户选择"允许一次"，返回 Agent 的 allow_once optionId
+						const allowOptionId = this.findOptionId(request.options, 'allow_once') || 'allow';
+						resolve({
+							outcome: 'selected',
+							optionId: allowOptionId,
+						});
+					} else if (response.optionId === 'reject') {
+						// 用户选择"拒绝"，返回 Agent 的 reject_once optionId
+						const rejectOptionId = this.findOptionId(request.options, 'reject_once') || 'reject';
+						resolve({
+							outcome: 'selected',
+							optionId: rejectOptionId,
 						});
 					} else {
 						resolve(response);

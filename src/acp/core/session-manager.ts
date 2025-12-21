@@ -14,6 +14,7 @@ import type {
 	RequestPermissionParams,
 	PermissionOutcome,
 	PromptResponse,
+	PromptContent,
 	SessionUpdateData,
 	ToolCallUpdateData,
 	ToolCallStatusUpdateData,
@@ -356,8 +357,13 @@ export class SessionManager {
 	 *
 	 * @param displayText - 显示给用户的文本
 	 * @param fullText - 发送给 Agent 的完整文本（可选，默认等于 displayText）
+	 * @param images - 可选的图片内容数组（base64 编码）
 	 */
-	public async sendPrompt(displayText: string, fullText?: string): Promise<StopReason> {
+	public async sendPrompt(
+		displayText: string,
+		fullText?: string,
+		images?: Array<{ data: string; mimeType: string }>,
+	): Promise<StopReason> {
 		if (!this._sessionId) {
 			throw new Error('没有活动会话，请先调用 start()');
 		}
@@ -387,8 +393,22 @@ export class SessionManager {
 		this.setState('processing');
 
 		try {
-			// 发送请求（包含完整上下文）
-			const response = await this.connection.sendPrompt(textToSend);
+			// 构建 prompt 内容数组（支持图片）
+			const promptContent: PromptContent[] = [{ type: 'text', text: textToSend }];
+
+			// 添加图片内容
+			if (images && images.length > 0) {
+				for (const image of images) {
+					promptContent.push({
+						type: 'image',
+						data: image.data,
+						mimeType: image.mimeType,
+					});
+				}
+			}
+
+			// 发送请求（包含完整上下文和图片）
+			const response = await this.connection.sendPrompt(promptContent);
 
 			// 完成回合
 			const stopReason = this.parseStopReason(response);

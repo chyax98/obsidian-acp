@@ -37,6 +37,7 @@ import type {
 	RequestPermissionParams,
 	PermissionOutcome,
 	PromptResponse,
+	PromptContent,
 	NewSessionResponse,
 	SessionNewMcpServerConfig,
 	SessionNewParams,
@@ -956,15 +957,22 @@ export class AcpConnection {
 
 	/**
 	 * 发送提示
+	 *
+	 * @param content - 提示内容，可以是文本字符串或 ContentBlock 数组（支持图片等）
 	 */
-	public async sendPrompt(text: string): Promise<PromptResponse> {
+	public async sendPrompt(content: string | PromptContent[]): Promise<PromptResponse> {
 		if (!this.sessionId) {
 			throw new Error('没有活动的 ACP 会话');
 		}
 
+		// 如果是字符串，转换为 ContentBlock 数组
+		const promptContent: PromptContent[] = typeof content === 'string'
+			? [{ type: 'text', text: content }]
+			: content;
+
 		return await this.sendRequest<PromptResponse>(AcpMethod.SESSION_PROMPT, {
 			sessionId: this.sessionId,
-			prompt: [{ type: 'text', text }], // 修正：使用 prompt 而不是 content
+			prompt: promptContent,
 		});
 	}
 
@@ -1115,6 +1123,7 @@ export class AcpConnection {
 					title: params.toolCall?.title || '',
 					kind: params.toolCall?.kind || '',
 					rawInput: params.toolCall?.rawInput || {},
+					options: params.options,  // 传递 Agent 的权限选项
 				};
 
 				const response = await this.permissionManager.handlePermissionRequest(request);
@@ -1145,22 +1154,26 @@ export class AcpConnection {
 
 			// 处理用户取消的情况
 			if (userChoice.type === 'cancelled') {
+				// 使用 Agent 的 reject_once optionId
+				const rejectOptionId = params.options?.find(opt => opt.kind === 'reject_once')?.optionId || 'reject_once';
 				return {
 					outcome: {
 						outcome: 'rejected',
-						optionId: 'reject_once',
+						optionId: rejectOptionId,
 					},
 				};
 			}
 
-			// 根据 optionId 判断是 selected 还是 rejected（参考 AionUI）
-			const optionId = userChoice.optionId;
-			const outcome = optionId.includes('reject') ? 'rejected' : 'selected';
+			// 根据用户选择的 kind，从 Agent 的 options 中找到对应的 optionId
+			const userKind = userChoice.optionId?.includes('always') ? 'allow_always' :
+				userChoice.optionId?.includes('reject') ? 'reject_once' : 'allow_once';
+			const agentOptionId = params.options?.find(opt => opt.kind === userKind)?.optionId || userChoice.optionId;
+			const outcome = agentOptionId?.includes('reject') ? 'rejected' : 'selected';
 
 			const result = {
 				outcome: {
 					outcome,
-					optionId,
+					optionId: agentOptionId,
 				},
 			};
 			console.log('[ACP] 发送权限响应:', JSON.stringify(result));

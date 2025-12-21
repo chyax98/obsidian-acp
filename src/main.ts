@@ -4,8 +4,8 @@
  * 通过 ACP 协议连接 Claude Code
  */
 
-import type { WorkspaceLeaf } from 'obsidian';
-import { Plugin } from 'obsidian';
+import type { WorkspaceLeaf, Editor } from 'obsidian';
+import { Plugin, Notice } from 'obsidian';
 import { AcpSettingTab } from './ui/SettingsTab';
 import { AcpChatView, ACP_CHAT_VIEW_TYPE } from './ui/ChatView';
 
@@ -167,6 +167,20 @@ export default class AcpPlugin extends Plugin {
 			void this.activateChatView();
 		});
 
+		// 发送选中文本到 ACP Chat
+		this.addCommand({
+			id: 'send-selection-to-acp',
+			name: '发送选中文本到 ACP Chat',
+			editorCallback: (editor: Editor) => {
+				const selection = editor.getSelection();
+				if (!selection) {
+					new Notice('未选中任何文本');
+					return;
+				}
+				void this.sendSelectionToChat(selection);
+			},
+		});
+
 		// 注册设置页面
 		this.addSettingTab(new AcpSettingTab(this.app, this));
 	}
@@ -197,6 +211,26 @@ export default class AcpPlugin extends Plugin {
 
 		if (leaf) {
 			void workspace.revealLeaf(leaf);
+		}
+	}
+
+	/**
+	 * 发送选中文本到 ACP Chat
+	 */
+	private async sendSelectionToChat(text: string): Promise<void> {
+		// 激活 ChatView
+		await this.activateChatView();
+
+		// 获取 ChatView 实例
+		const leaves = this.app.workspace.getLeavesOfType(ACP_CHAT_VIEW_TYPE);
+		if (leaves.length > 0) {
+			const view = leaves[0].view as AcpChatView;
+			if (view && typeof view.appendText === 'function') {
+				// 格式化为引用块
+				const formattedText = `\n\n> 选中的内容:\n> ${text.split('\n').join('\n> ')}\n\n`;
+				view.appendText(formattedText);
+				new Notice('已添加选中文本到 ACP Chat');
+			}
 		}
 	}
 

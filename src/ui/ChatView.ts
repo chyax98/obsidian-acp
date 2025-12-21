@@ -11,23 +11,14 @@ import { SessionManager } from '../acp/core/session-manager';
 import { AcpConnection } from '../acp/core/connection';
 import type { Message, ToolCall, PlanEntry, SessionState } from '../acp/core/session-manager';
 import { ACP_BACKENDS } from '../acp/backends/registry';
-import type { AcpBackendId } from '../acp/backends/types';
 import { PermissionModal } from './PermissionModal';
 import type { RequestPermissionParams, PermissionOutcome } from '../acp/types/permissions';
 import type { AvailableCommand } from '../acp/types/updates';
 import { MessageRenderer } from './MessageRenderer';
 import { SessionStorage, type SessionMeta } from '../acp/core/session-storage';
 import { SessionHistoryModal } from './SessionHistoryModal';
+import { FileInputSuggest } from './FileInputSuggest';
 
-/**
- * Agent 信息（简化版）
- */
-interface AgentInfo {
-	backendId: AcpBackendId;
-	name: string;
-	cliPath: string;
-	acpArgs: string[];
-}
 
 // ============================================================================
 // 常量
@@ -61,9 +52,8 @@ export class AcpChatView extends ItemView {
 	private sessionStorage: SessionStorage;
 	private currentSessionId: string | null = null;
 
-	// Agent 信息
-	private availableAgents: AgentInfo[] = [];
-	private selectedAgent: AgentInfo | null = null;
+	// 连接状态
+	private isConnecting: boolean = false;
 
 	// 会话状态
 	private currentMode: string | null = null;
@@ -79,9 +69,6 @@ export class AcpChatView extends ItemView {
 	private inputEl!: HTMLTextAreaElement;
 	private sendButtonEl!: HTMLButtonElement;
 	private cancelButtonEl!: HTMLButtonElement;
-	private agentSelectEl!: HTMLSelectElement;
-	private connectButtonEl!: HTMLButtonElement;
-	private cancelConnectButtonEl!: HTMLButtonElement; // 取消连接按钮
 	private newChatButtonEl!: HTMLButtonElement;
 	private exportButtonEl!: HTMLButtonElement;
 	private historyButtonEl!: HTMLButtonElement;
@@ -108,6 +95,9 @@ export class AcpChatView extends ItemView {
 	// 斜杠命令菜单
 	private commandMenuEl: HTMLElement | null = null;
 	private commandMenuSelectedIndex: number = -1;
+
+	// @ 文件引用建议
+	private fileInputSuggest: FileInputSuggest | null = null;
 
 	// ========================================================================
 	// 构造函数
@@ -167,9 +157,6 @@ export class AcpChatView extends ItemView {
 
 		// 创建输入区域
 		this.createInputArea(container);
-
-		// 加载可用 Agent
-		await this.loadAvailableAgents();
 	}
 
 	/**
@@ -196,12 +183,12 @@ export class AcpChatView extends ItemView {
 	// ========================================================================
 
 	/**
-	 * 创建头部区域（紧凑版）
+	 * 创建头部区域（简化版）
 	 */
 	private createHeader(container: HTMLElement): void {
 		this.headerEl = container.createDiv({ cls: 'acp-chat-header-compact' });
 
-		// 左侧：状态指示器 + Agent 选择器
+		// 左侧：状态指示器 + 标题
 		const leftSection = this.headerEl.createDiv({ cls: 'acp-header-left' });
 
 		// 连接状态指示器（小圆点）
@@ -210,11 +197,10 @@ export class AcpChatView extends ItemView {
 			attr: { 'aria-label': '未连接' },
 		});
 
-		// Agent 下拉框
-		this.agentSelectEl = leftSection.createEl('select', { cls: 'acp-agent-select-compact' });
-		this.agentSelectEl.createEl('option', {
-			text: '选择 Agent...',
-			value: '',
+		// 标题
+		leftSection.createDiv({
+			cls: 'acp-header-title',
+			text: 'Claude Code',
 		});
 
 		// 右侧：按钮组
@@ -248,25 +234,6 @@ export class AcpChatView extends ItemView {
 		setIcon(this.newChatButtonEl, 'plus');
 		this.newChatButtonEl.addEventListener('click', () => {
 			void this.handleNewChat();
-		});
-
-		// 连接按钮
-		this.connectButtonEl = rightSection.createEl('button', {
-			cls: 'acp-connect-btn',
-			text: '连接',
-		});
-		this.connectButtonEl.addEventListener('click', () => {
-			void this.handleConnect();
-		});
-
-		// 取消连接按钮（初始隐藏）
-		this.cancelConnectButtonEl = rightSection.createEl('button', {
-			cls: 'acp-cancel-connect-btn',
-			text: '取消',
-		});
-		this.cancelConnectButtonEl.style.display = 'none';
-		this.cancelConnectButtonEl.addEventListener('click', () => {
-			this.handleCancelConnect();
 		});
 	}
 
@@ -390,41 +357,77 @@ export class AcpChatView extends ItemView {
 
 		// 初始状态：未连接，禁用输入
 		this.updateUIState('idle');
-	}
 
-	// ========================================================================
-	// Agent 管理
-	// ========================================================================
+		// 设置拖拽支持
+		this.setupDragAndDrop();
+
+		// 设置 @ 文件引用建议
+		this.fileInputSuggest = new FileInputSuggest(this.app, this.inputEl);
+	}
 
 	/**
-	 * 加载可用 Agent（只有 Claude Code）
+	 * 设置拖拽文件支持
 	 */
-	private async loadAvailableAgents(): Promise<void> {
-		const config = ACP_BACKENDS.claude;
-		const manualPath = this.plugin.settings.manualAgentPaths?.claude;
+	private setupDragAndDrop(): void {
+		const dropZone = this.inputContainerEl;
 
-		// 构建 Claude Code Agent 信息
-		this.availableAgents = [{
-			backendId: 'claude',
-			name: config.name,
-			cliPath: manualPath || config.defaultCliPath || 'npx @zed-industries/claude-code-acp',
-			acpArgs: config.acpArgs || [],
-		}];
-
-		// 更新下拉框
-		this.agentSelectEl.empty();
-		this.agentSelectEl.createEl('option', {
-			text: '选择 Agent...',
-			value: '',
+		// 拖拽进入
+		dropZone.addEventListener('dragover', (evt) => {
+			evt.preventDefault();
+			if (evt.dataTransfer) {
+				evt.dataTransfer.dropEffect = 'copy';
+			}
+			dropZone.addClass('acp-drag-over');
 		});
 
-		for (const agent of this.availableAgents) {
-			this.agentSelectEl.createEl('option', {
-				text: agent.name,
-				value: agent.backendId,
-			});
-		}
+		// 拖拽离开
+		dropZone.addEventListener('dragleave', (evt) => {
+			// 检查是否真的离开了容器（而非进入子元素）
+			const relatedTarget = evt.relatedTarget as Node | null;
+			if (!dropZone.contains(relatedTarget)) {
+				dropZone.removeClass('acp-drag-over');
+			}
+		});
+
+		// 放下
+		dropZone.addEventListener('drop', (evt) => {
+			evt.preventDefault();
+			evt.stopPropagation();
+			dropZone.removeClass('acp-drag-over');
+
+			const dataTransfer = evt.dataTransfer;
+			if (!dataTransfer) return;
+
+			// 优先处理 Obsidian 文件拖拽
+			const obsidianFiles = dataTransfer.getData('text/x-obsidian-files');
+			if (obsidianFiles) {
+				const paths = obsidianFiles.split('\n').filter(p => p.trim());
+				if (paths.length > 0) {
+					// 追加到输入框
+					const references = paths.map(p => `[[${p}]]`).join(' ');
+					this.inputEl.value = this.inputEl.value
+						? `${this.inputEl.value} ${references}`
+						: references;
+					this.inputEl.focus();
+					new Notice(`已添加 ${paths.length} 个文件引用`);
+				}
+				return;
+			}
+
+			// 处理纯文本拖拽
+			const text = dataTransfer.getData('text/plain');
+			if (text) {
+				this.inputEl.value = this.inputEl.value
+					? `${this.inputEl.value} ${text}`
+					: text;
+				this.inputEl.focus();
+			}
+		});
 	}
+
+	// ========================================================================
+	// 连接管理
+	// ========================================================================
 
 	/**
 	 * 获取工作目录
@@ -457,139 +460,96 @@ export class AcpChatView extends ItemView {
 	}
 
 	/**
-	 * 处理连接按钮点击
+	 * 确保已连接（自动连接）
+	 *
+	 * 如果未连接，自动连接到 Claude Code
+	 * 如果连接断开，自动重连
 	 */
-	private async handleConnect(): Promise<void> {
-		// 如果已连接，则断开
-		if (this.connection?.isConnected) {
-			this.handleDisconnect();
-			return;
+	private async ensureConnected(): Promise<boolean> {
+		// 已连接且会话有效
+		if (this.connection?.isConnected && this.sessionManager) {
+			return true;
 		}
 
-		// 获取选中的 Agent
-		const agentId = this.agentSelectEl.value;
-		if (!agentId) {
-			new Notice('请先选择一个 Agent');
-			return;
+		// 正在连接中，等待
+		if (this.isConnecting) {
+			return false;
 		}
 
-		this.selectedAgent = this.availableAgents.find((a) => a.backendId === agentId) || null;
-		if (!this.selectedAgent) {
-			new Notice('Agent 无效');
-			return;
-		}
+		this.isConnecting = true;
 
 		try {
-			this.updateConnectionStatus('connecting', this.selectedAgent.name);
-			this.connectButtonEl.disabled = true;
-			this.agentSelectEl.disabled = true;
+			// 更新状态
+			this.updateConnectionStatus('connecting', 'Claude Code');
+			this.setInputSending(true);
+			this.sendButtonEl.textContent = '连接中...';
 
-			// 显示取消按钮，隐藏连接按钮
-			this.connectButtonEl.style.display = 'none';
-			this.cancelConnectButtonEl.style.display = '';
+			// 获取配置
+			const config = ACP_BACKENDS.claude;
+			const manualPath = this.plugin.settings.manualAgentPaths?.claude;
+			const cliPath = manualPath || config.defaultCliPath || 'npx @zed-industries/claude-code-acp';
+			const workingDir = this.getWorkingDirectory();
 
-			// 使用 ACP 模式连接
-			await this.connectWithAcp();
+			// 创建连接
+			this.connection = new AcpConnection();
 
-			// 连接成功，隐藏取消按钮，显示断开按钮
-			this.cancelConnectButtonEl.style.display = 'none';
-			this.connectButtonEl.style.display = '';
-			this.connectButtonEl.textContent = '断开';
-			this.connectButtonEl.disabled = false;
+			await this.connection.connect({
+				backendId: 'claude',
+				cliPath,
+				workingDir,
+				acpArgs: config.acpArgs || [],
+				app: this.app,
+				permissionSettings: this.plugin.settings.permission,
+				saveSettings: async () => {
+					await this.plugin.saveSettings();
+				},
+				mcpServers: this.plugin.settings.mcpServers,
+			});
 
-			// 隐藏空状态引导
+			// 创建会话管理器
+			this.sessionManager = new SessionManager({
+				connection: this.connection,
+				workingDir,
+				onPermissionRequest: async (params: RequestPermissionParams) => {
+					return await this.handlePermissionRequest(params);
+				},
+			});
+
+			// 绑定会话回调
+			this.setupSessionCallbacks();
+
+			// 创建新会话
+			await this.sessionManager.start();
+
+			// 连接成功
+			this.updateConnectionStatus('connected', 'Claude Code');
 			this.hideEmptyState();
-
-			// 使用统一的状态更新
 			this.updateUIState('idle');
 
-			this.addSystemMessage(`已连接到 ${this.selectedAgent.name}`);
-			new Notice(`已连接到 ${this.selectedAgent.name}`);
+			return true;
 		} catch (error) {
-			console.error('[ChatView] 连接失败:', error);
+			console.error('[ChatView] 自动连接失败:', error);
 			this.updateConnectionStatus('error');
-
-			// 恢复按钮状态
-			this.cancelConnectButtonEl.style.display = 'none';
-			this.connectButtonEl.style.display = '';
-			this.connectButtonEl.disabled = false;
-			this.agentSelectEl.disabled = false;
-			this.inputEl.disabled = true;
-
-			// Phase 4: 友好化错误提示
 			this.showFriendlyError(error as Error, 'connection');
+
+			// 清理失败的连接
+			if (this.connection) {
+				this.connection.disconnect();
+				this.connection = null;
+			}
+			this.sessionManager = null;
+
+			return false;
+		} finally {
+			this.isConnecting = false;
+			this.setInputSending(false);
 		}
-	}
-
-	/**
-	 * 使用 ACP 模式连接
-	 */
-	private async connectWithAcp(): Promise<void> {
-		if (!this.selectedAgent) return;
-
-		// 创建连接
-		this.connection = new AcpConnection();
-
-		// 连接到 Agent
-		const workingDir = this.getWorkingDirectory();
-
-		// 注意：传入检测到的 cliPath，让 connection 使用正确的 wrapper
-		await this.connection.connect({
-			backendId: this.selectedAgent.backendId,
-			cliPath: this.selectedAgent.cliPath, // 使用检测到的 wrapper
-			workingDir: workingDir,
-			acpArgs: this.selectedAgent.acpArgs,
-			app: this.app,
-			permissionSettings: this.plugin.settings.permission,
-			saveSettings: async () => {
-				await this.plugin.saveSettings();
-			},
-			mcpServers: this.plugin.settings.mcpServers,
-		});
-
-		// 创建会话管理器（传入权限回调，避免竞态条件）
-		this.sessionManager = new SessionManager({
-			connection: this.connection,
-			workingDir,
-			onPermissionRequest: async (params: RequestPermissionParams) => {
-				return await this.handlePermissionRequest(params);
-			},
-		});
-
-		// 绑定会话回调
-		this.setupSessionCallbacks();
-
-		// 创建新会话
-		await this.sessionManager.start();
-	}
-
-	/**
-	 * 取消连接（用户主动取消）
-	 */
-	private handleCancelConnect(): void {
-		console.log('[ChatView] 用户取消连接');
-
-		// 调用连接的取消方法
-		if (this.connection) {
-			this.connection.cancelConnection();
-		}
-
-		// 更新 UI 状态
-		this.updateConnectionStatus('disconnected');
-		this.cancelConnectButtonEl.style.display = 'none';
-		this.connectButtonEl.style.display = '';
-		this.connectButtonEl.textContent = '连接';
-		this.connectButtonEl.disabled = false;
-		this.agentSelectEl.disabled = false;
-
-		new Notice('已取消连接');
 	}
 
 	/**
 	 * 断开连接
 	 */
 	private handleDisconnect(): void {
-		// 断开 ACP 连接
 		if (this.sessionManager) {
 			this.sessionManager.end();
 			this.sessionManager = null;
@@ -601,42 +561,39 @@ export class AcpChatView extends ItemView {
 		}
 
 		this.updateConnectionStatus('disconnected');
-		this.connectButtonEl.textContent = '连接';
-		this.agentSelectEl.disabled = false;
-
-		// 使用统一的状态更新
 		this.updateUIState('idle');
 	}
 
 	/**
-	 * 处理新对话
+	 * 处理新对话（保持连接，只重建会话）
 	 */
 	private async handleNewChat(): Promise<void> {
-		// 如果没有连接，直接清空消息
-		if (!this.connection?.isConnected || !this.sessionManager) {
-			this.clearMessages();
-			new Notice('已清空对话');
-			return;
-		}
+		// 清空消息区域
+		this.clearMessages();
 
-		try {
-			// 结束当前会话
-			this.sessionManager.end();
+		// 重置 turn 容器
+		this.currentTurnContainer = null;
 
-			// 清空消息区域
-			this.clearMessages();
+		// 重置首条消息标记
+		this.isFirstMessage = true;
 
-			// 重置 turn 容器
-			this.currentTurnContainer = null;
+		// 显示空状态
+		this.showEmptyState();
 
-			// 创建新会话
-			await this.sessionManager.start();
-
-			this.addSystemMessage('✨ 新对话已开始');
-			new Notice('新对话已开始');
-		} catch (error) {
-			console.error('[ChatView] 新对话失败:', error);
-			new Notice('创建新对话失败');
+		// 如果已连接，只重建会话
+		if (this.sessionManager) {
+			try {
+				await this.sessionManager.start();
+				this.hideEmptyState();
+				this.addSystemMessage('✨ 新对话已开始');
+				new Notice('新对话已开始');
+			} catch (error) {
+				console.error('[ChatView] 新对话失败:', error);
+				new Notice('创建新对话失败');
+			}
+		} else {
+			// 未连接时，只清空界面，等待用户发送消息时自动连接
+			new Notice('输入消息开始新对话');
 		}
 	}
 
@@ -709,7 +666,7 @@ export class AcpChatView extends ItemView {
 
 		try {
 			const data = this.sessionManager.toJSON();
-			const agentName = this.selectedAgent?.name;
+			const agentName = 'Claude Code';
 			this.currentSessionId = await this.sessionStorage.saveSession(data, agentName);
 		} catch (error) {
 			console.error('[ChatView] 自动保存会话失败:', error);
@@ -941,7 +898,7 @@ export class AcpChatView extends ItemView {
 		
 		// 更新连接状态显示
 		if (isConnected) {
-			this.updateConnectionStatus('connected', this.selectedAgent?.name);
+			this.updateConnectionStatus('connected', 'Claude Code');
 		} else {
 			this.updateConnectionStatus('disconnected');
 		}
@@ -1043,9 +1000,10 @@ export class AcpChatView extends ItemView {
 			return;
 		}
 
-		// 检查连接状态
-		if (!this.sessionManager) {
-			new Notice('未连接到 Agent');
+		// 自动连接（如果未连接或已断开）
+		const connected = await this.ensureConnected();
+		if (!connected) {
+			// ensureConnected 已经显示了错误信息
 			return;
 		}
 
@@ -1072,6 +1030,9 @@ export class AcpChatView extends ItemView {
 			// 使用 SessionManager 发送
 			// displayText: 显示给用户的文本
 			// fullText: 发送给 Agent 的完整文本（包含上下文）
+			if (!this.sessionManager) {
+				throw new Error('会话管理器未初始化');
+			}
 			await this.sessionManager.sendPrompt(displayText, fullText);
 		} catch (error) {
 			console.error('[ChatView] 发送失败:', error);
@@ -1290,7 +1251,7 @@ export class AcpChatView extends ItemView {
 		// 提示文本
 		this.emptyStateEl.createDiv({
 			cls: 'acp-empty-state-text',
-			text: '选择 Agent 开始对话',
+			text: '输入消息开始对话',
 		});
 	}
 
@@ -1603,5 +1564,20 @@ export class AcpChatView extends ItemView {
 
 		// 自动滚动
 		this.smartScroll();
+	}
+
+	// ========================================================================
+	// 公共方法（供外部调用）
+	// ========================================================================
+
+	/**
+	 * 追加文本到输入框
+	 * 供其他命令/功能调用
+	 */
+	public appendText(text: string): void {
+		this.inputEl.value += text;
+		this.inputEl.focus();
+		// 滚动到输入框底部
+		this.inputEl.scrollTop = this.inputEl.scrollHeight;
 	}
 }

@@ -213,8 +213,8 @@ export class MessageRenderer {
 
 			// 2. 先尝试通过 Obsidian Vault 读取（Vault 内文件）
 			const vaultFile = app.vault.getAbstractFileByPath(filePath);
-			if (vaultFile && 'path' in vaultFile) {
-				imgEl.src = app.vault.adapter.getResourcePath(vaultFile.path);
+			if (vaultFile instanceof TFile) {
+				imgEl.src = app.vault.getResourcePath(vaultFile);
 				this.setupImageEvents(imgEl, imageWrapper, app);
 				return;
 			}
@@ -1030,7 +1030,7 @@ export class MessageRenderer {
 
 		// 代码内容
 		const preEl = codeWrapper.createEl('pre', { cls: 'acp-code-block-content' });
-		const codeEl = preEl.createEl('code', {
+		preEl.createEl('code', {
 			cls: `language-${language}`,
 			text: code,
 		});

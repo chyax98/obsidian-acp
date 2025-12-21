@@ -648,8 +648,6 @@ export class AcpConnection {
 	 */
 	private async handleIncomingRequest(message: AcpRequest | AcpNotification): Promise<void> {
 		const { method, params } = message;
-		const messageId = 'id' in message ? message.id : undefined;
-		// console.log(`[ACP] 收到请求: method=${method}, id=${messageId}`);
 
 		try {
 			let result: unknown = null;

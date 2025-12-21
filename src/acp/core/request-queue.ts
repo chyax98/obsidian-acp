@@ -306,7 +306,7 @@ export class RequestQueue {
 	public clear(reason = '连接已断开'): number {
 		const count = this.requests.size;
 
-		for (const [_id, request] of this.requests) {
+		for (const [, request] of this.requests) {
 			if (request.timeoutId) {
 				clearTimeout(request.timeoutId);
 			}

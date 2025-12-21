@@ -413,8 +413,8 @@ export class AcpChatView extends ItemView {
 			if (obsidianFiles) {
 				const paths = obsidianFiles.split('\n').filter(p => p.trim());
 				if (paths.length > 0) {
-					// 追加到输入框（纯路径）
-					const references = paths.join('\n');
+					// 追加到输入框（@path 格式）
+					const references = paths.map(p => `@${p}`).join('\n');
 					this.inputEl.value = this.inputEl.value
 						? `${this.inputEl.value}\n${references}`
 						: references;
@@ -427,7 +427,7 @@ export class AcpChatView extends ItemView {
 			// 处理纯文本拖拽（可能是 obsidian:// URL 或文件夹名）
 			const text = dataTransfer.getData('text/plain');
 			if (text) {
-				let processedText = text;
+				let processedPath = text;
 
 				// 解析 obsidian:// URL
 				if (text.startsWith('obsidian://open?')) {
@@ -435,7 +435,7 @@ export class AcpChatView extends ItemView {
 						const url = new URL(text);
 						const filePath = url.searchParams.get('file');
 						if (filePath) {
-							processedText = decodeURIComponent(filePath);
+							processedPath = decodeURIComponent(filePath);
 						}
 					} catch {
 						// URL 解析失败，保持原文本
@@ -444,13 +444,15 @@ export class AcpChatView extends ItemView {
 					// 可能是文件夹名，尝试在 Vault 中查找完整路径
 					const resolved = this.resolvePathInVault(text);
 					if (resolved) {
-						processedText = resolved;
+						processedPath = resolved;
 					}
 				}
 
+				// 统一添加 @ 前缀
+				const reference = `@${processedPath}`;
 				this.inputEl.value = this.inputEl.value
-					? `${this.inputEl.value}\n${processedText}`
-					: processedText;
+					? `${this.inputEl.value}\n${reference}`
+					: reference;
 				this.inputEl.focus();
 			}
 		});

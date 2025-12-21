@@ -440,6 +440,18 @@
 	text-overflow: ellipsis;
 }
 
+/* 参数预览：显示关键参数让用户知道具体操作 */
+.acp-tool-call-params {
+	font-size: 0.8em;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-top: 2px;
+	max-width: 400px;
+}
+
 /* 右侧：时间 + 展开箭头 */
 .acp-tool-call-right {
 	display: flex;

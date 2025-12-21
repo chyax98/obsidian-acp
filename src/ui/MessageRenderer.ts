@@ -468,6 +468,13 @@ export class MessageRenderer {
 		const titleEl = leftEl.createDiv({ cls: 'acp-tool-call-title' });
 		titleEl.textContent = displayInfo.title;
 
+		// 显示关键参数（让用户知道具体操作了什么）
+		const paramsPreview = this.formatRawInputPreview(toolCall.rawInput, toolCall.kind);
+		if (paramsPreview) {
+			const paramsEl = leftEl.createDiv({ cls: 'acp-tool-call-params' });
+			paramsEl.textContent = paramsPreview;
+		}
+
 		// 右侧：时间 + 展开图标
 		const rightEl = headerEl.createDiv({ cls: 'acp-tool-call-right' });
 
@@ -477,12 +484,18 @@ export class MessageRenderer {
 
 		// 展开/折叠指示器
 		const chevronEl = rightEl.createDiv({ cls: 'acp-tool-call-chevron' });
-		setIcon(chevronEl, 'chevron-right');
 
-		// 内容区域（默认折叠）
+		// 判断是否应该默认展开（edit/write 类型应该让用户看到改了什么）
+		const kind = toolCall.kind?.toLowerCase() || '';
+		const shouldExpandByDefault = kind === 'edit' || kind === 'write' || kind === 'patch';
+		const initialExpanded = shouldExpandByDefault;
+
+		setIcon(chevronEl, initialExpanded ? 'chevron-down' : 'chevron-right');
+
+		// 内容区域
 		const contentEl = toolCallEl.createDiv({
-			cls: 'acp-tool-call-content',
-			attr: { 'data-expanded': 'false' },
+			cls: `acp-tool-call-content${initialExpanded ? ' acp-tool-call-content-expanded' : ''}`,
+			attr: { 'data-expanded': initialExpanded ? 'true' : 'false' },
 		});
 
 		// 渲染内容
@@ -738,6 +751,72 @@ export class MessageRenderer {
 			return `.../${parts[parts.length - 2]}/${fileName}`;
 		}
 		return fileName;
+	}
+
+	/**
+	 * 格式化 rawInput 预览（显示关键参数）
+	 *
+	 * 让用户清楚知道工具执行了什么操作
+	 */
+	private static formatRawInputPreview(
+		rawInput: Record<string, unknown> | undefined,
+		kind: string | undefined,
+	): string {
+		if (!rawInput || Object.keys(rawInput).length === 0) {
+			return '';
+		}
+
+		const k = kind?.toLowerCase() || '';
+
+		// 命令执行类：显示完整命令
+		if (rawInput.command) {
+			const cmd = String(rawInput.command);
+			// 截断过长的命令
+			return cmd.length > 100 ? cmd.slice(0, 97) + '...' : cmd;
+		}
+
+		// 读取/写入/编辑：显示文件路径
+		if (k === 'read' || k === 'write' || k === 'edit' || k === 'patch') {
+			const filePath = rawInput.path || rawInput.file_path || rawInput.filename;
+			if (filePath) {
+				return String(filePath);
+			}
+		}
+
+		// 搜索类：显示搜索模式/查询
+		if (k === 'search' || k === 'grep' || k === 'find' || k === 'glob') {
+			const pattern = rawInput.pattern || rawInput.query || rawInput.search;
+			if (pattern) {
+				const p = String(pattern);
+				return p.length > 60 ? p.slice(0, 57) + '...' : p;
+			}
+		}
+
+		// 其他情况：显示前几个关键参数
+		const importantKeys = ['path', 'file_path', 'url', 'query', 'pattern', 'name', 'content'];
+		for (const key of importantKeys) {
+			if (rawInput[key] !== undefined) {
+				const val = String(rawInput[key]);
+				return val.length > 80 ? val.slice(0, 77) + '...' : val;
+			}
+		}
+
+		// 最后：显示所有参数的简短摘要
+		const keys = Object.keys(rawInput).filter((k) => !k.startsWith('_'));
+		if (keys.length > 0) {
+			const preview = keys
+				.slice(0, 3)
+				.map((k) => {
+					const v = rawInput[k];
+					const val = typeof v === 'string' ? v : JSON.stringify(v);
+					const shortVal = val && val.length > 20 ? val.slice(0, 17) + '...' : val;
+					return `${k}: ${shortVal}`;
+				})
+				.join(', ');
+			return keys.length > 3 ? preview + '...' : preview;
+		}
+
+		return '';
 	}
 
 	/**

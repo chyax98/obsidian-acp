@@ -171,13 +171,14 @@ export default class AcpPlugin extends Plugin {
 		this.addCommand({
 			id: 'send-selection-to-acp',
 			name: '发送选中文本到 ACP Chat',
-			editorCallback: (editor: Editor) => {
+			editorCallback: (editor: Editor, view) => {
 				const selection = editor.getSelection();
 				if (!selection) {
 					new Notice('未选中任何文本');
 					return;
 				}
-				void this.sendSelectionToChat(selection);
+				const filePath = view.file?.path;
+				void this.sendSelectionToChat(selection, filePath);
 			},
 		});
 
@@ -217,7 +218,7 @@ export default class AcpPlugin extends Plugin {
 	/**
 	 * 发送选中文本到 ACP Chat
 	 */
-	private async sendSelectionToChat(text: string): Promise<void> {
+	private async sendSelectionToChat(text: string, filePath?: string): Promise<void> {
 		// 激活 ChatView
 		await this.activateChatView();
 
@@ -226,8 +227,9 @@ export default class AcpPlugin extends Plugin {
 		if (leaves.length > 0) {
 			const view = leaves[0].view as AcpChatView;
 			if (view && typeof view.appendText === 'function') {
-				// 格式化为引用块
-				const formattedText = `\n\n> 选中的内容:\n> ${text.split('\n').join('\n> ')}\n\n`;
+				// 简单格式：在 {文件} 选中的内容
+				const fileInfo = filePath ? `在 ${filePath} 选中的内容` : '选中的内容';
+				const formattedText = `\n${fileInfo}:\n${text}\n`;
 				view.appendText(formattedText);
 				new Notice('已添加选中文本到 ACP Chat');
 			}

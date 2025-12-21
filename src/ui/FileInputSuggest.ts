@@ -105,10 +105,10 @@ export class FileInputSuggest {
 		const atIndex = beforeCursor.lastIndexOf('@');
 
 		if (atIndex !== -1) {
-			// 替换 @ 为 [[path]]
+			// 替换 @ 为 file: path
 			const before = value.slice(0, atIndex);
 			const after = value.slice(cursorPos);
-			const reference = `[[${item.path}]]`;
+			const reference = `file: ${item.path}`;
 
 			this.inputEl.value = before + reference + after;
 

@@ -408,12 +408,6 @@ export class AcpChatView extends ItemView {
 			const dataTransfer = evt.dataTransfer;
 			if (!dataTransfer) return;
 
-			// DEBUG: 打印所有可用的数据类型
-			console.log('[ACP Drop] Available types:', dataTransfer.types);
-			for (const type of dataTransfer.types) {
-				console.log(`[ACP Drop] ${type}:`, dataTransfer.getData(type));
-			}
-
 			// 优先处理 Obsidian 文件拖拽
 			const obsidianFiles = dataTransfer.getData('text/x-obsidian-files');
 			if (obsidianFiles) {

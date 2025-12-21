@@ -333,10 +333,10 @@ export class AcpChatView extends ItemView {
 		// 监听输入变化，检测斜杠命令
 		this.inputEl.addEventListener('input', () => {
 			const value = this.inputEl.value;
-			
-			// 检测是否输入斜杠
-			if (value.startsWith('/')) {
-				const filter = value.slice(1); // 去掉斜杠
+
+			// 检测是否输入斜杠（支持中文输入法的 、）
+			if (value.startsWith('/') || value.startsWith('、')) {
+				const filter = value.slice(1); // 去掉斜杠/顿号
 				this.showCommandMenu(filter);
 			} else {
 				this.hideCommandMenu();
@@ -407,6 +407,12 @@ export class AcpChatView extends ItemView {
 
 			const dataTransfer = evt.dataTransfer;
 			if (!dataTransfer) return;
+
+			// DEBUG: 打印所有可用的数据类型
+			console.log('[ACP Drop] Available types:', dataTransfer.types);
+			for (const type of dataTransfer.types) {
+				console.log(`[ACP Drop] ${type}:`, dataTransfer.getData(type));
+			}
 
 			// 优先处理 Obsidian 文件拖拽
 			const obsidianFiles = dataTransfer.getData('text/x-obsidian-files');
@@ -1028,9 +1034,14 @@ export class AcpChatView extends ItemView {
 	 * 处理发送
 	 */
 	private async handleSend(): Promise<void> {
-		const displayText = this.inputEl.value.trim();
+		let displayText = this.inputEl.value.trim();
 		if (!displayText) {
 			return;
+		}
+
+		// 中文输入法兼容：将开头的 、 转换为 /
+		if (displayText.startsWith('、')) {
+			displayText = '/' + displayText.slice(1);
 		}
 
 		// 自动连接（如果未连接或已断开）
@@ -1344,9 +1355,10 @@ export class AcpChatView extends ItemView {
 
 				// 触发连接，连接后命令会通过 handleAvailableCommandsUpdate 更新
 				void this.ensureConnected().then(() => {
-					// 连接成功后，如果用户还在输入 /，刷新菜单
-					if (this.inputEl.value.startsWith('/')) {
-						this.showCommandMenu(this.inputEl.value.slice(1));
+					// 连接成功后，如果用户还在输入 / 或 、，刷新菜单
+					const val = this.inputEl.value;
+					if (val.startsWith('/') || val.startsWith('、')) {
+						this.showCommandMenu(val.slice(1));
 					}
 				});
 				return;

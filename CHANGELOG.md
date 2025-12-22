@@ -4,7 +4,7 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
-## [0.2.0] - 2024-12-19
+## [0.2.0] - 2025-12-22
 
 ### 修复
 - **权限响应格式**：修复 ACP 权限响应格式，从 `{ outcome: { type: 'selected' } }` 改为正确的 `{ outcome: { outcome: 'selected' } }`（参考 AionUI 实现）

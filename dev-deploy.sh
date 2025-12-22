@@ -10,6 +10,7 @@ npm run build
 if [ $? -eq 0 ]; then
     echo ""
     echo "📦 复制到插件目录..."
+    mkdir -p "$PLUGIN_DIR"
     cp -v main.js "$PLUGIN_DIR/main.js"
     cp -v manifest.json "$PLUGIN_DIR/manifest.json"
     cp -v styles.css "$PLUGIN_DIR/styles.css"

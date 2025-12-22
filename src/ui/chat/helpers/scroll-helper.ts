@@ -4,7 +4,7 @@
  * 提供智能滚动和"跳到最新"按钮功能
  */
 
-import { setIcon } from 'obsidian';
+import { setIcon } from "obsidian";
 
 /**
  * 滚动配置
@@ -41,18 +41,18 @@ export class ScrollHelper {
 	 */
 	public createScrollButton(container: HTMLElement): HTMLElement {
 		this.scrollToBottomButton = container.createDiv({
-			cls: 'acp-scroll-to-bottom',
-			attr: { 'aria-label': '跳到最新' },
+			cls: "acp-scroll-to-bottom",
+			attr: { "aria-label": "跳到最新" },
 		});
-		this.scrollToBottomButton.style.display = 'none';
-		setIcon(this.scrollToBottomButton, 'arrow-down');
+		this.scrollToBottomButton.style.display = "none";
+		setIcon(this.scrollToBottomButton, "arrow-down");
 
-		this.scrollToBottomButton.addEventListener('click', () => {
+		this.scrollToBottomButton.addEventListener("click", () => {
 			this.forceScrollToBottom();
 		});
 
 		// 监听消息区域滚动
-		this.messagesEl.addEventListener('scroll', () => {
+		this.messagesEl.addEventListener("scroll", () => {
 			this.updateScrollButton();
 		});
 
@@ -106,9 +106,9 @@ export class ScrollHelper {
 		if (!this.scrollToBottomButton) return;
 
 		if (this.isNearBottom(50)) {
-			this.scrollToBottomButton.style.display = 'none';
+			this.scrollToBottomButton.style.display = "none";
 		} else {
-			this.scrollToBottomButton.style.display = 'flex';
+			this.scrollToBottomButton.style.display = "flex";
 		}
 	}
 

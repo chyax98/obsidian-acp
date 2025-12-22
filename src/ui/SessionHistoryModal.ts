@@ -4,9 +4,9 @@
  * 显示历史会话列表，支持加载和删除
  */
 
-import type { App } from 'obsidian';
-import { Modal, setIcon } from 'obsidian';
-import type { SessionMeta } from '../acp/core/session-storage';
+import type { App } from "obsidian";
+import { Modal, setIcon } from "obsidian";
+import type { SessionMeta } from "../acp/core/session-storage";
 
 /**
  * 会话历史 Modal
@@ -36,7 +36,7 @@ export class SessionHistoryModal extends Modal {
 	public onOpen(): void {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.addClass('acp-session-history-modal');
+		contentEl.addClass("acp-session-history-modal");
 
 		this.renderContent();
 	}
@@ -46,16 +46,16 @@ export class SessionHistoryModal extends Modal {
 		contentEl.empty();
 
 		// 标题栏
-		const headerEl = contentEl.createDiv({ cls: 'acp-history-header' });
-		headerEl.createEl('h2', { text: '📚 会话历史' });
+		const headerEl = contentEl.createDiv({ cls: "acp-history-header" });
+		headerEl.createEl("h2", { text: "📚 会话历史" });
 
 		// 刷新按钮
-		const refreshBtn = headerEl.createEl('button', {
-			cls: 'acp-history-refresh clickable-icon',
-			attr: { 'aria-label': '刷新' },
+		const refreshBtn = headerEl.createEl("button", {
+			cls: "acp-history-refresh clickable-icon",
+			attr: { "aria-label": "刷新" },
 		});
-		setIcon(refreshBtn, 'refresh-cw');
-		refreshBtn.addEventListener('click', async () => {
+		setIcon(refreshBtn, "refresh-cw");
+		refreshBtn.addEventListener("click", async () => {
 			this.sessions = await this.onRefresh();
 			this.renderContent();
 		});
@@ -63,28 +63,28 @@ export class SessionHistoryModal extends Modal {
 		// 会话列表
 		if (this.sessions.length === 0) {
 			contentEl.createDiv({
-				cls: 'acp-history-empty',
-				text: '暂无历史会话',
+				cls: "acp-history-empty",
+				text: "暂无历史会话",
 			});
 			return;
 		}
 
-		const listEl = contentEl.createDiv({ cls: 'acp-history-list' });
+		const listEl = contentEl.createDiv({ cls: "acp-history-list" });
 
 		for (const session of this.sessions) {
-			const itemEl = listEl.createDiv({ cls: 'acp-history-item' });
+			const itemEl = listEl.createDiv({ cls: "acp-history-item" });
 
 			// 会话信息
-			const infoEl = itemEl.createDiv({ cls: 'acp-history-info' });
+			const infoEl = itemEl.createDiv({ cls: "acp-history-info" });
 
 			// 标题
 			infoEl.createDiv({
-				cls: 'acp-history-title',
-				text: session.title || '无标题',
+				cls: "acp-history-title",
+				text: session.title || "无标题",
 			});
 
 			// 元数据
-			const metaEl = infoEl.createDiv({ cls: 'acp-history-meta' });
+			const metaEl = infoEl.createDiv({ cls: "acp-history-meta" });
 			const date = new Date(session.updatedAt);
 			metaEl.createSpan({ text: this.formatDate(date) });
 
@@ -95,33 +95,33 @@ export class SessionHistoryModal extends Modal {
 			metaEl.createSpan({ text: ` · ${session.messageCount} 条消息` });
 
 			// 操作按钮
-			const actionsEl = itemEl.createDiv({ cls: 'acp-history-actions' });
+			const actionsEl = itemEl.createDiv({ cls: "acp-history-actions" });
 
 			// 加载按钮
-			const loadBtn = actionsEl.createEl('button', {
-				cls: 'acp-history-load clickable-icon',
-				attr: { 'aria-label': '加载会话' },
+			const loadBtn = actionsEl.createEl("button", {
+				cls: "acp-history-load clickable-icon",
+				attr: { "aria-label": "加载会话" },
 			});
-			setIcon(loadBtn, 'file-input');
-			loadBtn.addEventListener('click', () => {
+			setIcon(loadBtn, "file-input");
+			loadBtn.addEventListener("click", () => {
 				this.onSelect(session.id);
 				this.close();
 			});
 
 			// 删除按钮
-			const deleteBtn = actionsEl.createEl('button', {
-				cls: 'acp-history-delete clickable-icon',
-				attr: { 'aria-label': '删除会话' },
+			const deleteBtn = actionsEl.createEl("button", {
+				cls: "acp-history-delete clickable-icon",
+				attr: { "aria-label": "删除会话" },
 			});
-			setIcon(deleteBtn, 'trash-2');
-			deleteBtn.addEventListener('click', () => {
+			setIcon(deleteBtn, "trash-2");
+			deleteBtn.addEventListener("click", () => {
 				void this.confirmAndDelete(session);
 			});
 		}
 
 		// 底部提示
 		contentEl.createDiv({
-			cls: 'acp-history-tip',
+			cls: "acp-history-tip",
 			text: `共 ${this.sessions.length} 个会话`,
 		});
 	}
@@ -133,17 +133,28 @@ export class SessionHistoryModal extends Modal {
 
 		if (diff < dayMs) {
 			// 今天
-			return `今天 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
+			return `今天 ${date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
 		} else if (diff < 2 * dayMs) {
 			// 昨天
-			return `昨天 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
+			return `昨天 ${date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
 		} else if (diff < 7 * dayMs) {
 			// 一周内
-			const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+			const days = [
+				"周日",
+				"周一",
+				"周二",
+				"周三",
+				"周四",
+				"周五",
+				"周六",
+			];
 			return days[date.getDay()];
 		} else {
 			// 更早
-			return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+			return date.toLocaleDateString("zh-CN", {
+				month: "short",
+				day: "numeric",
+			});
 		}
 	}
 
@@ -157,11 +168,13 @@ export class SessionHistoryModal extends Modal {
 			'.acp-history-item:has([aria-label="删除会话"]) .acp-history-delete',
 		) as HTMLElement;
 
-		if (deleteBtn?.hasClass('confirm-pending')) {
+		if (deleteBtn?.hasClass("confirm-pending")) {
 			// 第二次点击，执行删除
 			const success = await this.onDelete(session.id);
 			if (success) {
-				this.sessions = this.sessions.filter((s) => s.id !== session.id);
+				this.sessions = this.sessions.filter(
+					(s) => s.id !== session.id,
+				);
 				this.renderContent();
 			}
 		} else {
@@ -169,7 +182,9 @@ export class SessionHistoryModal extends Modal {
 			// 直接执行删除（简化流程）
 			const success = await this.onDelete(session.id);
 			if (success) {
-				this.sessions = this.sessions.filter((s) => s.id !== session.id);
+				this.sessions = this.sessions.filter(
+					(s) => s.id !== session.id,
+				);
 				this.renderContent();
 			}
 		}

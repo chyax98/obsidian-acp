@@ -1,17 +1,17 @@
-import type { App } from 'obsidian';
-import { Notice } from 'obsidian';
-import type { PermissionSettings } from '../main';
-import type { PermissionOption } from './types/permissions';
-import { PermissionModal } from '../ui/PermissionModal';
+import type { App } from "obsidian";
+import { Notice } from "obsidian";
+import type { PermissionSettings } from "../main";
+import type { PermissionOption } from "./types/permissions";
+import { PermissionModal } from "../ui/PermissionModal";
 
 /**
  * 权限请求
  */
 export interface PermissionRequest {
 	toolCallId: string;
-	toolName: string;      // 如 "fs/read", "bash/run"
-	title: string;         // 如 "Reading configuration file"
-	kind: string;          // 如 "read", "write", "execute"
+	toolName: string; // 如 "fs/read", "bash/run"
+	title: string; // 如 "Reading configuration file"
+	kind: string; // 如 "read", "write", "execute"
 	rawInput: Record<string, unknown>;
 	/** Agent 提供的权限选项（用于返回正确的 optionId） */
 	options?: PermissionOption[];
@@ -21,8 +21,8 @@ export interface PermissionRequest {
  * 权限响应
  */
 export interface PermissionResponse {
-	outcome: 'selected' | 'cancelled';
-	optionId?: string;  // 'allow' | 'allow_always' | 'reject' (ACP 标准格式)
+	outcome: "selected" | "cancelled";
+	optionId?: string; // 'allow' | 'allow_always' | 'reject' (ACP 标准格式)
 }
 
 /**
@@ -63,26 +63,28 @@ export class PermissionManager {
 	): Promise<PermissionResponse> {
 		const { toolName, options } = request;
 
-		console.log('[PermissionManager] 权限请求:', toolName);
+		console.log("[PermissionManager] 权限请求:", toolName);
 
 		// 模式 1: 完全信任 - 自动批准所有请求（不需要排队）
-		if (this.settings.mode === 'trustAll') {
-			console.log('[PermissionManager] trustAll 模式，自动批准');
+		if (this.settings.mode === "trustAll") {
+			console.log("[PermissionManager] trustAll 模式，自动批准");
 			// 使用 Agent 提供的 allow_once optionId
-			const allowOptionId = this.findOptionId(options, 'allow_once') || 'allow';
+			const allowOptionId =
+				this.findOptionId(options, "allow_once") || "allow";
 			return {
-				outcome: 'selected',
+				outcome: "selected",
 				optionId: allowOptionId,
 			};
 		}
 
 		// 检查是否已记录"始终允许"（不需要排队）
 		if (this.settings.alwaysAllowedTools[toolName]) {
-			console.log('[PermissionManager] 工具已在始终允许列表');
+			console.log("[PermissionManager] 工具已在始终允许列表");
 			// 使用 Agent 提供的 allow_once optionId
-			const allowOptionId = this.findOptionId(options, 'allow_once') || 'allow';
+			const allowOptionId =
+				this.findOptionId(options, "allow_once") || "allow";
 			return {
-				outcome: 'selected',
+				outcome: "selected",
 				optionId: allowOptionId,
 			};
 		}
@@ -90,7 +92,10 @@ export class PermissionManager {
 		// 需要显示弹窗的请求加入队列
 		return new Promise((resolve) => {
 			this.requestQueue.push({ request, resolve });
-			console.log('[PermissionManager] 请求加入队列，当前队列长度:', this.requestQueue.length);
+			console.log(
+				"[PermissionManager] 请求加入队列，当前队列长度:",
+				this.requestQueue.length,
+			);
 			this.processNextRequest();
 		});
 	}
@@ -98,11 +103,14 @@ export class PermissionManager {
 	/**
 	 * 从 Agent 的 options 中找到指定 kind 的 optionId
 	 */
-	private findOptionId(options: PermissionOption[] | undefined, kind: string): string | undefined {
+	private findOptionId(
+		options: PermissionOption[] | undefined,
+		kind: string,
+	): string | undefined {
 		if (!options || options.length === 0) {
 			return undefined;
 		}
-		const option = options.find(opt => opt.kind === kind);
+		const option = options.find((opt) => opt.kind === kind);
 		return option?.optionId;
 	}
 
@@ -119,11 +127,14 @@ export class PermissionManager {
 		const queued = this.requestQueue.shift();
 		if (!queued) return;
 
-		console.log('[PermissionManager] 开始处理队列请求:', queued.request.toolName);
+		console.log(
+			"[PermissionManager] 开始处理队列请求:",
+			queued.request.toolName,
+		);
 
 		// 显示对话框并等待响应
 		void this.showPermissionDialog(queued.request).then((response) => {
-			console.log('[PermissionManager] 对话框响应:', response);
+			console.log("[PermissionManager] 对话框响应:", response);
 			queued.resolve(response);
 			this.isProcessing = false;
 
@@ -144,30 +155,37 @@ export class PermissionManager {
 				request,
 				(response: PermissionResponse) => {
 					// 如果用户选择"始终允许"，记录到设置
-					if (response.optionId === 'allow_always') {
-						this.settings.alwaysAllowedTools[request.toolName] = true;
+					if (response.optionId === "allow_always") {
+						this.settings.alwaysAllowedTools[request.toolName] =
+							true;
 						void this.saveSettings().then(() => {
 							new Notice(`已记住：始终允许 ${request.toolName}`);
 						});
 
 						// 返回 Agent 的 allow_once optionId（ACP 标准格式）
-						const allowOptionId = this.findOptionId(request.options, 'allow_once') || 'allow';
+						const allowOptionId =
+							this.findOptionId(request.options, "allow_once") ||
+							"allow";
 						resolve({
-							outcome: 'selected',
+							outcome: "selected",
 							optionId: allowOptionId,
 						});
-					} else if (response.optionId === 'allow') {
+					} else if (response.optionId === "allow") {
 						// 用户选择"允许一次"，返回 Agent 的 allow_once optionId
-						const allowOptionId = this.findOptionId(request.options, 'allow_once') || 'allow';
+						const allowOptionId =
+							this.findOptionId(request.options, "allow_once") ||
+							"allow";
 						resolve({
-							outcome: 'selected',
+							outcome: "selected",
 							optionId: allowOptionId,
 						});
-					} else if (response.optionId === 'reject') {
+					} else if (response.optionId === "reject") {
 						// 用户选择"拒绝"，返回 Agent 的 reject_once optionId
-						const rejectOptionId = this.findOptionId(request.options, 'reject_once') || 'reject';
+						const rejectOptionId =
+							this.findOptionId(request.options, "reject_once") ||
+							"reject";
 						resolve({
-							outcome: 'selected',
+							outcome: "selected",
 							optionId: rejectOptionId,
 						});
 					} else {

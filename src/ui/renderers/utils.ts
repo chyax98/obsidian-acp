@@ -11,7 +11,7 @@ export function formatTimestamp(timestamp: number): string {
 
 	// 小于 1 分钟
 	if (diff < 60000) {
-		return '刚刚';
+		return "刚刚";
 	}
 
 	// 小于 1 小时
@@ -32,22 +32,25 @@ export function formatTimestamp(timestamp: number): string {
 
 	// 今天：显示时间
 	if (date.toDateString() === today.toDateString()) {
-		return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+		return date.toLocaleTimeString("zh-CN", {
+			hour: "2-digit",
+			minute: "2-digit",
+		});
 	}
 
 	// 昨天
 	const yesterday = new Date(today);
 	yesterday.setDate(yesterday.getDate() - 1);
 	if (date.toDateString() === yesterday.toDateString()) {
-		return `昨天 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
+		return `昨天 ${date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
 	}
 
 	// 其他：显示日期和时间
-	return date.toLocaleString('zh-CN', {
-		month: '2-digit',
-		day: '2-digit',
-		hour: '2-digit',
-		minute: '2-digit',
+	return date.toLocaleString("zh-CN", {
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
 	});
 }
 
@@ -82,10 +85,13 @@ export function getFileName(path: string): string {
 /**
  * 安全获取字符串参数（从多个可能的 key 中）
  */
-export function getStringParam(rawInput: Record<string, unknown>, keys: string[]): string | undefined {
+export function getStringParam(
+	rawInput: Record<string, unknown>,
+	keys: string[],
+): string | undefined {
 	for (const key of keys) {
 		const value = rawInput[key];
-		if (typeof value === 'string' && value.length > 0) {
+		if (typeof value === "string" && value.length > 0) {
 			return value;
 		}
 	}
@@ -101,7 +107,7 @@ export function getOtherParams(
 ): Record<string, unknown> {
 	const result: Record<string, unknown> = {};
 	for (const key of Object.keys(rawInput)) {
-		if (!excludeKeys.includes(key) && !key.startsWith('_')) {
+		if (!excludeKeys.includes(key) && !key.startsWith("_")) {
 			result[key] = rawInput[key];
 		}
 	}

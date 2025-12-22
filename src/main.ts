@@ -4,10 +4,10 @@
  * 通过 ACP 协议连接 Claude Code
  */
 
-import type { WorkspaceLeaf, Editor } from 'obsidian';
-import { Plugin, Notice } from 'obsidian';
-import { AcpSettingTab } from './ui/SettingsTab';
-import { AcpChatView, ACP_CHAT_VIEW_TYPE } from './ui/ChatView';
+import type { WorkspaceLeaf, Editor } from "obsidian";
+import { Plugin, Notice } from "obsidian";
+import { AcpSettingTab } from "./ui/SettingsTab";
+import { AcpChatView, ACP_CHAT_VIEW_TYPE } from "./ui/ChatView";
 
 // ============================================================================
 // 类型定义
@@ -16,7 +16,7 @@ import { AcpChatView, ACP_CHAT_VIEW_TYPE } from './ui/ChatView';
 /**
  * 权限模式
  */
-export type PermissionMode = 'interactive' | 'trustAll';
+export type PermissionMode = "interactive" | "trustAll";
 
 /**
  * 权限设置
@@ -42,7 +42,7 @@ export interface McpServerConfig {
 	/** 服务器名称 */
 	name: string;
 	/** 传输类型 */
-	type: 'stdio' | 'http' | 'sse';
+	type: "stdio" | "http" | "sse";
 	/** stdio: 命令 */
 	command?: string;
 	/** stdio: 参数 */
@@ -64,7 +64,7 @@ export interface McpServerConfig {
  */
 export interface AcpPluginSettings {
 	/** 工作目录模式 */
-	workingDir: 'vault' | 'current-note-folder' | 'custom';
+	workingDir: "vault" | "current-note-folder" | "custom";
 
 	/** 自定义工作目录路径 */
 	customWorkingDir?: string;
@@ -95,40 +95,36 @@ export interface AcpPluginSettings {
  * 默认设置
  */
 const DEFAULT_SETTINGS: AcpPluginSettings = {
-	workingDir: 'vault',
+	workingDir: "vault",
 	customWorkingDir: undefined,
 	apiKey: undefined,
 	apiUrl: undefined,
 	showToolCallDetails: true,
 	permission: {
-		mode: 'interactive',  // 默认每次询问
+		mode: "interactive", // 默认每次询问
 		alwaysAllowedTools: {},
 	},
 	debugMode: false,
 	mcpServers: [
 		{
-			id: 'vault',
-			name: 'Obsidian Vault (BM25)',
-			type: 'stdio',
-			command: 'npx',
-			args: [
-				'obsidian-vault-mcp',
-				'--vault',
-				'{VAULT_PATH}',
-			],
+			id: "vault",
+			name: "Obsidian Vault (BM25)",
+			type: "stdio",
+			command: "npx",
+			args: ["obsidian-vault-mcp", "--vault", "{VAULT_PATH}"],
 			enabled: true,
 		},
 		{
-			id: 'filesystem',
-			name: 'Filesystem (基础)',
-			type: 'stdio',
-			command: 'npx',
+			id: "filesystem",
+			name: "Filesystem (基础)",
+			type: "stdio",
+			command: "npx",
 			args: [
-				'@modelcontextprotocol/server-filesystem',
-				'--root',
-				'{VAULT_PATH}',
+				"@modelcontextprotocol/server-filesystem",
+				"--root",
+				"{VAULT_PATH}",
 			],
-			enabled: false,  // Claude Code 已有文件访问能力，默认禁用
+			enabled: false, // Claude Code 已有文件访问能力，默认禁用
 		},
 	],
 };
@@ -154,12 +150,15 @@ export default class AcpPlugin extends Plugin {
 		await this.loadSettings();
 
 		// 注册 ChatView
-		this.registerView(ACP_CHAT_VIEW_TYPE, (leaf) => new AcpChatView(leaf, this));
+		this.registerView(
+			ACP_CHAT_VIEW_TYPE,
+			(leaf) => new AcpChatView(leaf, this),
+		);
 
 		// 添加打开 ACP Chat 的命令
 		this.addCommand({
-			id: 'open-acp-chat',
-			name: '打开 ACP Chat',
+			id: "open-acp-chat",
+			name: "打开 ACP Chat",
 			callback: () => {
 				void this.activateChatView();
 			},
@@ -167,26 +166,26 @@ export default class AcpPlugin extends Plugin {
 
 		// 添加新建 ACP Chat 窗口的命令
 		this.addCommand({
-			id: 'new-acp-chat',
-			name: '新建 ACP Chat 窗口',
+			id: "new-acp-chat",
+			name: "新建 ACP Chat 窗口",
 			callback: () => {
 				void this.activateChatView(true);
 			},
 		});
 
 		// 添加 Ribbon 图标
-		this.addRibbonIcon('bot', 'ACP Agent Chat', () => {
+		this.addRibbonIcon("bot", "ACP Agent Chat", () => {
 			void this.activateChatView();
 		});
 
 		// 发送选中文本到 ACP Chat
 		this.addCommand({
-			id: 'send-selection-to-acp',
-			name: '发送选中文本到 ACP Chat',
+			id: "send-selection-to-acp",
+			name: "发送选中文本到 ACP Chat",
 			editorCallback: (editor: Editor, view) => {
 				const selection = editor.getSelection();
 				if (!selection) {
-					new Notice('未选中任何文本');
+					new Notice("未选中任何文本");
 					return;
 				}
 				const filePath = view.file?.path;
@@ -198,8 +197,7 @@ export default class AcpPlugin extends Plugin {
 		this.addSettingTab(new AcpSettingTab(this.app, this));
 	}
 
-	public onunload(): void {
-	}
+	public onunload(): void {}
 
 	/**
 	 * 激活或创建 ChatView
@@ -218,7 +216,10 @@ export default class AcpPlugin extends Plugin {
 			// 不存在或强制新建，在右侧创建新的
 			leaf = workspace.getRightLeaf(false);
 			if (leaf) {
-				await leaf.setViewState({ type: ACP_CHAT_VIEW_TYPE, active: true });
+				await leaf.setViewState({
+					type: ACP_CHAT_VIEW_TYPE,
+					active: true,
+				});
 			}
 		}
 
@@ -230,7 +231,10 @@ export default class AcpPlugin extends Plugin {
 	/**
 	 * 发送选中文本到 ACP Chat
 	 */
-	private async sendSelectionToChat(text: string, filePath?: string): Promise<void> {
+	private async sendSelectionToChat(
+		text: string,
+		filePath?: string,
+	): Promise<void> {
 		// 激活 ChatView
 		await this.activateChatView();
 
@@ -238,19 +242,23 @@ export default class AcpPlugin extends Plugin {
 		const leaves = this.app.workspace.getLeavesOfType(ACP_CHAT_VIEW_TYPE);
 		if (leaves.length > 0) {
 			const view = leaves[0].view as AcpChatView;
-			if (view && typeof view.appendText === 'function') {
+			if (view && typeof view.appendText === "function") {
 				// 简单格式：在 {文件} 选中的内容
-				const fileInfo = filePath ? `在 ${filePath} 选中的内容` : '选中的内容';
+				const fileInfo = filePath
+					? `在 ${filePath} 选中的内容`
+					: "选中的内容";
 				const formattedText = `\n${fileInfo}:\n${text}\n`;
 				view.appendText(formattedText);
-				new Notice('已添加选中文本到 ACP Chat');
+				new Notice("已添加选中文本到 ACP Chat");
 			}
 		}
 	}
 
 	public async loadSettings(): Promise<void> {
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-redundant-type-constituents
-		const loadedData = (await this.loadData()) as Partial<AcpPluginSettings> | undefined;
+		const loadedData = (await this.loadData()) as
+			| Partial<AcpPluginSettings>
+			| undefined;
 
 		// 深度合并设置，确保嵌套对象正确合并
 		this.settings = {
@@ -262,7 +270,7 @@ export default class AcpPlugin extends Plugin {
 			},
 		};
 
-		console.log('[ACP] 加载设置:', this.settings.permission);
+		console.log("[ACP] 加载设置:", this.settings.permission);
 	}
 
 	public async saveSettings(): Promise<void> {

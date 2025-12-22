@@ -77,7 +77,7 @@ export class InputHistoryManager {
 		}
 
 		if (this.currentIndex === -1) {
-			return ''; // 返回空字符串表示回到最新（空输入）
+			return ""; // 返回空字符串表示回到最新（空输入）
 		}
 
 		return this.history[this.currentIndex];
@@ -87,8 +87,8 @@ export class InputHistoryManager {
 	 * 导航历史
 	 * @returns 对应的历史记录，null 表示无变化
 	 */
-	public navigate(direction: 'up' | 'down'): string | null {
-		if (direction === 'up') {
+	public navigate(direction: "up" | "down"): string | null {
+		if (direction === "up") {
 			return this.navigateUp();
 		} else {
 			return this.navigateDown();

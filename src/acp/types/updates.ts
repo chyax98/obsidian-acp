@@ -7,7 +7,7 @@
  * @see https://agentclientprotocol.com/protocol/prompt-turn#3-agent-reports-output
  */
 
-import type { MetaData } from './initialize';
+import type { MetaData } from "./initialize";
 
 // ============================================================================
 // 会话更新基础
@@ -18,24 +18,25 @@ import type { MetaData } from './initialize';
  */
 export const SessionUpdateType = {
 	/** Agent 消息块 */
-	AGENT_MESSAGE_CHUNK: 'agent_message_chunk',
+	AGENT_MESSAGE_CHUNK: "agent_message_chunk",
 	/** Agent 思考块 */
-	AGENT_THOUGHT_CHUNK: 'agent_thought_chunk',
+	AGENT_THOUGHT_CHUNK: "agent_thought_chunk",
 	/** 工具调用 */
-	TOOL_CALL: 'tool_call',
+	TOOL_CALL: "tool_call",
 	/** 工具调用状态更新 */
-	TOOL_CALL_UPDATE: 'tool_call_update',
+	TOOL_CALL_UPDATE: "tool_call_update",
 	/** 计划更新 */
-	PLAN: 'plan',
+	PLAN: "plan",
 	/** 可用命令更新 */
-	AVAILABLE_COMMANDS_UPDATE: 'available_commands_update',
+	AVAILABLE_COMMANDS_UPDATE: "available_commands_update",
 	/** 用户消息块 */
-	USER_MESSAGE_CHUNK: 'user_message_chunk',
+	USER_MESSAGE_CHUNK: "user_message_chunk",
 	/** 当前模式更新 */
-	CURRENT_MODE_UPDATE: 'current_mode_update',
+	CURRENT_MODE_UPDATE: "current_mode_update",
 } as const;
 
-export type SessionUpdateTypeLiteral = (typeof SessionUpdateType)[keyof typeof SessionUpdateType];
+export type SessionUpdateTypeLiteral =
+	(typeof SessionUpdateType)[keyof typeof SessionUpdateType];
 
 /**
  * 会话通知参数基础接口
@@ -57,7 +58,7 @@ export interface SessionNotificationParams {
  * 文本消息内容
  */
 export interface TextMessageContent {
-	type: 'text';
+	type: "text";
 	text: string;
 }
 
@@ -65,7 +66,7 @@ export interface TextMessageContent {
  * 图像消息内容
  */
 export interface ImageMessageContent {
-	type: 'image';
+	type: "image";
 	data?: string;
 	mimeType?: string;
 	uri?: string;
@@ -78,7 +79,7 @@ export interface ImageMessageContent {
  * 用于在消息中嵌入文件链接、笔记链接等资源引用。
  */
 export interface ResourceLinkContent {
-	type: 'resource_link';
+	type: "resource_link";
 	/** 资源 URI (file://, http://, obsidian:// 等) */
 	uri: string;
 	/** 资源名称 */
@@ -94,7 +95,10 @@ export interface ResourceLinkContent {
 /**
  * 消息内容联合类型
  */
-export type MessageContent = TextMessageContent | ImageMessageContent | ResourceLinkContent;
+export type MessageContent =
+	| TextMessageContent
+	| ImageMessageContent
+	| ResourceLinkContent;
 
 // ============================================================================
 // Agent 消息块更新
@@ -137,7 +141,7 @@ export interface AgentThoughtChunkUpdateData {
  * - completed: 执行成功
  * - failed: 执行失败（协议标准，包含错误和取消场景）
  */
-export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+export type ToolCallStatus = "pending" | "in_progress" | "completed" | "failed";
 
 /**
  * 工具调用类型
@@ -146,22 +150,22 @@ export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
  * @see https://agentclientprotocol.com/protocol/tool-calls#creating
  */
 export type ToolCallKind =
-	| 'read'        // 读取文件/数据
-	| 'edit'        // 修改文件/内容
-	| 'delete'      // 删除文件/数据
-	| 'move'        // 移动/重命名
-	| 'search'      // 搜索信息
-	| 'execute'     // 执行命令/代码
-	| 'think'       // 内部推理
-	| 'fetch'       // 获取外部数据
-	| 'switch_mode' // 切换模式
-	| 'other';      // 其他（默认）
+	| "read" // 读取文件/数据
+	| "edit" // 修改文件/内容
+	| "delete" // 删除文件/数据
+	| "move" // 移动/重命名
+	| "search" // 搜索信息
+	| "execute" // 执行命令/代码
+	| "think" // 内部推理
+	| "fetch" // 获取外部数据
+	| "switch_mode" // 切换模式
+	| "other"; // 其他（默认）
 
 /**
  * 工具调用内容 - 文本
  */
 export interface ToolCallTextContent {
-	type: 'content';
+	type: "content";
 	content: TextMessageContent;
 }
 
@@ -169,7 +173,7 @@ export interface ToolCallTextContent {
  * 工具调用内容 - Diff
  */
 export interface ToolCallDiffContent {
-	type: 'diff';
+	type: "diff";
 	path?: string;
 	oldText?: string | null;
 	newText?: string;
@@ -179,14 +183,17 @@ export interface ToolCallDiffContent {
  * 工具调用内容 - 终端
  */
 export interface ToolCallTerminalContent {
-	type: 'terminal';
+	type: "terminal";
 	terminalId: string;
 }
 
 /**
  * 工具调用内容联合类型
  */
-export type ToolCallContent = ToolCallTextContent | ToolCallDiffContent | ToolCallTerminalContent;
+export type ToolCallContent =
+	| ToolCallTextContent
+	| ToolCallDiffContent
+	| ToolCallTerminalContent;
 
 /**
  * 工具调用位置
@@ -242,12 +249,12 @@ export interface ToolCallStatusUpdateData {
 /**
  * 计划条目状态
  */
-export type PlanEntryStatus = 'pending' | 'in_progress' | 'completed';
+export type PlanEntryStatus = "pending" | "in_progress" | "completed";
 
 /**
  * 计划条目优先级
  */
-export type PlanEntryPriority = 'low' | 'medium' | 'high';
+export type PlanEntryPriority = "low" | "medium" | "high";
 
 /**
  * 计划条目
@@ -350,26 +357,38 @@ export type SessionUpdateData =
 /**
  * 类型守卫工具函数
  */
-export function isAgentMessageChunk(update: SessionUpdateData): update is AgentMessageChunkUpdateData {
+export function isAgentMessageChunk(
+	update: SessionUpdateData,
+): update is AgentMessageChunkUpdateData {
 	return update.sessionUpdate === SessionUpdateType.AGENT_MESSAGE_CHUNK;
 }
 
-export function isAgentThoughtChunk(update: SessionUpdateData): update is AgentThoughtChunkUpdateData {
+export function isAgentThoughtChunk(
+	update: SessionUpdateData,
+): update is AgentThoughtChunkUpdateData {
 	return update.sessionUpdate === SessionUpdateType.AGENT_THOUGHT_CHUNK;
 }
 
-export function isToolCall(update: SessionUpdateData): update is ToolCallUpdateData {
+export function isToolCall(
+	update: SessionUpdateData,
+): update is ToolCallUpdateData {
 	return update.sessionUpdate === SessionUpdateType.TOOL_CALL;
 }
 
-export function isToolCallUpdate(update: SessionUpdateData): update is ToolCallStatusUpdateData {
+export function isToolCallUpdate(
+	update: SessionUpdateData,
+): update is ToolCallStatusUpdateData {
 	return update.sessionUpdate === SessionUpdateType.TOOL_CALL_UPDATE;
 }
 
-export function isPlanUpdate(update: SessionUpdateData): update is PlanUpdateData {
+export function isPlanUpdate(
+	update: SessionUpdateData,
+): update is PlanUpdateData {
 	return update.sessionUpdate === SessionUpdateType.PLAN;
 }
 
-export function isAvailableCommandsUpdate(update: SessionUpdateData): update is AvailableCommandsUpdateData {
+export function isAvailableCommandsUpdate(
+	update: SessionUpdateData,
+): update is AvailableCommandsUpdateData {
 	return update.sessionUpdate === SessionUpdateType.AVAILABLE_COMMANDS_UPDATE;
 }

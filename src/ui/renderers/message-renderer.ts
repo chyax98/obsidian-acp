@@ -7,11 +7,11 @@
  * - 复制按钮
  */
 
-import type { Component, App } from 'obsidian';
-import { MarkdownRenderer, setIcon, Notice } from 'obsidian';
-import type { Message } from '../../acp/core/session-manager';
-import { ImageRenderer } from './image-renderer';
-import { formatTimestamp } from './utils';
+import type { Component, App } from "obsidian";
+import { MarkdownRenderer, setIcon, Notice } from "obsidian";
+import type { Message } from "../../acp/core/session-manager";
+import { ImageRenderer } from "./image-renderer";
+import { formatTimestamp } from "./utils";
 
 /**
  * 流式渲染节流配置
@@ -28,11 +28,14 @@ const DEFAULT_STREAMING_CONFIG: StreamingConfig = {
 /**
  * 流式渲染状态跟踪
  */
-const streamingState = new Map<string, {
-	lastRenderTime: number;
-	lastContent: string;
-	pendingRender: number | null;
-}>();
+const streamingState = new Map<
+	string,
+	{
+		lastRenderTime: number;
+		lastContent: string;
+		pendingRender: number | null;
+	}
+>();
 
 /**
  * 消息渲染器
@@ -55,32 +58,43 @@ export class MessageRenderer {
 		message: Message,
 		component: Component,
 		app: App,
-		sourcePath: string = '',
+		sourcePath: string = "",
 	): Promise<void> {
 		// 创建消息结构
 		const messageEl = container.createDiv({
 			cls: `acp-message acp-message-${message.role}`,
-			attr: { 'data-message-id': message.id },
+			attr: { "data-message-id": message.id },
 		});
 
 		// 时间戳
 		if (message.timestamp) {
-			const timestampEl = messageEl.createDiv({ cls: 'acp-message-timestamp' });
+			const timestampEl = messageEl.createDiv({
+				cls: "acp-message-timestamp",
+			});
 			timestampEl.textContent = formatTimestamp(message.timestamp);
-			timestampEl.setAttribute('title', new Date(message.timestamp).toLocaleString());
+			timestampEl.setAttribute(
+				"title",
+				new Date(message.timestamp).toLocaleString(),
+			);
 		}
 
 		// 消息内容容器
-		const contentEl = messageEl.createDiv({ cls: 'acp-message-content' });
+		const contentEl = messageEl.createDiv({ cls: "acp-message-content" });
 
 		// 渲染内容
 		if (message.content && message.content.trim()) {
-			await this.renderContent(contentEl, message.content, app, sourcePath, component);
+			await this.renderContent(
+				contentEl,
+				message.content,
+				app,
+				sourcePath,
+				component,
+			);
 		}
 
 		// 流式状态
 		if (message.isStreaming) {
-			contentEl.addClass('acp-message-streaming');
+			contentEl.addClass("acp-message-streaming");
 		}
 
 		// 添加操作栏
@@ -100,28 +114,46 @@ export class MessageRenderer {
 		message: Message,
 		component: Component,
 		app: App,
-		sourcePath: string = '',
+		sourcePath: string = "",
 	): void {
-		const messageEl = container.querySelector(`[data-message-id="${message.id}"]`);
+		const messageEl = container.querySelector(
+			`[data-message-id="${message.id}"]`,
+		);
 		if (!messageEl) {
-			console.warn('[MessageRenderer] 找不到消息元素:', message.id);
+			console.warn("[MessageRenderer] 找不到消息元素:", message.id);
 			return;
 		}
 
-		const contentEl = messageEl.querySelector('.acp-message-content') as HTMLElement;
+		const contentEl = messageEl.querySelector(
+			".acp-message-content",
+		) as HTMLElement;
 		if (!contentEl) {
-			console.warn('[MessageRenderer] 找不到消息内容元素:', message.id);
+			console.warn("[MessageRenderer] 找不到消息内容元素:", message.id);
 			return;
 		}
 
-		const newContent = message.content || '';
+		const newContent = message.content || "";
 
 		if (message.isStreaming) {
 			// 流式渲染：节流 Markdown 渲染
-			this.updateStreaming(message.id, contentEl, newContent, component, app, sourcePath);
+			this.updateStreaming(
+				message.id,
+				contentEl,
+				newContent,
+				component,
+				app,
+				sourcePath,
+			);
 		} else {
 			// 流式结束：最终渲染
-			this.finalizeStreaming(message.id, contentEl, newContent, component, app, sourcePath);
+			this.finalizeStreaming(
+				message.id,
+				contentEl,
+				newContent,
+				component,
+				app,
+				sourcePath,
+			);
 		}
 	}
 
@@ -141,7 +173,7 @@ export class MessageRenderer {
 		if (!state) {
 			state = {
 				lastRenderTime: 0,
-				lastContent: '',
+				lastContent: "",
 				pendingRender: null,
 			};
 			streamingState.set(messageId, state);
@@ -165,7 +197,14 @@ export class MessageRenderer {
 
 		if (timeSinceLastRender >= this.config.throttleInterval) {
 			// 立即渲染
-			this.doMarkdownRender(contentEl, content, component, app, sourcePath, true);
+			this.doMarkdownRender(
+				contentEl,
+				content,
+				component,
+				app,
+				sourcePath,
+				true,
+			);
 			state.lastRenderTime = now;
 		} else {
 			// 延迟渲染
@@ -173,7 +212,14 @@ export class MessageRenderer {
 			state.pendingRender = window.setTimeout(() => {
 				const currentState = streamingState.get(messageId);
 				if (currentState) {
-					this.doMarkdownRender(contentEl, currentState.lastContent, component, app, sourcePath, true);
+					this.doMarkdownRender(
+						contentEl,
+						currentState.lastContent,
+						component,
+						app,
+						sourcePath,
+						true,
+					);
 					currentState.lastRenderTime = Date.now();
 					currentState.pendingRender = null;
 				}
@@ -200,10 +246,17 @@ export class MessageRenderer {
 		streamingState.delete(messageId);
 
 		// 移除流式样式
-		contentEl.removeClass('acp-message-streaming');
+		contentEl.removeClass("acp-message-streaming");
 
 		// 最终渲染
-		this.doMarkdownRender(contentEl, content, component, app, sourcePath, false);
+		this.doMarkdownRender(
+			contentEl,
+			content,
+			component,
+			app,
+			sourcePath,
+			false,
+		);
 	}
 
 	/**
@@ -225,12 +278,19 @@ export class MessageRenderer {
 			}
 
 			// 检查是否包含图片
-			const imagePattern = /!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
+			const imagePattern =
+				/!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
 			const hasImages = imagePattern.test(content);
 
 			if (hasImages) {
 				// 有图片，特殊处理
-				void this.renderContentWithImages(contentEl, content, app, sourcePath, component);
+				void this.renderContentWithImages(
+					contentEl,
+					content,
+					app,
+					sourcePath,
+					component,
+				);
 			} else {
 				// 纯文本/Markdown
 				void MarkdownRenderer.render(
@@ -240,14 +300,17 @@ export class MessageRenderer {
 					sourcePath,
 					component,
 				).catch((error) => {
-					console.error('[MessageRenderer] Markdown 渲染失败:', error);
+					console.error(
+						"[MessageRenderer] Markdown 渲染失败:",
+						error,
+					);
 					contentEl.textContent = content;
 				});
 			}
 
 			// 流式状态样式
 			if (isStreaming) {
-				contentEl.addClass('acp-message-streaming');
+				contentEl.addClass("acp-message-streaming");
 			}
 		});
 	}
@@ -263,16 +326,29 @@ export class MessageRenderer {
 		component: Component,
 	): Promise<void> {
 		// 检查是否包含图片
-		const imagePattern = /!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
+		const imagePattern =
+			/!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
 		const hasImages = imagePattern.test(content);
 
 		if (hasImages) {
-			await this.renderContentWithImages(contentEl, content, app, sourcePath, component);
+			await this.renderContentWithImages(
+				contentEl,
+				content,
+				app,
+				sourcePath,
+				component,
+			);
 		} else {
 			try {
-				await MarkdownRenderer.render(app, content, contentEl, sourcePath, component);
+				await MarkdownRenderer.render(
+					app,
+					content,
+					contentEl,
+					sourcePath,
+					component,
+				);
 			} catch (error) {
-				console.error('[MessageRenderer] Markdown 渲染失败:', error);
+				console.error("[MessageRenderer] Markdown 渲染失败:", error);
 				contentEl.textContent = content;
 			}
 		}
@@ -288,7 +364,8 @@ export class MessageRenderer {
 		sourcePath: string,
 		component: Component,
 	): Promise<void> {
-		const imagePattern = /!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
+		const imagePattern =
+			/!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
 		let lastIndex = 0;
 		let match: RegExpExecArray | null;
 
@@ -297,9 +374,18 @@ export class MessageRenderer {
 			const textBefore = content.substring(lastIndex, match.index);
 			if (textBefore.trim()) {
 				try {
-					await MarkdownRenderer.render(app, textBefore, container, sourcePath, component);
+					await MarkdownRenderer.render(
+						app,
+						textBefore,
+						container,
+						sourcePath,
+						component,
+					);
 				} catch (error) {
-					console.error('[MessageRenderer] Markdown 渲染失败:', error);
+					console.error(
+						"[MessageRenderer] Markdown 渲染失败:",
+						error,
+					);
 					container.createDiv({ text: textBefore });
 				}
 			}
@@ -315,9 +401,15 @@ export class MessageRenderer {
 		const textAfter = content.substring(lastIndex);
 		if (textAfter.trim()) {
 			try {
-				await MarkdownRenderer.render(app, textAfter, container, sourcePath, component);
+				await MarkdownRenderer.render(
+					app,
+					textAfter,
+					container,
+					sourcePath,
+					component,
+				);
 			} catch (error) {
-				console.error('[MessageRenderer] Markdown 渲染失败:', error);
+				console.error("[MessageRenderer] Markdown 渲染失败:", error);
 				container.createDiv({ text: textAfter });
 			}
 		}
@@ -326,28 +418,31 @@ export class MessageRenderer {
 	/**
 	 * 添加消息操作按钮
 	 */
-	private static addMessageActions(messageEl: HTMLElement, message: Message): void {
-		const actionsEl = messageEl.createDiv({ cls: 'acp-message-actions' });
+	private static addMessageActions(
+		messageEl: HTMLElement,
+		message: Message,
+	): void {
+		const actionsEl = messageEl.createDiv({ cls: "acp-message-actions" });
 
 		// 复制按钮
 		const copyBtn = actionsEl.createDiv({
-			cls: 'acp-message-copy-btn',
-			attr: { 'aria-label': '复制消息' },
+			cls: "acp-message-copy-btn",
+			attr: { "aria-label": "复制消息" },
 		});
-		setIcon(copyBtn, 'copy');
+		setIcon(copyBtn, "copy");
 
-		copyBtn.addEventListener('click', (e) => {
+		copyBtn.addEventListener("click", (e) => {
 			e.stopPropagation();
-			const text = message.content || '';
+			const text = message.content || "";
 			if (text) {
 				void navigator.clipboard.writeText(text).then(() => {
-					new Notice('已复制消息');
+					new Notice("已复制消息");
 
 					copyBtn.empty();
-					setIcon(copyBtn, 'check');
+					setIcon(copyBtn, "check");
 					setTimeout(() => {
 						copyBtn.empty();
-						setIcon(copyBtn, 'copy');
+						setIcon(copyBtn, "copy");
 					}, 1500);
 				});
 			}

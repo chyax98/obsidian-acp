@@ -7,8 +7,8 @@
  * - 删除旧会话
  */
 
-import type { App } from 'obsidian';
-import type { SessionExportData } from './types';
+import type { App } from "obsidian";
+import type { SessionExportData } from "./types";
 
 /**
  * 会话元数据（用于列表显示）
@@ -39,8 +39,8 @@ export interface StoredSession extends SessionExportData {
 /**
  * 存储路径配置
  */
-const STORAGE_DIR = '.obsidian/plugins/obsidian-acp/sessions';
-const INDEX_FILE = 'session-index.json';
+const STORAGE_DIR = ".obsidian/plugins/obsidian-acp/sessions";
+const INDEX_FILE = "session-index.json";
 
 /**
  * 会话存储管理器
@@ -86,7 +86,7 @@ export class SessionStorage {
 				this.sessionIndex = [];
 			}
 		} catch (error) {
-			console.error('[SessionStorage] 加载索引失败:', error);
+			console.error("[SessionStorage] 加载索引失败:", error);
 			this.sessionIndex = [];
 		}
 
@@ -101,16 +101,22 @@ export class SessionStorage {
 		const indexPath = `${STORAGE_DIR}/${INDEX_FILE}`;
 
 		try {
-			await adapter.write(indexPath, JSON.stringify(this.sessionIndex, null, 2));
+			await adapter.write(
+				indexPath,
+				JSON.stringify(this.sessionIndex, null, 2),
+			);
 		} catch (error) {
-			console.error('[SessionStorage] 保存索引失败:', error);
+			console.error("[SessionStorage] 保存索引失败:", error);
 		}
 	}
 
 	/**
 	 * 保存会话
 	 */
-	public async saveSession(data: SessionExportData, agentName?: string): Promise<string> {
+	public async saveSession(
+		data: SessionExportData,
+		agentName?: string,
+	): Promise<string> {
 		if (!this.indexLoaded) {
 			await this.loadIndex();
 		}
@@ -121,8 +127,8 @@ export class SessionStorage {
 		const sessionId = data.sessionId || `session-${Date.now()}`;
 
 		// 提取标题（第一条用户消息的前 50 字符）
-		const firstUserMessage = data.turns[0]?.userMessage.content || '新对话';
-		const title = firstUserMessage.slice(0, 50).replace(/\n/g, ' ');
+		const firstUserMessage = data.turns[0]?.userMessage.content || "新对话";
+		const title = firstUserMessage.slice(0, 50).replace(/\n/g, " ");
 
 		// 创建元数据
 		const meta: SessionMeta = {
@@ -145,7 +151,9 @@ export class SessionStorage {
 		await adapter.write(filePath, JSON.stringify(storedSession, null, 2));
 
 		// 更新索引
-		const existingIndex = this.sessionIndex.findIndex((s) => s.id === sessionId);
+		const existingIndex = this.sessionIndex.findIndex(
+			(s) => s.id === sessionId,
+		);
 		if (existingIndex >= 0) {
 			this.sessionIndex[existingIndex] = meta;
 		} else {
@@ -174,7 +182,7 @@ export class SessionStorage {
 			const content = await adapter.read(filePath);
 			return JSON.parse(content) as StoredSession;
 		} catch (error) {
-			console.error('[SessionStorage] 加载会话失败:', error);
+			console.error("[SessionStorage] 加载会话失败:", error);
 			return null;
 		}
 	}
@@ -197,12 +205,14 @@ export class SessionStorage {
 			}
 
 			// 从索引中移除
-			this.sessionIndex = this.sessionIndex.filter((s) => s.id !== sessionId);
+			this.sessionIndex = this.sessionIndex.filter(
+				(s) => s.id !== sessionId,
+			);
 			await this.saveIndex();
 
 			return true;
 		} catch (error) {
-			console.error('[SessionStorage] 删除会话失败:', error);
+			console.error("[SessionStorage] 删除会话失败:", error);
 			return false;
 		}
 	}
@@ -232,7 +242,9 @@ export class SessionStorage {
 		}
 
 		// 按更新时间排序
-		const sorted = [...this.sessionIndex].sort((a, b) => b.updatedAt - a.updatedAt);
+		const sorted = [...this.sessionIndex].sort(
+			(a, b) => b.updatedAt - a.updatedAt,
+		);
 		const toDelete = sorted.slice(keepCount);
 
 		let deletedCount = 0;

@@ -15,8 +15,8 @@
  * 保持原有 API 以确保向后兼容。
  */
 
-import type { Component, App } from 'obsidian';
-import type { Message, ToolCall, PlanEntry } from '../acp/core/session-manager';
+import type { Component, App } from "obsidian";
+import type { Message, ToolCall, PlanEntry } from "../acp/core/session-manager";
 
 // 导入新的拆分模块
 import {
@@ -25,7 +25,7 @@ import {
 	ThoughtRenderer,
 	PlanRenderer,
 	CodeBlockRenderer,
-} from './renderers';
+} from "./renderers";
 
 /**
  * 消息渲染器
@@ -41,9 +41,15 @@ export class MessageRenderer {
 		message: Message,
 		component: Component,
 		app: App,
-		sourcePath: string = '',
+		sourcePath: string = "",
 	): Promise<void> {
-		return NewMessageRenderer.render(container, message, component, app, sourcePath);
+		return NewMessageRenderer.render(
+			container,
+			message,
+			component,
+			app,
+			sourcePath,
+		);
 	}
 
 	/**
@@ -54,15 +60,25 @@ export class MessageRenderer {
 		message: Message,
 		component: Component,
 		app: App,
-		sourcePath: string = '',
+		sourcePath: string = "",
 	): void {
-		NewMessageRenderer.update(container, message, component, app, sourcePath);
+		NewMessageRenderer.update(
+			container,
+			message,
+			component,
+			app,
+			sourcePath,
+		);
 	}
 
 	/**
 	 * 渲染工具调用卡片
 	 */
-	public static renderToolCall(container: HTMLElement, toolCall: ToolCall, app?: App): HTMLElement {
+	public static renderToolCall(
+		container: HTMLElement,
+		toolCall: ToolCall,
+		app?: App,
+	): HTMLElement {
 		return ToolCallRenderer.render(container, toolCall, app);
 	}
 
@@ -75,20 +91,32 @@ export class MessageRenderer {
 		groupTitle?: string,
 		app?: App,
 	): HTMLElement {
-		return ToolCallRenderer.renderGroup(container, toolCalls, groupTitle, app);
+		return ToolCallRenderer.renderGroup(
+			container,
+			toolCalls,
+			groupTitle,
+			app,
+		);
 	}
 
 	/**
 	 * 渲染思考块
 	 */
-	public static renderThoughts(container: HTMLElement, thoughts: string[], isStreaming = false): HTMLElement {
+	public static renderThoughts(
+		container: HTMLElement,
+		thoughts: string[],
+		isStreaming = false,
+	): HTMLElement {
 		return ThoughtRenderer.render(container, thoughts, isStreaming);
 	}
 
 	/**
 	 * 渲染计划
 	 */
-	public static renderPlan(container: HTMLElement, plan: PlanEntry[]): HTMLElement {
+	public static renderPlan(
+		container: HTMLElement,
+		plan: PlanEntry[],
+	): HTMLElement {
 		return PlanRenderer.render(container, plan);
 	}
 
@@ -98,7 +126,7 @@ export class MessageRenderer {
 	public static renderCodeBlock(
 		container: HTMLElement,
 		code: string,
-		language: string = 'text',
+		language: string = "text",
 		filename?: string,
 	): void {
 		CodeBlockRenderer.render(container, code, language, filename);

@@ -7,7 +7,7 @@
  * - 复制按钮
  */
 
-import { setIcon, Notice } from 'obsidian';
+import { setIcon, Notice } from "obsidian";
 
 /**
  * 代码块渲染器
@@ -24,42 +24,56 @@ export class CodeBlockRenderer {
 	public static render(
 		container: HTMLElement,
 		code: string,
-		language: string = 'text',
+		language: string = "text",
 		filename?: string,
 	): void {
-		const codeWrapper = container.createDiv({ cls: 'acp-code-block-wrapper' });
+		const codeWrapper = container.createDiv({
+			cls: "acp-code-block-wrapper",
+		});
 
 		// 头部：语言标签 + 文件名 + 复制按钮
-		const headerEl = codeWrapper.createDiv({ cls: 'acp-code-block-header' });
+		const headerEl = codeWrapper.createDiv({
+			cls: "acp-code-block-header",
+		});
 
 		// 左侧信息
-		const infoEl = headerEl.createDiv({ cls: 'acp-code-block-info' });
-		infoEl.createDiv({ cls: 'acp-code-block-language', text: language.toUpperCase() });
+		const infoEl = headerEl.createDiv({ cls: "acp-code-block-info" });
+		infoEl.createDiv({
+			cls: "acp-code-block-language",
+			text: language.toUpperCase(),
+		});
 		if (filename) {
-			infoEl.createDiv({ cls: 'acp-code-block-filename', text: filename });
+			infoEl.createDiv({
+				cls: "acp-code-block-filename",
+				text: filename,
+			});
 		}
 
 		// 复制按钮
-		const copyBtn = headerEl.createDiv({ cls: 'acp-copy-button acp-copy-button-code' });
-		setIcon(copyBtn, 'copy');
-		copyBtn.setAttribute('aria-label', '复制代码');
+		const copyBtn = headerEl.createDiv({
+			cls: "acp-copy-button acp-copy-button-code",
+		});
+		setIcon(copyBtn, "copy");
+		copyBtn.setAttribute("aria-label", "复制代码");
 
-		copyBtn.addEventListener('click', (e) => {
+		copyBtn.addEventListener("click", (e) => {
 			e.stopPropagation();
 			void navigator.clipboard.writeText(code).then(() => {
-				new Notice('已复制代码');
+				new Notice("已复制代码");
 				copyBtn.empty();
-				setIcon(copyBtn, 'check');
+				setIcon(copyBtn, "check");
 				setTimeout(() => {
 					copyBtn.empty();
-					setIcon(copyBtn, 'copy');
+					setIcon(copyBtn, "copy");
 				}, 2000);
 			});
 		});
 
 		// 代码内容
-		const preEl = codeWrapper.createEl('pre', { cls: 'acp-code-block-content' });
-		preEl.createEl('code', {
+		const preEl = codeWrapper.createEl("pre", {
+			cls: "acp-code-block-content",
+		});
+		preEl.createEl("code", {
 			cls: `language-${language}`,
 			text: code,
 		});
@@ -68,27 +82,30 @@ export class CodeBlockRenderer {
 	/**
 	 * 渲染带复制按钮的文本内容
 	 */
-	public static renderTextWithCopy(container: HTMLElement, text: string): void {
-		const wrapperEl = container.createDiv({ cls: 'acp-content-with-copy' });
+	public static renderTextWithCopy(
+		container: HTMLElement,
+		text: string,
+	): void {
+		const wrapperEl = container.createDiv({ cls: "acp-content-with-copy" });
 
 		// 文本内容
-		const textEl = wrapperEl.createDiv({ cls: 'acp-content-text' });
+		const textEl = wrapperEl.createDiv({ cls: "acp-content-text" });
 		textEl.textContent = text;
 
 		// 复制按钮
-		const copyBtn = wrapperEl.createDiv({ cls: 'acp-copy-button' });
-		setIcon(copyBtn, 'copy');
-		copyBtn.setAttribute('aria-label', '复制');
+		const copyBtn = wrapperEl.createDiv({ cls: "acp-copy-button" });
+		setIcon(copyBtn, "copy");
+		copyBtn.setAttribute("aria-label", "复制");
 
-		copyBtn.addEventListener('click', (e) => {
+		copyBtn.addEventListener("click", (e) => {
 			e.stopPropagation();
 			void navigator.clipboard.writeText(text).then(() => {
-				new Notice('已复制到剪贴板');
+				new Notice("已复制到剪贴板");
 				copyBtn.empty();
-				setIcon(copyBtn, 'check');
+				setIcon(copyBtn, "check");
 				setTimeout(() => {
 					copyBtn.empty();
-					setIcon(copyBtn, 'copy');
+					setIcon(copyBtn, "copy");
 				}, 1500);
 			});
 		});

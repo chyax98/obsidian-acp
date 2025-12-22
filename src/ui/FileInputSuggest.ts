@@ -4,7 +4,13 @@
  * 当用户在输入框输入 @ 时触发文件/文件夹搜索建议
  */
 
-import { type App, TFile, TFolder, type TAbstractFile, FuzzySuggestModal } from 'obsidian';
+import {
+	type App,
+	TFile,
+	TFolder,
+	type TAbstractFile,
+	FuzzySuggestModal,
+} from "obsidian";
 
 /**
  * 文件选择弹窗
@@ -16,19 +22,21 @@ export class FileSuggestModal extends FuzzySuggestModal<TAbstractFile> {
 	constructor(app: App, onChoose: (item: TAbstractFile) => void) {
 		super(app);
 		this.onChoose = onChoose;
-		this.setPlaceholder('搜索文件或文件夹...');
+		this.setPlaceholder("搜索文件或文件夹...");
 		this.setInstructions([
-			{ command: '↑↓', purpose: '导航' },
-			{ command: '↵', purpose: '选择' },
-			{ command: 'esc', purpose: '取消' },
+			{ command: "↑↓", purpose: "导航" },
+			{ command: "↵", purpose: "选择" },
+			{ command: "esc", purpose: "取消" },
 		]);
 	}
 
 	public getItems(): TAbstractFile[] {
 		const allFiles = this.app.vault.getFiles();
-		const allFolders = this.app.vault.getAllLoadedFiles().filter(
-			(f): f is TFolder => f instanceof TFolder && f.path !== '/',
-		);
+		const allFolders = this.app.vault
+			.getAllLoadedFiles()
+			.filter(
+				(f): f is TFolder => f instanceof TFolder && f.path !== "/",
+			);
 		return [...allFolders, ...allFiles];
 	}
 
@@ -36,24 +44,30 @@ export class FileSuggestModal extends FuzzySuggestModal<TAbstractFile> {
 		return item.path;
 	}
 
-	public onChooseItem(item: TAbstractFile, _evt: MouseEvent | KeyboardEvent): void {
+	public onChooseItem(
+		item: TAbstractFile,
+		_evt: MouseEvent | KeyboardEvent,
+	): void {
 		this.onChoose(item);
 	}
 
-	public renderSuggestion(item: { item: TAbstractFile; match: { score: number } }, el: HTMLElement): void {
+	public renderSuggestion(
+		item: { item: TAbstractFile; match: { score: number } },
+		el: HTMLElement,
+	): void {
 		const file = item.item;
 		const isFolder = file instanceof TFolder;
-		const isMarkdown = file instanceof TFile && file.extension === 'md';
-		const icon = isFolder ? '📁' : isMarkdown ? '📄' : '📎';
+		const isMarkdown = file instanceof TFile && file.extension === "md";
+		const icon = isFolder ? "📁" : isMarkdown ? "📄" : "📎";
 
 		el.createDiv({
-			cls: 'acp-file-suggest-item',
+			cls: "acp-file-suggest-item",
 			text: `${icon} ${file.name}`,
 		});
 
-		if (file.parent && file.parent.path !== '/') {
+		if (file.parent && file.parent.path !== "/") {
 			el.createDiv({
-				cls: 'acp-file-suggest-path',
+				cls: "acp-file-suggest-path",
 				text: file.parent.path,
 			});
 		}
@@ -73,8 +87,8 @@ export class FileInputSuggest {
 		this.inputEl = inputEl;
 
 		// 监听 @ 键
-		this.inputEl.addEventListener('keydown', (e) => {
-			if (e.key === '@') {
+		this.inputEl.addEventListener("keydown", (e) => {
+			if (e.key === "@") {
 				// 延迟一下让 @ 先输入
 				setTimeout(() => {
 					this.showFileSuggest();
@@ -102,7 +116,7 @@ export class FileInputSuggest {
 
 		// 找到 @ 的位置（从光标往前找）
 		const beforeCursor = value.slice(0, cursorPos);
-		const atIndex = beforeCursor.lastIndexOf('@');
+		const atIndex = beforeCursor.lastIndexOf("@");
 
 		if (atIndex !== -1) {
 			// 替换 @ 后面的内容为 @path 格式

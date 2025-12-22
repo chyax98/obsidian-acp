@@ -8,7 +8,7 @@
  */
 
 /** JSON-RPC 版本常量 */
-export const JSONRPC_VERSION = '2.0' as const;
+export const JSONRPC_VERSION = "2.0" as const;
 
 /** 请求 ID 类型 */
 export type RequestId = number | string;
@@ -77,7 +77,10 @@ export interface AcpNotification<T = unknown> {
  *
  * 包含所有可能的 JSON-RPC 消息类型。
  */
-export type AcpMessage<T = unknown> = AcpRequest<T> | AcpResponse<T> | AcpNotification<T>;
+export type AcpMessage<T = unknown> =
+	| AcpRequest<T>
+	| AcpResponse<T>
+	| AcpNotification<T>;
 
 /**
  * 标准 JSON-RPC 错误代码
@@ -99,27 +102,36 @@ export const JsonRpcErrorCode = {
  * 类型守卫：判断是否为请求消息
  */
 export function isAcpRequest(msg: AcpMessage): msg is AcpRequest {
-	return 'id' in msg && 'method' in msg && !('result' in msg) && !('error' in msg);
+	return (
+		"id" in msg &&
+		"method" in msg &&
+		!("result" in msg) &&
+		!("error" in msg)
+	);
 }
 
 /**
  * 类型守卫：判断是否为响应消息
  */
 export function isAcpResponse(msg: AcpMessage): msg is AcpResponse {
-	return 'id' in msg && ('result' in msg || 'error' in msg);
+	return "id" in msg && ("result" in msg || "error" in msg);
 }
 
 /**
  * 类型守卫：判断是否为通知消息
  */
 export function isAcpNotification(msg: AcpMessage): msg is AcpNotification {
-	return 'method' in msg && !('id' in msg);
+	return "method" in msg && !("id" in msg);
 }
 
 /**
  * 创建请求消息
  */
-export function createRequest<T>(id: RequestId, method: string, params?: T): AcpRequest<T> {
+export function createRequest<T>(
+	id: RequestId,
+	method: string,
+	params?: T,
+): AcpRequest<T> {
 	return {
 		jsonrpc: JSONRPC_VERSION,
 		id,
@@ -142,7 +154,12 @@ export function createResponse<T>(id: RequestId, result: T): AcpResponse<T> {
 /**
  * 创建错误响应
  */
-export function createErrorResponse(id: RequestId, code: number, message: string, data?: unknown): AcpResponse {
+export function createErrorResponse(
+	id: RequestId,
+	code: number,
+	message: string,
+	data?: unknown,
+): AcpResponse {
 	return {
 		jsonrpc: JSONRPC_VERSION,
 		id,

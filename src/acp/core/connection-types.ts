@@ -2,8 +2,8 @@
  * ACP 连接相关类型定义
  */
 
-import type { AcpBackendId } from '../backends';
-import type { PermissionSettings } from '../../main';
+import type { AcpBackendId } from "../backends";
+import type { PermissionSettings } from "../../main";
 
 /**
  * 文件操作信息
@@ -21,7 +21,7 @@ export interface FileOperation {
 export interface McpServerConfig {
 	id: string;
 	name: string;
-	type: 'stdio' | 'http' | 'sse';
+	type: "stdio" | "http" | "sse";
 	command?: string;
 	args?: string[];
 	url?: string;
@@ -58,4 +58,8 @@ export interface ConnectionOptions {
 /**
  * 连接状态
  */
-export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
+export type ConnectionState =
+	| "disconnected"
+	| "connecting"
+	| "connected"
+	| "error";

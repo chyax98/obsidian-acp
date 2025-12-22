@@ -8,7 +8,7 @@
  * - UI 事件回调
  */
 
-import type { AcpConnection, FileOperation } from './connection';
+import type { AcpConnection, FileOperation } from "./connection";
 import type {
 	SessionNotificationParams,
 	RequestPermissionParams,
@@ -21,9 +21,9 @@ import type {
 	AvailableCommand,
 	CurrentModeUpdateData,
 	AvailableCommandsUpdateData,
-} from '../types';
-import { StreamingMessageBuffer } from './message-buffer';
-import { SessionExporter } from './session-export';
+} from "../types";
+import { StreamingMessageBuffer } from "./message-buffer";
+import { SessionExporter } from "./session-export";
 
 // 类型导出（保持向后兼容）
 export type {
@@ -36,7 +36,7 @@ export type {
 	PlanEntry,
 	Turn,
 	SessionExportData,
-} from './types';
+} from "./types";
 
 import type {
 	SessionState,
@@ -48,7 +48,7 @@ import type {
 	PlanEntry,
 	Turn,
 	SessionExportData,
-} from './types';
+} from "./types";
 
 // ============================================================================
 // SessionManager 配置
@@ -63,7 +63,9 @@ export interface SessionManagerConfig {
 	/** 工作目录 */
 	workingDir?: string;
 	/** 权限请求回调（可选，用于避免竞态条件） */
-	onPermissionRequest?: (params: RequestPermissionParams) => Promise<PermissionOutcome>;
+	onPermissionRequest?: (
+		params: RequestPermissionParams,
+	) => Promise<PermissionOutcome>;
 }
 
 // ============================================================================
@@ -81,7 +83,7 @@ export class SessionManager {
 	private workingDir: string;
 
 	// 状态
-	private _state: SessionState = 'idle';
+	private _state: SessionState = "idle";
 	private _sessionId: string | null = null;
 
 	// 历史
@@ -113,14 +115,19 @@ export class SessionManager {
 	public onThought: (thought: string) => void = () => {};
 
 	/** 状态变更回调 */
-	public onStateChange: (state: SessionState, previousState: SessionState) => void = () => {};
+	public onStateChange: (
+		state: SessionState,
+		previousState: SessionState,
+	) => void = () => {};
 
 	/** 回合结束回调 */
 	public onTurnEnd: (turn: Turn) => void = () => {};
 
 	/** 权限请求回调 */
-	public onPermissionRequest: (params: RequestPermissionParams) => Promise<PermissionOutcome> = () =>
-		Promise.resolve({ type: 'cancelled' });
+	public onPermissionRequest: (
+		params: RequestPermissionParams,
+	) => Promise<PermissionOutcome> = () =>
+		Promise.resolve({ type: "cancelled" });
 
 	/** 文件操作回调 */
 	public onFileOperation: (operation: FileOperation) => void = () => {};
@@ -129,10 +136,12 @@ export class SessionManager {
 	public onError: (error: Error) => void = () => {};
 
 	/** 当前模式更新回调 */
-	public onCurrentModeUpdate: (mode: string, description?: string) => void = () => {};
+	public onCurrentModeUpdate: (mode: string, description?: string) => void =
+		() => {};
 
 	/** 可用命令更新回调 */
-	public onAvailableCommandsUpdate: (commands: AvailableCommand[]) => void = () => {};
+	public onAvailableCommandsUpdate: (commands: AvailableCommand[]) => void =
+		() => {};
 
 	// ========================================================================
 	// 构造函数
@@ -161,8 +170,10 @@ export class SessionManager {
 	 * 设置连接回调
 	 */
 	private setupConnectionCallbacks(): void {
-		this.connection.onSessionUpdate = (data) => this.handleSessionUpdate(data);
-		this.connection.onPermissionRequest = (params) => this.onPermissionRequest(params);
+		this.connection.onSessionUpdate = (data) =>
+			this.handleSessionUpdate(data);
+		this.connection.onPermissionRequest = (params) =>
+			this.onPermissionRequest(params);
 		this.connection.onFileOperation = (op) => this.onFileOperation(op);
 		this.connection.onEndTurn = () => this.handleEndTurn();
 		this.connection.onError = (err) => this.onError(err);
@@ -194,7 +205,7 @@ export class SessionManager {
 	}
 
 	public get isProcessing(): boolean {
-		return this._state === 'processing';
+		return this._state === "processing";
 	}
 
 	// ========================================================================
@@ -219,7 +230,7 @@ export class SessionManager {
 
 	public async start(workingDir?: string): Promise<void> {
 		if (this._sessionId) {
-			throw new Error('会话已存在，请先结束当前会话');
+			throw new Error("会话已存在，请先结束当前会话");
 		}
 
 		const cwd = workingDir || this.workingDir;
@@ -234,15 +245,15 @@ export class SessionManager {
 		images?: Array<{ data: string; mimeType: string }>,
 	): Promise<StopReason> {
 		if (!this._sessionId) {
-			throw new Error('没有活动会话，请先调用 start()');
+			throw new Error("没有活动会话，请先调用 start()");
 		}
 
-		if (this._state === 'processing') {
-			throw new Error('会话正在处理中');
+		if (this._state === "processing") {
+			throw new Error("会话正在处理中");
 		}
 
 		const textToSend = fullText ?? displayText;
-		const userMessage = this.createMessage('user', displayText);
+		const userMessage = this.createMessage("user", displayText);
 		this._messages.push(userMessage);
 		this.onMessage(userMessage, true);
 
@@ -254,7 +265,7 @@ export class SessionManager {
 			startTime: Date.now(),
 		};
 
-		this.setState('processing');
+		this.setState("processing");
 
 		try {
 			const promptContent = this.buildPromptContent(textToSend, images);
@@ -263,7 +274,7 @@ export class SessionManager {
 			this.completeTurn(stopReason);
 			return stopReason;
 		} catch (error) {
-			this.completeTurn('error');
+			this.completeTurn("error");
 			throw error;
 		}
 	}
@@ -272,12 +283,12 @@ export class SessionManager {
 		text: string,
 		images?: Array<{ data: string; mimeType: string }>,
 	): PromptContent[] {
-		const content: PromptContent[] = [{ type: 'text', text }];
+		const content: PromptContent[] = [{ type: "text", text }];
 
 		if (images && images.length > 0) {
 			for (const image of images) {
 				content.push({
-					type: 'image',
+					type: "image",
 					data: image.data,
 					mimeType: image.mimeType,
 				});
@@ -288,29 +299,29 @@ export class SessionManager {
 	}
 
 	public async cancel(): Promise<void> {
-		if (this._state !== 'processing') {
+		if (this._state !== "processing") {
 			return;
 		}
 
-		this.setState('cancelled');
+		this.setState("cancelled");
 
 		try {
 			await this.connection.cancelSession();
 		} catch (error) {
-			console.error('[SessionManager] 取消失败:', error);
+			console.error("[SessionManager] 取消失败:", error);
 		}
 
-		this.completeTurn('cancelled');
+		this.completeTurn("cancelled");
 	}
 
 	public end(): void {
 		if (this.currentTurn) {
-			this.completeTurn('cancelled');
+			this.completeTurn("cancelled");
 		}
 
 		this.messageBuffer.clear();
 		this._sessionId = null;
-		this.setState('idle');
+		this.setState("idle");
 	}
 
 	public clearHistory(): void {
@@ -335,11 +346,20 @@ export class SessionManager {
 	}
 
 	private parseStopReason(response: PromptResponse): StopReason {
-		const validReasons: StopReason[] = ['end_turn', 'cancelled', 'max_tokens', 'max_turn_requests', 'refusal'];
-		if (response.stopReason && validReasons.includes(response.stopReason as StopReason)) {
+		const validReasons: StopReason[] = [
+			"end_turn",
+			"cancelled",
+			"max_tokens",
+			"max_turn_requests",
+			"refusal",
+		];
+		if (
+			response.stopReason &&
+			validReasons.includes(response.stopReason as StopReason)
+		) {
 			return response.stopReason as StopReason;
 		}
-		return 'end_turn';
+		return "end_turn";
 	}
 
 	private completeTurn(stopReason: StopReason): void {
@@ -357,7 +377,7 @@ export class SessionManager {
 		this.onTurnEnd(this.currentTurn);
 
 		this.currentTurn = null;
-		this.setState('idle');
+		this.setState("idle");
 	}
 
 	// ========================================================================
@@ -368,25 +388,27 @@ export class SessionManager {
 		const update = data.update;
 
 		switch (update.sessionUpdate) {
-			case 'agent_message_chunk':
+			case "agent_message_chunk":
 				this.handleAgentMessageChunk(update);
 				break;
-			case 'agent_thought_chunk':
+			case "agent_thought_chunk":
 				this.handleAgentThoughtChunk(update);
 				break;
-			case 'tool_call':
+			case "tool_call":
 				this.handleToolCall(update);
 				break;
-			case 'tool_call_update':
+			case "tool_call_update":
 				this.handleToolCallUpdate(update);
 				break;
-			case 'plan':
-				this.handlePlan(update as { sessionUpdate: 'plan'; entries: PlanEntry[] });
+			case "plan":
+				this.handlePlan(
+					update as { sessionUpdate: "plan"; entries: PlanEntry[] },
+				);
 				break;
-			case 'current_mode_update':
+			case "current_mode_update":
 				this.handleCurrentModeUpdate(update);
 				break;
-			case 'available_commands_update':
+			case "available_commands_update":
 				this.handleAvailableCommandsUpdate(update);
 				break;
 			default:
@@ -401,7 +423,7 @@ export class SessionManager {
 		const text = this.extractMessageText(update);
 
 		if (!this.currentTurn.assistantMessage) {
-			const message = this.createMessage('assistant', '');
+			const message = this.createMessage("assistant", "");
 			message.isStreaming = true;
 			this.currentTurn.assistantMessage = message;
 			this._messages.push(message);
@@ -417,38 +439,49 @@ export class SessionManager {
 					this.onMessage(this.currentTurn.assistantMessage, false);
 				}
 			},
-			'accumulate',
+			"accumulate",
 		);
 	}
 
 	private extractMessageText(update: SessionUpdateData): string {
-		const content = (update as { content?: { type?: string; text?: string; uri?: string; name?: string; title?: string; description?: string } }).content;
-		if (!content) return '';
+		const content = (
+			update as {
+				content?: {
+					type?: string;
+					text?: string;
+					uri?: string;
+					name?: string;
+					title?: string;
+					description?: string;
+				};
+			}
+		).content;
+		if (!content) return "";
 
-		if (content.type === 'text') {
-			return content.text || '';
+		if (content.type === "text") {
+			return content.text || "";
 		}
-		if (content.type === 'resource_link') {
-			const linkName = content.title || content.name || 'Resource';
-			const linkUri = content.uri || '';
+		if (content.type === "resource_link") {
+			const linkName = content.title || content.name || "Resource";
+			const linkUri = content.uri || "";
 			let text = `[${linkName}](${linkUri})`;
 			if (content.description) {
 				text += `\n> ${content.description}`;
 			}
 			return text;
 		}
-		if (content.type === 'image') {
-			return content.uri ? `![图像](${content.uri})` : '(图像)';
+		if (content.type === "image") {
+			return content.uri ? `![图像](${content.uri})` : "(图像)";
 		}
 
-		return '';
+		return "";
 	}
 
 	private handleAgentThoughtChunk(update: SessionUpdateData): void {
 		if (!this.currentTurn) return;
 
 		const content = (update as { content?: { text?: string } }).content;
-		const text = content?.text || '';
+		const text = content?.text || "";
 
 		if (text) {
 			this.currentTurn.thoughts.push(text);
@@ -464,9 +497,9 @@ export class SessionManager {
 
 		const toolCall: ToolCall = {
 			toolCallId: update.toolCallId,
-			title: update.title || '工具调用',
-			kind: update.kind || 'other',
-			status: (update.status as ToolCallStatus) || 'pending',
+			title: update.title || "工具调用",
+			kind: update.kind || "other",
+			status: (update.status as ToolCallStatus) || "pending",
 			locations: update.locations,
 			rawInput: update.rawInput,
 			startTime: Date.now(),
@@ -488,7 +521,9 @@ export class SessionManager {
 	private handleToolCallUpdate(update: ToolCallStatusUpdateData): void {
 		if (!this.currentTurn) return;
 
-		const toolCall = this.currentTurn.toolCalls.find((tc) => tc.toolCallId === update.toolCallId);
+		const toolCall = this.currentTurn.toolCalls.find(
+			(tc) => tc.toolCallId === update.toolCallId,
+		);
 		if (!toolCall) return;
 
 		if (update.status) {
@@ -499,14 +534,17 @@ export class SessionManager {
 			toolCall.content = update.content;
 		}
 
-		if (toolCall.status === 'completed' || toolCall.status === 'failed') {
+		if (toolCall.status === "completed" || toolCall.status === "failed") {
 			toolCall.endTime = Date.now();
 		}
 
 		this.onToolCall(toolCall);
 	}
 
-	private handlePlan(update: { sessionUpdate: 'plan'; entries: PlanEntry[] }): void {
+	private handlePlan(update: {
+		sessionUpdate: "plan";
+		entries: PlanEntry[];
+	}): void {
 		if (!this.currentTurn) return;
 
 		this.currentTurn.plan = update.entries;
@@ -514,24 +552,26 @@ export class SessionManager {
 	}
 
 	private handleEndTurn(): void {
-		if (this._state === 'processing') {
-			this.completeTurn('end_turn');
+		if (this._state === "processing") {
+			this.completeTurn("end_turn");
 		}
 	}
 
 	private handleDisconnect(): void {
 		if (this.currentTurn) {
-			this.completeTurn('error');
+			this.completeTurn("error");
 		}
 		this._sessionId = null;
-		this.setState('idle');
+		this.setState("idle");
 	}
 
 	private handleCurrentModeUpdate(update: CurrentModeUpdateData): void {
 		this.onCurrentModeUpdate(update.mode, update.description);
 	}
 
-	private handleAvailableCommandsUpdate(update: AvailableCommandsUpdateData): void {
+	private handleAvailableCommandsUpdate(
+		update: AvailableCommandsUpdateData,
+	): void {
 		this.onAvailableCommandsUpdate(update.availableCommands);
 	}
 
@@ -540,14 +580,22 @@ export class SessionManager {
 	// ========================================================================
 
 	public toJSON(): SessionExportData {
-		return SessionExporter.toJSON(this._sessionId, this._messages, this._turns, this.workingDir);
+		return SessionExporter.toJSON(
+			this._sessionId,
+			this._messages,
+			this._turns,
+			this.workingDir,
+		);
 	}
 
 	public toMarkdown(): string {
 		return SessionExporter.toMarkdown(this._turns, this.workingDir);
 	}
 
-	public static fromJSON(data: SessionExportData): { messages: Message[]; turns: Turn[] } {
+	public static fromJSON(data: SessionExportData): {
+		messages: Message[];
+		turns: Turn[];
+	} {
 		return SessionExporter.fromJSON(data);
 	}
 }

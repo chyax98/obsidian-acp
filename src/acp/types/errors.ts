@@ -13,29 +13,29 @@
  */
 export enum AcpErrorType {
 	/** 连接未就绪 */
-	CONNECTION_NOT_READY = 'CONNECTION_NOT_READY',
+	CONNECTION_NOT_READY = "CONNECTION_NOT_READY",
 	/** 连接已关闭 */
-	CONNECTION_CLOSED = 'CONNECTION_CLOSED',
+	CONNECTION_CLOSED = "CONNECTION_CLOSED",
 	/** 认证失败 */
-	AUTHENTICATION_FAILED = 'AUTHENTICATION_FAILED',
+	AUTHENTICATION_FAILED = "AUTHENTICATION_FAILED",
 	/** 会话过期 */
-	SESSION_EXPIRED = 'SESSION_EXPIRED',
+	SESSION_EXPIRED = "SESSION_EXPIRED",
 	/** 会话不存在 */
-	SESSION_NOT_FOUND = 'SESSION_NOT_FOUND',
+	SESSION_NOT_FOUND = "SESSION_NOT_FOUND",
 	/** 网络错误 */
-	NETWORK_ERROR = 'NETWORK_ERROR',
+	NETWORK_ERROR = "NETWORK_ERROR",
 	/** 超时 */
-	TIMEOUT = 'TIMEOUT',
+	TIMEOUT = "TIMEOUT",
 	/** 权限拒绝 */
-	PERMISSION_DENIED = 'PERMISSION_DENIED',
+	PERMISSION_DENIED = "PERMISSION_DENIED",
 	/** 进程启动失败 */
-	SPAWN_FAILED = 'SPAWN_FAILED',
+	SPAWN_FAILED = "SPAWN_FAILED",
 	/** CLI 未安装 */
-	CLI_NOT_FOUND = 'CLI_NOT_FOUND',
+	CLI_NOT_FOUND = "CLI_NOT_FOUND",
 	/** 协议错误 */
-	PROTOCOL_ERROR = 'PROTOCOL_ERROR',
+	PROTOCOL_ERROR = "PROTOCOL_ERROR",
 	/** 未知错误 */
-	UNKNOWN = 'UNKNOWN',
+	UNKNOWN = "UNKNOWN",
 }
 
 // ============================================================================
@@ -118,7 +118,11 @@ export function isRetryableError(error: AcpError): boolean {
 	if (error.retryable) return true;
 
 	// 这些错误类型通常可以重试
-	const retryableTypes = [AcpErrorType.CONNECTION_NOT_READY, AcpErrorType.NETWORK_ERROR, AcpErrorType.TIMEOUT];
+	const retryableTypes = [
+		AcpErrorType.CONNECTION_NOT_READY,
+		AcpErrorType.NETWORK_ERROR,
+		AcpErrorType.TIMEOUT,
+	];
 
 	return retryableTypes.includes(error.type);
 }
@@ -158,69 +162,99 @@ export function isFailure<T>(result: AcpResult<T>): result is AcpFailure {
 /**
  * 连接未就绪错误
  */
-export function connectionNotReadyError(message = '连接尚未就绪'): AcpError {
-	return createAcpError(AcpErrorType.CONNECTION_NOT_READY, message, { retryable: true });
+export function connectionNotReadyError(message = "连接尚未就绪"): AcpError {
+	return createAcpError(AcpErrorType.CONNECTION_NOT_READY, message, {
+		retryable: true,
+	});
 }
 
 /**
  * 连接已关闭错误
  */
-export function connectionClosedError(message = '连接已关闭'): AcpError {
-	return createAcpError(AcpErrorType.CONNECTION_CLOSED, message, { retryable: true });
+export function connectionClosedError(message = "连接已关闭"): AcpError {
+	return createAcpError(AcpErrorType.CONNECTION_CLOSED, message, {
+		retryable: true,
+	});
 }
 
 /**
  * 网络错误
  */
 export function networkError(message: string, cause?: Error): AcpError {
-	return createAcpError(AcpErrorType.NETWORK_ERROR, message, { retryable: true, cause });
+	return createAcpError(AcpErrorType.NETWORK_ERROR, message, {
+		retryable: true,
+		cause,
+	});
 }
 
 /**
  * 超时错误
  */
 export function timeoutError(operation: string, timeoutMs: number): AcpError {
-	return createAcpError(AcpErrorType.TIMEOUT, `${operation} 超时 (${timeoutMs}ms)`, { retryable: true });
+	return createAcpError(
+		AcpErrorType.TIMEOUT,
+		`${operation} 超时 (${timeoutMs}ms)`,
+		{ retryable: true },
+	);
 }
 
 /**
  * 会话过期错误
  */
-export function sessionExpiredError(message = '会话已过期'): AcpError {
-	return createAcpError(AcpErrorType.SESSION_EXPIRED, message, { retryable: false });
+export function sessionExpiredError(message = "会话已过期"): AcpError {
+	return createAcpError(AcpErrorType.SESSION_EXPIRED, message, {
+		retryable: false,
+	});
 }
 
 /**
  * 会话未找到错误
  */
 export function sessionNotFoundError(sessionId: string): AcpError {
-	return createAcpError(AcpErrorType.SESSION_NOT_FOUND, `会话未找到: ${sessionId}`, { retryable: false });
+	return createAcpError(
+		AcpErrorType.SESSION_NOT_FOUND,
+		`会话未找到: ${sessionId}`,
+		{ retryable: false },
+	);
 }
 
 /**
  * 认证失败错误
  */
-export function authenticationFailedError(message = '认证失败'): AcpError {
-	return createAcpError(AcpErrorType.AUTHENTICATION_FAILED, message, { retryable: false });
+export function authenticationFailedError(message = "认证失败"): AcpError {
+	return createAcpError(AcpErrorType.AUTHENTICATION_FAILED, message, {
+		retryable: false,
+	});
 }
 
 /**
  * CLI 未找到错误
  */
 export function cliNotFoundError(cliName: string): AcpError {
-	return createAcpError(AcpErrorType.CLI_NOT_FOUND, `未找到 CLI: ${cliName}，请确认已安装`, { retryable: false });
+	return createAcpError(
+		AcpErrorType.CLI_NOT_FOUND,
+		`未找到 CLI: ${cliName}，请确认已安装`,
+		{ retryable: false },
+	);
 }
 
 /**
  * 进程启动失败错误
  */
 export function spawnFailedError(command: string, reason: string): AcpError {
-	return createAcpError(AcpErrorType.SPAWN_FAILED, `启动进程失败: ${command} - ${reason}`, { retryable: false });
+	return createAcpError(
+		AcpErrorType.SPAWN_FAILED,
+		`启动进程失败: ${command} - ${reason}`,
+		{ retryable: false },
+	);
 }
 
 /**
  * 协议错误
  */
 export function protocolError(message: string, details?: unknown): AcpError {
-	return createAcpError(AcpErrorType.PROTOCOL_ERROR, message, { retryable: false, details });
+	return createAcpError(AcpErrorType.PROTOCOL_ERROR, message, {
+		retryable: false,
+		details,
+	});
 }

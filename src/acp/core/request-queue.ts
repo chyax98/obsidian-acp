@@ -8,7 +8,7 @@
  * - 超时暂停/恢复（用于权限请求等场景）
  */
 
-import type { RequestId } from '../types';
+import type { RequestId } from "../types";
 
 // ============================================================================
 // 类型定义
@@ -97,7 +97,9 @@ export class RequestQueue {
 				const request = this.requests.get(id);
 				if (request && !request.isPaused) {
 					this.requests.delete(id);
-					reject(new Error(`请求 ${method} 超时 (${timeoutMs / 1000}s)`));
+					reject(
+						new Error(`请求 ${method} 超时 (${timeoutMs / 1000}s)`),
+					);
 				}
 			}, timeoutMs);
 
@@ -214,7 +216,10 @@ export class RequestQueue {
 		if (!request || !request.isPaused) return false;
 
 		// 计算剩余时间
-		const remaining = Math.max(0, request.timeoutDuration - request.elapsedTime);
+		const remaining = Math.max(
+			0,
+			request.timeoutDuration - request.elapsedTime,
+		);
 
 		if (remaining > 0) {
 			// 更新开始时间
@@ -303,7 +308,7 @@ export class RequestQueue {
 	 * @param reason - 拒绝原因
 	 * @returns 清空的请求数
 	 */
-	public clear(reason = '连接已断开'): number {
+	public clear(reason = "连接已断开"): number {
 		const count = this.requests.size;
 
 		for (const [, request] of this.requests) {

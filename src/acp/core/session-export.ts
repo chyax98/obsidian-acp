@@ -10,7 +10,7 @@ import type {
 	ToolCall,
 	ToolCallStatus,
 	SessionExportData,
-} from './types';
+} from "./types";
 
 /**
  * 会话导出器
@@ -58,13 +58,16 @@ export class SessionExporter {
 			this.appendTurn(lines, turn);
 		}
 
-		return lines.join('\n');
+		return lines.join("\n");
 	}
 
 	/**
 	 * 从 JSON 数据恢复会话
 	 */
-	public static fromJSON(data: SessionExportData): { messages: Message[]; turns: Turn[] } {
+	public static fromJSON(data: SessionExportData): {
+		messages: Message[];
+		turns: Turn[];
+	} {
 		if (data.version !== 1) {
 			throw new Error(`不支持的会话数据版本: ${data.version}`);
 		}
@@ -78,15 +81,19 @@ export class SessionExporter {
 	// Markdown 导出辅助方法
 	// ========================================================================
 
-	private static appendHeader(lines: string[], workingDir: string, messageCount: number): void {
-		lines.push('# ACP 会话记录');
-		lines.push('');
+	private static appendHeader(
+		lines: string[],
+		workingDir: string,
+		messageCount: number,
+	): void {
+		lines.push("# ACP 会话记录");
+		lines.push("");
 		lines.push(`> 导出时间: ${new Date().toLocaleString()}`);
 		lines.push(`> 工作目录: ${workingDir}`);
 		lines.push(`> 消息数: ${messageCount}`);
-		lines.push('');
-		lines.push('---');
-		lines.push('');
+		lines.push("");
+		lines.push("---");
+		lines.push("");
 	}
 
 	private static appendTurn(lines: string[], turn: Turn): void {
@@ -108,43 +115,49 @@ export class SessionExporter {
 			this.appendAssistantMessage(lines, turn.assistantMessage);
 		}
 
-		lines.push('---');
-		lines.push('');
+		lines.push("---");
+		lines.push("");
 	}
 
 	private static appendUserMessage(lines: string[], message: Message): void {
-		lines.push('## 👤 用户');
-		lines.push('');
+		lines.push("## 👤 用户");
+		lines.push("");
 		lines.push(message.content);
-		lines.push('');
+		lines.push("");
 	}
 
 	private static appendThoughts(lines: string[], thoughts: string[]): void {
-		lines.push('### 💭 思考');
-		lines.push('');
+		lines.push("### 💭 思考");
+		lines.push("");
 		for (const thought of thoughts) {
-			lines.push(`> ${thought.replace(/\n/g, '\n> ')}`);
+			lines.push(`> ${thought.replace(/\n/g, "\n> ")}`);
 		}
-		lines.push('');
+		lines.push("");
 	}
 
-	private static appendToolCalls(lines: string[], toolCalls: ToolCall[]): void {
-		lines.push('### 🔧 工具调用');
-		lines.push('');
+	private static appendToolCalls(
+		lines: string[],
+		toolCalls: ToolCall[],
+	): void {
+		lines.push("### 🔧 工具调用");
+		lines.push("");
 		for (const toolCall of toolCalls) {
 			this.appendSingleToolCall(lines, toolCall);
 		}
-		lines.push('');
+		lines.push("");
 	}
 
-	private static appendSingleToolCall(lines: string[], toolCall: ToolCall): void {
+	private static appendSingleToolCall(
+		lines: string[],
+		toolCall: ToolCall,
+	): void {
 		const statusIcon = this.getToolStatusIcon(toolCall.status);
 		lines.push(`- ${statusIcon} **${toolCall.title}** (${toolCall.kind})`);
 
 		// 工具输出 - 提取为单独处理避免深层嵌套
 		const outputText = this.extractToolCallOutput(toolCall);
 		if (outputText) {
-			this.appendCodeBlock(lines, outputText, '  ');
+			this.appendCodeBlock(lines, outputText, "  ");
 		}
 	}
 
@@ -154,38 +167,47 @@ export class SessionExporter {
 		}
 
 		for (const content of toolCall.content) {
-			if (content.type !== 'content') continue;
-			if (content.content?.type !== 'text') continue;
+			if (content.type !== "content") continue;
+			if (content.content?.type !== "text") continue;
 
-			const text = content.content.text || '';
+			const text = content.content.text || "";
 			if (!text) continue;
 
-			return text.length > 500 ? text.slice(0, 500) + '...(truncated)' : text;
+			return text.length > 500
+				? text.slice(0, 500) + "...(truncated)"
+				: text;
 		}
 
 		return null;
 	}
 
-	private static appendCodeBlock(lines: string[], text: string, indent: string): void {
+	private static appendCodeBlock(
+		lines: string[],
+		text: string,
+		indent: string,
+	): void {
 		lines.push(`${indent}\`\`\``);
 		lines.push(indent + text.replace(/\n/g, `\n${indent}`));
 		lines.push(`${indent}\`\`\``);
 	}
 
-	private static appendAssistantMessage(lines: string[], message: Message): void {
-		lines.push('## 🤖 Agent');
-		lines.push('');
+	private static appendAssistantMessage(
+		lines: string[],
+		message: Message,
+	): void {
+		lines.push("## 🤖 Agent");
+		lines.push("");
 		lines.push(message.content);
-		lines.push('');
+		lines.push("");
 	}
 
 	private static getToolStatusIcon(status: ToolCallStatus): string {
 		const icons: Record<ToolCallStatus, string> = {
-			completed: '✅',
-			failed: '❌',
-			in_progress: '⏳',
-			pending: '⏸️',
+			completed: "✅",
+			failed: "❌",
+			in_progress: "⏳",
+			pending: "⏸️",
 		};
-		return icons[status] || '⏸️';
+		return icons[status] || "⏸️";
 	}
 }

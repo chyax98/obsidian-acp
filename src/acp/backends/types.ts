@@ -11,7 +11,7 @@
 /**
  * 只支持 Claude Code
  */
-export type AcpBackendId = 'claude';
+export type AcpBackendId = "claude";
 
 // ============================================================================
 // 后端配置接口
@@ -138,7 +138,11 @@ export interface DetectableAcpCli {
 /**
  * 后端检测状态
  */
-export type BackendDetectionStatus = 'unknown' | 'checking' | 'installed' | 'not_installed';
+export type BackendDetectionStatus =
+	| "unknown"
+	| "checking"
+	| "installed"
+	| "not_installed";
 
 /**
  * 后端运行时状态

@@ -7,7 +7,7 @@
  * - 脉冲动画
  */
 
-import { setIcon } from 'obsidian';
+import { setIcon } from "obsidian";
 
 /**
  * 思考块渲染器
@@ -21,9 +21,15 @@ export class ThoughtRenderer {
 	 * @param isStreaming - 是否正在流式输出
 	 * @returns 思考块元素
 	 */
-	public static render(container: HTMLElement, thoughts: string[], isStreaming = false): HTMLElement {
+	public static render(
+		container: HTMLElement,
+		thoughts: string[],
+		isStreaming = false,
+	): HTMLElement {
 		// 查找已存在的思考块
-		const thoughtsEl = container.querySelector('.acp-thoughts') as HTMLElement;
+		const thoughtsEl = container.querySelector(
+			".acp-thoughts",
+		) as HTMLElement;
 
 		if (thoughtsEl) {
 			// 增量更新
@@ -38,36 +44,43 @@ export class ThoughtRenderer {
 	/**
 	 * 更新已存在的思考块
 	 */
-	private static updateExisting(thoughtsEl: HTMLElement, thoughts: string[], isStreaming: boolean): void {
+	private static updateExisting(
+		thoughtsEl: HTMLElement,
+		thoughts: string[],
+		isStreaming: boolean,
+	): void {
 		requestAnimationFrame(() => {
 			// 更新计数
-			const countEl = thoughtsEl.querySelector('.acp-thoughts-count');
+			const countEl = thoughtsEl.querySelector(".acp-thoughts-count");
 			if (countEl) {
 				countEl.textContent = `(${thoughts.length})`;
 			}
 
 			// 更新标题
-			const titleEl = thoughtsEl.querySelector('.acp-thoughts-title');
+			const titleEl = thoughtsEl.querySelector(".acp-thoughts-title");
 			if (titleEl) {
-				titleEl.textContent = isStreaming ? '正在思考...' : '思考过程';
+				titleEl.textContent = isStreaming ? "正在思考..." : "思考过程";
 			}
 
 			// 更新图标动画
-			const iconEl = thoughtsEl.querySelector('.acp-thoughts-icon');
+			const iconEl = thoughtsEl.querySelector(".acp-thoughts-icon");
 			if (iconEl) {
 				if (isStreaming) {
-					iconEl.addClass('acp-thoughts-streaming');
+					iconEl.addClass("acp-thoughts-streaming");
 				} else {
-					iconEl.removeClass('acp-thoughts-streaming');
+					iconEl.removeClass("acp-thoughts-streaming");
 				}
 			}
 
 			// 增量添加新的思考项
-			const contentEl = thoughtsEl.querySelector('.acp-thoughts-content');
+			const contentEl = thoughtsEl.querySelector(".acp-thoughts-content");
 			if (contentEl) {
-				const existingCount = contentEl.querySelectorAll('.acp-thought-item').length;
+				const existingCount =
+					contentEl.querySelectorAll(".acp-thought-item").length;
 				for (let i = existingCount; i < thoughts.length; i++) {
-					const thoughtEl = (contentEl as HTMLElement).createDiv({ cls: 'acp-thought-item' });
+					const thoughtEl = (contentEl as HTMLElement).createDiv({
+						cls: "acp-thought-item",
+					});
 					thoughtEl.textContent = thoughts[i];
 				}
 			}
@@ -77,58 +90,70 @@ export class ThoughtRenderer {
 	/**
 	 * 创建新的思考块
 	 */
-	private static createNew(container: HTMLElement, thoughts: string[], isStreaming: boolean): HTMLElement {
-		const thoughtsEl = container.createDiv({ cls: 'acp-thoughts' });
+	private static createNew(
+		container: HTMLElement,
+		thoughts: string[],
+		isStreaming: boolean,
+	): HTMLElement {
+		const thoughtsEl = container.createDiv({ cls: "acp-thoughts" });
 
 		// 头部
-		const headerEl = thoughtsEl.createDiv({ cls: 'acp-thoughts-header' });
-		const leftEl = headerEl.createDiv({ cls: 'acp-thoughts-left' });
+		const headerEl = thoughtsEl.createDiv({ cls: "acp-thoughts-header" });
+		const leftEl = headerEl.createDiv({ cls: "acp-thoughts-left" });
 
 		// 展开/折叠图标
-		const toggleIcon = leftEl.createDiv({ cls: 'acp-thoughts-toggle' });
-		setIcon(toggleIcon, 'chevron-right');
+		const toggleIcon = leftEl.createDiv({ cls: "acp-thoughts-toggle" });
+		setIcon(toggleIcon, "chevron-right");
 
 		// 思考图标
 		const thinkIcon = leftEl.createDiv({
-			cls: isStreaming ? 'acp-thoughts-icon acp-thoughts-streaming' : 'acp-thoughts-icon',
+			cls: isStreaming
+				? "acp-thoughts-icon acp-thoughts-streaming"
+				: "acp-thoughts-icon",
 		});
-		setIcon(thinkIcon, 'brain');
+		setIcon(thinkIcon, "brain");
 
 		// 标题
 		leftEl.createDiv({
-			cls: 'acp-thoughts-title',
-			text: isStreaming ? '正在思考...' : '思考过程',
+			cls: "acp-thoughts-title",
+			text: isStreaming ? "正在思考..." : "思考过程",
 		});
 
 		// 数量
-		leftEl.createDiv({ cls: 'acp-thoughts-count', text: `(${thoughts.length})` });
+		leftEl.createDiv({
+			cls: "acp-thoughts-count",
+			text: `(${thoughts.length})`,
+		});
 
 		// 内容区域（默认折叠）
 		const contentEl = thoughtsEl.createDiv({
-			cls: 'acp-thoughts-content',
-			attr: { 'data-expanded': 'false' },
+			cls: "acp-thoughts-content",
+			attr: { "data-expanded": "false" },
 		});
 
 		// 渲染每条思考
 		for (const thought of thoughts) {
-			const thoughtEl = contentEl.createDiv({ cls: 'acp-thought-item' });
+			const thoughtEl = contentEl.createDiv({ cls: "acp-thought-item" });
 			thoughtEl.textContent = thought;
 		}
 
 		// 点击头部切换
-		headerEl.addEventListener('click', () => {
-			const expanded = contentEl.getAttribute('data-expanded') === 'true';
+		headerEl.addEventListener("click", () => {
+			const expanded = contentEl.getAttribute("data-expanded") === "true";
 			const newExpanded = !expanded;
-			contentEl.setAttribute('data-expanded', newExpanded ? 'true' : 'false');
+			contentEl.setAttribute(
+				"data-expanded",
+				newExpanded ? "true" : "false",
+			);
 
 			if (newExpanded) {
-				contentEl.addClass('acp-thoughts-content-expanded');
+				contentEl.addClass("acp-thoughts-content-expanded");
 			} else {
-				contentEl.removeClass('acp-thoughts-content-expanded');
+				contentEl.removeClass("acp-thoughts-content-expanded");
 			}
 
 			toggleIcon.empty();
-			setIcon(toggleIcon, newExpanded ? 'chevron-down' : 'chevron-right');
+			setIcon(toggleIcon, newExpanded ? "chevron-down" : "chevron-right");
 		});
 
 		return thoughtsEl;

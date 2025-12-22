@@ -71,7 +71,7 @@ export class StreamingMessageBuffer {
 		messageId: string,
 		chunk: string,
 		onUpdate: (content: string, isFinal: boolean) => void,
-		mode: 'accumulate' | 'replace' = 'accumulate',
+		mode: "accumulate" | "replace" = "accumulate",
 	): void {
 		let buffer = this.buffers.get(messageId);
 
@@ -79,7 +79,7 @@ export class StreamingMessageBuffer {
 		if (!buffer) {
 			buffer = {
 				messageId,
-				content: '',
+				content: "",
 				chunkCount: 0,
 				lastUpdate: Date.now(),
 				onUpdate,
@@ -88,7 +88,7 @@ export class StreamingMessageBuffer {
 		}
 
 		// 更新内容
-		if (mode === 'accumulate') {
+		if (mode === "accumulate") {
 			buffer.content += chunk;
 		} else {
 			buffer.content = chunk;

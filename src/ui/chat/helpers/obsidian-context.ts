@@ -4,7 +4,7 @@
  * 生成发送给 AI 的 Obsidian Vault 上下文信息
  */
 
-import type { App, TFolder } from 'obsidian';
+import type { App, TFolder } from "obsidian";
 
 /**
  * 上下文生成配置
@@ -44,13 +44,17 @@ export class ObsidianContextGenerator {
 		const parts: string[] = [];
 
 		// 系统角色说明
-		parts.push('[System Context]');
-		parts.push('You are working in an Obsidian vault - a local knowledge base with interconnected markdown notes.');
-		parts.push('The user may reference files using @path syntax. You can read and write files in this vault.');
-		parts.push('');
+		parts.push("[System Context]");
+		parts.push(
+			"You are working in an Obsidian vault - a local knowledge base with interconnected markdown notes.",
+		);
+		parts.push(
+			"The user may reference files using @path syntax. You can read and write files in this vault.",
+		);
+		parts.push("");
 
 		// Vault 信息
-		parts.push('[Vault Info]');
+		parts.push("[Vault Info]");
 		parts.push(`- Name: ${vault.getName()}`);
 
 		// 工作目录
@@ -63,43 +67,49 @@ export class ObsidianContextGenerator {
 
 		// 统计
 		const stats = this.getVaultStats();
-		parts.push(`- Stats: ${stats.mdFiles} notes, ${stats.otherFiles} attachments, ${stats.folders} folders`);
+		parts.push(
+			`- Stats: ${stats.mdFiles} notes, ${stats.otherFiles} attachments, ${stats.folders} folders`,
+		);
 
 		// 顶级目录结构
 		const topFolders = this.getTopFolders();
 		if (topFolders.length > 0) {
-			parts.push(`- Top folders: ${topFolders.join(', ')}`);
+			parts.push(`- Top folders: ${topFolders.join(", ")}`);
 		}
 
-		parts.push('');
+		parts.push("");
 
 		// 当前上下文
-		parts.push('[Current Context]');
+		parts.push("[Current Context]");
 		const activeFile = this.app.workspace.getActiveFile();
 		if (activeFile) {
 			parts.push(`- Active file: ${activeFile.path}`);
 		} else {
-			parts.push('- No file currently open');
+			parts.push("- No file currently open");
 		}
 
 		// Obsidian 语法提示
-		parts.push('');
-		parts.push('[Obsidian Syntax]');
-		parts.push('- Internal links: [[note]] or [[folder/note]]');
-		parts.push('- Tags: #tag or #nested/tag');
-		parts.push('- Frontmatter: YAML between --- at file start');
+		parts.push("");
+		parts.push("[Obsidian Syntax]");
+		parts.push("- Internal links: [[note]] or [[folder/note]]");
+		parts.push("- Tags: #tag or #nested/tag");
+		parts.push("- Frontmatter: YAML between --- at file start");
 
-		return parts.join('\n');
+		return parts.join("\n");
 	}
 
 	/**
 	 * 获取 Vault 统计信息
 	 */
-	private getVaultStats(): { mdFiles: number; otherFiles: number; folders: number } {
+	private getVaultStats(): {
+		mdFiles: number;
+		otherFiles: number;
+		folders: number;
+	} {
 		const vault = this.app.vault;
 		const allFiles = vault.getFiles();
-		const mdFiles = allFiles.filter(f => f.extension === 'md');
-		const folders = vault.getAllLoadedFiles().filter(f => {
+		const mdFiles = allFiles.filter((f) => f.extension === "md");
+		const folders = vault.getAllLoadedFiles().filter((f) => {
 			return (f as TFolder).children !== undefined;
 		});
 
@@ -115,12 +125,13 @@ export class ObsidianContextGenerator {
 	 */
 	private getTopFolders(): string[] {
 		const vault = this.app.vault;
-		return vault.getAllLoadedFiles()
+		return vault
+			.getAllLoadedFiles()
 			.filter((f): f is TFolder => {
 				const isFolder = (f as TFolder).children !== undefined;
-				return isFolder && f.parent?.path === '/';
+				return isFolder && f.parent?.path === "/";
 			})
-			.map(f => f.name)
+			.map((f) => f.name)
 			.slice(0, this.config.maxTopFolders);
 	}
 }

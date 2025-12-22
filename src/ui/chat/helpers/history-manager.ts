@@ -4,10 +4,16 @@
  * 处理会话的保存、加载和历史浏览
  */
 
-import type { App } from 'obsidian';
-import { Notice } from 'obsidian';
-import { SessionStorage, type SessionMeta } from '../../../acp/core/session-storage';
-import type { SessionExportData, Message } from '../../../acp/core/session-manager';
+import type { App } from "obsidian";
+import { Notice } from "obsidian";
+import {
+	SessionStorage,
+	type SessionMeta,
+} from "../../../acp/core/session-storage";
+import type {
+	SessionExportData,
+	Message,
+} from "../../../acp/core/session-manager";
 
 /**
  * 历史管理回调
@@ -71,12 +77,18 @@ export class HistoryManager {
 	/**
 	 * 保存当前会话
 	 */
-	public async saveSession(data: SessionExportData, agentName: string): Promise<string | null> {
+	public async saveSession(
+		data: SessionExportData,
+		agentName: string,
+	): Promise<string | null> {
 		try {
-			this.currentSessionId = await this.storage.saveSession(data, agentName);
+			this.currentSessionId = await this.storage.saveSession(
+				data,
+				agentName,
+			);
 			return this.currentSessionId;
 		} catch (error) {
-			console.error('[HistoryManager] 保存会话失败:', error);
+			console.error("[HistoryManager] 保存会话失败:", error);
 			return null;
 		}
 	}
@@ -95,7 +107,7 @@ export class HistoryManager {
 		try {
 			const storedSession = await this.storage.loadSession(sessionId);
 			if (!storedSession) {
-				new Notice('会话不存在');
+				new Notice("会话不存在");
 				return false;
 			}
 
@@ -119,11 +131,11 @@ export class HistoryManager {
 			}
 
 			this.callbacks.enterHistoryMode();
-			new Notice('查看历史会话（只读）');
+			new Notice("查看历史会话（只读）");
 			return true;
 		} catch (error) {
-			console.error('[HistoryManager] 加载会话失败:', error);
-			new Notice('加载会话失败');
+			console.error("[HistoryManager] 加载会话失败:", error);
+			new Notice("加载会话失败");
 			return false;
 		}
 	}
@@ -143,7 +155,7 @@ export class HistoryManager {
 			this.callbacks.showEmptyState();
 		}
 
-		new Notice('已返回当前对话');
+		new Notice("已返回当前对话");
 	}
 
 	/**
@@ -152,7 +164,7 @@ export class HistoryManager {
 	public async deleteSession(sessionId: string): Promise<boolean> {
 		const success = await this.storage.deleteSession(sessionId);
 		if (success) {
-			new Notice('会话已删除');
+			new Notice("会话已删除");
 		}
 		return success;
 	}

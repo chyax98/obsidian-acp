@@ -7,8 +7,8 @@
  * - file:// URI
  */
 
-import type { App } from 'obsidian';
-import { setIcon, Modal, TFile } from 'obsidian';
+import type { App } from "obsidian";
+import { setIcon, Modal, TFile } from "obsidian";
 
 /**
  * 图片渲染器
@@ -18,18 +18,22 @@ export class ImageRenderer {
 	 * 渲染图片（支持 data URI, HTTP/HTTPS URI, file:// URI）
 	 */
 	public static render(container: HTMLElement, uri: string, app: App): void {
-		const imageWrapper = container.createDiv({ cls: 'acp-content-image-wrapper' });
-		const imgEl = imageWrapper.createEl('img', { cls: 'acp-content-image' });
-		imgEl.alt = '图像';
+		const imageWrapper = container.createDiv({
+			cls: "acp-content-image-wrapper",
+		});
+		const imgEl = imageWrapper.createEl("img", {
+			cls: "acp-content-image",
+		});
+		imgEl.alt = "图像";
 
 		// 处理不同类型的 URI
-		if (uri.startsWith('data:')) {
+		if (uri.startsWith("data:")) {
 			imgEl.src = uri;
 			this.setupImageEvents(imgEl, imageWrapper, app);
-		} else if (uri.startsWith('http://') || uri.startsWith('https://')) {
+		} else if (uri.startsWith("http://") || uri.startsWith("https://")) {
 			imgEl.src = uri;
 			this.setupImageEvents(imgEl, imageWrapper, app);
-		} else if (uri.startsWith('file://')) {
+		} else if (uri.startsWith("file://")) {
 			void this.handleFileUri(uri, imgEl, imageWrapper, app);
 		} else {
 			imgEl.src = uri;
@@ -50,11 +54,11 @@ export class ImageRenderer {
 			let filePath = uri;
 
 			// 移除 file:// 前缀
-			if (filePath.startsWith('file:///')) {
+			if (filePath.startsWith("file:///")) {
 				filePath = filePath.substring(7);
-			} else if (filePath.startsWith('file://localhost/')) {
+			} else if (filePath.startsWith("file://localhost/")) {
 				filePath = filePath.substring(16);
-			} else if (filePath.startsWith('file://')) {
+			} else if (filePath.startsWith("file://")) {
 				filePath = filePath.substring(7);
 			}
 
@@ -70,30 +74,30 @@ export class ImageRenderer {
 			}
 
 			// Vault 外文件：使用 Node.js fs
-			const { promises: fs } = await import('fs');
-			const path = await import('path');
+			const { promises: fs } = await import("fs");
+			const path = await import("path");
 
 			await fs.access(filePath);
 			const imageData = await fs.readFile(filePath);
 
 			const ext = path.extname(filePath).toLowerCase();
 			const mimeTypes: Record<string, string> = {
-				'.png': 'image/png',
-				'.jpg': 'image/jpeg',
-				'.jpeg': 'image/jpeg',
-				'.gif': 'image/gif',
-				'.webp': 'image/webp',
-				'.svg': 'image/svg+xml',
-				'.bmp': 'image/bmp',
+				".png": "image/png",
+				".jpg": "image/jpeg",
+				".jpeg": "image/jpeg",
+				".gif": "image/gif",
+				".webp": "image/webp",
+				".svg": "image/svg+xml",
+				".bmp": "image/bmp",
 			};
-			const mimeType = mimeTypes[ext] || 'image/png';
-			const base64 = imageData.toString('base64');
+			const mimeType = mimeTypes[ext] || "image/png";
+			const base64 = imageData.toString("base64");
 			const dataUri = `data:${mimeType};base64,${base64}`;
 
 			imgEl.src = dataUri;
 			this.setupImageEvents(imgEl, imageWrapper, app);
 		} catch (error) {
-			console.error('[ImageRenderer] file:// URI 处理失败:', error);
+			console.error("[ImageRenderer] file:// URI 处理失败:", error);
 			this.showError(imageWrapper);
 		}
 	}
@@ -106,18 +110,18 @@ export class ImageRenderer {
 		imageWrapper: HTMLElement,
 		app: App,
 	): void {
-		imgEl.addClass('acp-image-loading');
+		imgEl.addClass("acp-image-loading");
 
-		imgEl.addEventListener('load', () => {
-			imgEl.removeClass('acp-image-loading');
-			imgEl.addClass('acp-image-loaded');
+		imgEl.addEventListener("load", () => {
+			imgEl.removeClass("acp-image-loading");
+			imgEl.addClass("acp-image-loaded");
 		});
 
-		imgEl.addEventListener('error', () => {
+		imgEl.addEventListener("error", () => {
 			this.showError(imageWrapper);
 		});
 
-		imgEl.addEventListener('click', () => {
+		imgEl.addEventListener("click", () => {
 			this.showPreview(imgEl.src, app);
 		});
 	}
@@ -127,10 +131,15 @@ export class ImageRenderer {
 	 */
 	private static showError(imageWrapper: HTMLElement): void {
 		imageWrapper.empty();
-		const errorEl = imageWrapper.createDiv({ cls: 'acp-image-error-placeholder' });
-		const iconEl = errorEl.createDiv({ cls: 'acp-image-error-icon' });
-		setIcon(iconEl, 'image-off');
-		errorEl.createDiv({ cls: 'acp-image-error-text', text: '图片加载失败' });
+		const errorEl = imageWrapper.createDiv({
+			cls: "acp-image-error-placeholder",
+		});
+		const iconEl = errorEl.createDiv({ cls: "acp-image-error-icon" });
+		setIcon(iconEl, "image-off");
+		errorEl.createDiv({
+			cls: "acp-image-error-text",
+			text: "图片加载失败",
+		});
 	}
 
 	/**
@@ -156,15 +165,15 @@ class ImagePreviewModal extends Modal {
 	public onOpen(): void {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.addClass('acp-image-preview-modal');
+		contentEl.addClass("acp-image-preview-modal");
 
-		const imgEl = contentEl.createEl('img', {
-			cls: 'acp-image-preview',
-			attr: { src: this.imageSrc, alt: '图片预览' },
+		const imgEl = contentEl.createEl("img", {
+			cls: "acp-image-preview",
+			attr: { src: this.imageSrc, alt: "图片预览" },
 		});
 
-		imgEl.addEventListener('click', () => this.close());
-		contentEl.addEventListener('click', (e) => {
+		imgEl.addEventListener("click", () => this.close());
+		contentEl.addEventListener("click", (e) => {
 			if (e.target === contentEl) this.close();
 		});
 	}

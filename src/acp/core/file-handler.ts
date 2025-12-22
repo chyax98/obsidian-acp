@@ -5,12 +5,12 @@
  * 优先使用 Obsidian Vault API，降级到 Node.js fs
  */
 
-import { TFile, normalizePath } from 'obsidian';
-import { promises as fs } from 'fs';
-import * as path from 'path';
+import { TFile, normalizePath } from "obsidian";
+import { promises as fs } from "fs";
+import * as path from "path";
 
-import { AcpMethod } from '../types';
-import type { FileOperation } from './connection-types';
+import { AcpMethod } from "../types";
+import type { FileOperation } from "./connection-types";
 
 /**
  * 文件操作处理器
@@ -52,7 +52,7 @@ export class FileHandler {
 		this.onFileOperation({
 			method: AcpMethod.FS_READ_TEXT_FILE,
 			path: resolvedPath,
-			sessionId: params.sessionId || '',
+			sessionId: params.sessionId || "",
 		});
 
 		// 优先使用 Vault API
@@ -66,7 +66,7 @@ export class FileHandler {
 		}
 
 		// 降级到 Node.js fs
-		const content = await fs.readFile(resolvedPath, 'utf-8');
+		const content = await fs.readFile(resolvedPath, "utf-8");
 		return { content };
 	}
 
@@ -85,13 +85,14 @@ export class FileHandler {
 			method: AcpMethod.FS_WRITE_TEXT_FILE,
 			path: resolvedPath,
 			content: params.content,
-			sessionId: params.sessionId || '',
+			sessionId: params.sessionId || "",
 		});
 
 		// 优先使用 Vault API
 		const vaultPath = this.toVaultPath(resolvedPath);
 		if (vaultPath && this.app?.vault) {
-			const existingFile = this.app.vault.getAbstractFileByPath(vaultPath);
+			const existingFile =
+				this.app.vault.getAbstractFileByPath(vaultPath);
 			if (existingFile instanceof TFile) {
 				// 文件存在，使用 modify
 				await this.app.vault.modify(existingFile, params.content);
@@ -106,7 +107,7 @@ export class FileHandler {
 
 		// 降级到 Node.js fs
 		await fs.mkdir(path.dirname(resolvedPath), { recursive: true });
-		await fs.writeFile(resolvedPath, params.content, 'utf-8');
+		await fs.writeFile(resolvedPath, params.content, "utf-8");
 
 		return null;
 	}
@@ -116,8 +117,9 @@ export class FileHandler {
 	 */
 	private async ensureParentDir(vaultPath: string): Promise<void> {
 		const parentPath = path.dirname(vaultPath);
-		if (parentPath && parentPath !== '.') {
-			const parentFolder = this.app.vault.getAbstractFileByPath(parentPath);
+		if (parentPath && parentPath !== ".") {
+			const parentFolder =
+				this.app.vault.getAbstractFileByPath(parentPath);
 			if (!parentFolder) {
 				await this.app.vault.createFolder(parentPath);
 			}
@@ -140,7 +142,7 @@ export class FileHandler {
 		if (!this.app?.vault?.adapter) return null;
 		const adapter = this.app.vault.adapter;
 		// 桌面版有 basePath 属性
-		if ('basePath' in adapter && typeof adapter.basePath === 'string') {
+		if ("basePath" in adapter && typeof adapter.basePath === "string") {
 			return adapter.basePath;
 		}
 		return null;
@@ -154,11 +156,13 @@ export class FileHandler {
 		if (!vaultBase) return null;
 
 		// 标准化路径分隔符
-		const normalizedAbsolute = absolutePath.replace(/\\/g, '/');
-		const normalizedBase = vaultBase.replace(/\\/g, '/');
+		const normalizedAbsolute = absolutePath.replace(/\\/g, "/");
+		const normalizedBase = vaultBase.replace(/\\/g, "/");
 
-		if (normalizedAbsolute.startsWith(normalizedBase + '/')) {
-			const relativePath = normalizedAbsolute.substring(normalizedBase.length + 1);
+		if (normalizedAbsolute.startsWith(normalizedBase + "/")) {
+			const relativePath = normalizedAbsolute.substring(
+				normalizedBase.length + 1,
+			);
 			return normalizePath(relativePath);
 		}
 		return null;

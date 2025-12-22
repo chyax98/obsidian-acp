@@ -4,7 +4,7 @@
  * 定义会话管理相关的所有类型
  */
 
-import type { ToolCallContent } from '../types';
+import type { ToolCallContent } from "../types";
 
 // ============================================================================
 // 状态类型
@@ -13,17 +13,23 @@ import type { ToolCallContent } from '../types';
 /**
  * 会话状态
  */
-export type SessionState = 'idle' | 'processing' | 'cancelled';
+export type SessionState = "idle" | "processing" | "cancelled";
 
 /**
  * 停止原因
  */
-export type StopReason = 'end_turn' | 'cancelled' | 'max_tokens' | 'max_turn_requests' | 'refusal' | 'error';
+export type StopReason =
+	| "end_turn"
+	| "cancelled"
+	| "max_tokens"
+	| "max_turn_requests"
+	| "refusal"
+	| "error";
 
 /**
  * 消息角色
  */
-export type MessageRole = 'user' | 'assistant';
+export type MessageRole = "user" | "assistant";
 
 /**
  * 工具调用状态
@@ -34,7 +40,7 @@ export type MessageRole = 'user' | 'assistant';
  * - completed: 执行成功
  * - failed: 执行失败（协议标准，包含错误和取消场景）
  */
-export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+export type ToolCallStatus = "pending" | "in_progress" | "completed" | "failed";
 
 // ============================================================================
 // 数据类型

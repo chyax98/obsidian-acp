@@ -6,7 +6,7 @@
  * @see https://agentclientprotocol.com/protocol/session-setup
  */
 
-import type { MetaData } from './initialize';
+import type { MetaData } from "./initialize";
 
 // ============================================================================
 // 会话创建 (Session New)
@@ -62,7 +62,7 @@ export interface LoadSessionResponse {
  * 文本内容
  */
 export interface TextContent {
-	type: 'text';
+	type: "text";
 	text: string;
 }
 
@@ -70,7 +70,7 @@ export interface TextContent {
  * 图像内容
  */
 export interface ImageContent {
-	type: 'image';
+	type: "image";
 	/** Base64 编码的图像数据 */
 	data?: string;
 	/** 图像 MIME 类型 */
@@ -83,7 +83,7 @@ export interface ImageContent {
  * 音频内容
  */
 export interface AudioContent {
-	type: 'audio';
+	type: "audio";
 	/** Base64 编码的音频数据 */
 	data: string;
 	/** 音频 MIME 类型 */
@@ -94,7 +94,7 @@ export interface AudioContent {
  * 嵌入上下文 (文件内容)
  */
 export interface EmbeddedContext {
-	type: 'embeddedContext';
+	type: "embeddedContext";
 	/** 文件路径 */
 	path: string;
 	/** 文件内容 */
@@ -104,7 +104,11 @@ export interface EmbeddedContext {
 /**
  * 提示内容联合类型
  */
-export type PromptContent = TextContent | ImageContent | AudioContent | EmbeddedContext;
+export type PromptContent =
+	| TextContent
+	| ImageContent
+	| AudioContent
+	| EmbeddedContext;
 
 /**
  * 命令调用
@@ -135,13 +139,13 @@ export interface PromptParams {
  */
 export type StopReason =
 	/** 正常结束 */
-	| 'end_turn'
+	| "end_turn"
 	/** 用户取消 */
-	| 'cancelled'
+	| "cancelled"
 	/** 达到最大输出 */
-	| 'max_output_reached'
+	| "max_output_reached"
 	/** 工具使用 */
-	| 'tool_use';
+	| "tool_use";
 
 /**
  * 提示响应

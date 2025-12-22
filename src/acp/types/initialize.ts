@@ -203,37 +203,37 @@ export interface AuthenticateResponse {
  */
 export const AcpMethod = {
 	/** 初始化 */
-	INITIALIZE: 'initialize',
+	INITIALIZE: "initialize",
 	/** 认证 */
-	AUTHENTICATE: 'authenticate',
+	AUTHENTICATE: "authenticate",
 	/** 新建会话 */
-	SESSION_NEW: 'session/new',
+	SESSION_NEW: "session/new",
 	/** 加载会话 */
-	SESSION_LOAD: 'session/load',
+	SESSION_LOAD: "session/load",
 	/** 发送提示 */
-	SESSION_PROMPT: 'session/prompt',
+	SESSION_PROMPT: "session/prompt",
 	/** 取消会话 */
-	SESSION_CANCEL: 'session/cancel',
+	SESSION_CANCEL: "session/cancel",
 	/** 会话更新通知 */
-	SESSION_UPDATE: 'session/update',
+	SESSION_UPDATE: "session/update",
 	/** 设置会话模式 */
-	SESSION_SET_MODE: 'session/setMode',
+	SESSION_SET_MODE: "session/setMode",
 	/** 读取文本文件 */
-	FS_READ_TEXT_FILE: 'fs/readTextFile',
+	FS_READ_TEXT_FILE: "fs/readTextFile",
 	/** 写入文本文件 */
-	FS_WRITE_TEXT_FILE: 'fs/writeTextFile',
+	FS_WRITE_TEXT_FILE: "fs/writeTextFile",
 	/** 请求权限 */
-	REQUEST_PERMISSION: 'requestPermission',
+	REQUEST_PERMISSION: "requestPermission",
 	/** 创建终端 */
-	TERMINAL_CREATE: 'terminal/create',
+	TERMINAL_CREATE: "terminal/create",
 	/** 获取终端输出 */
-	TERMINAL_OUTPUT: 'terminal/output',
+	TERMINAL_OUTPUT: "terminal/output",
 	/** 释放终端 */
-	TERMINAL_RELEASE: 'terminal/release',
+	TERMINAL_RELEASE: "terminal/release",
 	/** 等待终端退出 */
-	TERMINAL_WAIT_FOR_EXIT: 'terminal/waitForExit',
+	TERMINAL_WAIT_FOR_EXIT: "terminal/waitForExit",
 	/** 终止终端命令 */
-	TERMINAL_KILL: 'terminal/kill',
+	TERMINAL_KILL: "terminal/kill",
 } as const;
 
 export type AcpMethodType = (typeof AcpMethod)[keyof typeof AcpMethod];
@@ -273,7 +273,7 @@ export interface SessionNewMcpServerStdio {
 	/** 服务器名称 */
 	name: string;
 	/** 传输类型 */
-	type: 'stdio';
+	type: "stdio";
 	/** 命令（必填） */
 	command: string;
 	/** 参数（必填，至少是空数组） */
@@ -289,7 +289,7 @@ export interface SessionNewMcpServerHttp {
 	/** 服务器名称 */
 	name: string;
 	/** 传输类型 */
-	type: 'http';
+	type: "http";
 	/** URL（必填） */
 	url: string;
 	/** 环境变量（必填，至少是空数组） */
@@ -305,7 +305,7 @@ export interface SessionNewMcpServerSse {
 	/** 服务器名称 */
 	name: string;
 	/** 传输类型 */
-	type: 'sse';
+	type: "sse";
 	/** URL（必填） */
 	url: string;
 	/** 环境变量（必填，至少是空数组） */

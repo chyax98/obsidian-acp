@@ -6,8 +6,13 @@
  * @see https://agentclientprotocol.com/protocol/tool-calls#requesting-permission
  */
 
-import type { MetaData } from './initialize';
-import type { ToolCallContent, ToolCallKind, ToolCallLocation, ToolCallStatus } from './updates';
+import type { MetaData } from "./initialize";
+import type {
+	ToolCallContent,
+	ToolCallKind,
+	ToolCallLocation,
+	ToolCallStatus,
+} from "./updates";
 
 // ============================================================================
 // 权限选项
@@ -18,13 +23,13 @@ import type { ToolCallContent, ToolCallKind, ToolCallLocation, ToolCallStatus } 
  */
 export type PermissionOptionKind =
 	/** 允许一次 */
-	| 'allow_once'
+	| "allow_once"
 	/** 始终允许 */
-	| 'allow_always'
+	| "allow_always"
 	/** 拒绝一次 */
-	| 'reject_once'
+	| "reject_once"
 	/** 始终拒绝 */
-	| 'reject_always';
+	| "reject_always";
 
 /**
  * 权限选项
@@ -93,9 +98,9 @@ export interface RequestPermissionParams {
  */
 export type PermissionOutcome =
 	/** 用户选择了某个选项 */
-	| { type: 'selected'; optionId: string }
+	| { type: "selected"; optionId: string }
 	/** 用户取消了请求 */
-	| { type: 'cancelled' };
+	| { type: "cancelled" };
 
 /**
  * 权限响应
@@ -130,27 +135,39 @@ export interface PermissionRequestData {
 /**
  * 创建允许一次的权限选项
  */
-export function createAllowOnceOption(id: string, name = '允许'): PermissionOption {
-	return { optionId: id, name, kind: 'allow_once' };
+export function createAllowOnceOption(
+	id: string,
+	name = "允许",
+): PermissionOption {
+	return { optionId: id, name, kind: "allow_once" };
 }
 
 /**
  * 创建始终允许的权限选项
  */
-export function createAllowAlwaysOption(id: string, name = '始终允许'): PermissionOption {
-	return { optionId: id, name, kind: 'allow_always' };
+export function createAllowAlwaysOption(
+	id: string,
+	name = "始终允许",
+): PermissionOption {
+	return { optionId: id, name, kind: "allow_always" };
 }
 
 /**
  * 创建拒绝一次的权限选项
  */
-export function createRejectOnceOption(id: string, name = '拒绝'): PermissionOption {
-	return { optionId: id, name, kind: 'reject_once' };
+export function createRejectOnceOption(
+	id: string,
+	name = "拒绝",
+): PermissionOption {
+	return { optionId: id, name, kind: "reject_once" };
 }
 
 /**
  * 创建始终拒绝的权限选项
  */
-export function createRejectAlwaysOption(id: string, name = '始终拒绝'): PermissionOption {
-	return { optionId: id, name, kind: 'reject_always' };
+export function createRejectAlwaysOption(
+	id: string,
+	name = "始终拒绝",
+): PermissionOption {
+	return { optionId: id, name, kind: "reject_always" };
 }

@@ -4,11 +4,17 @@
  * 处理 ACP 连接的建立、断开和状态管理
  */
 
-import type { App } from 'obsidian';
-import { AcpConnection, type ConnectionOptions } from '../../../acp/core/connection';
-import { SessionManager } from '../../../acp/core/session-manager';
-import type { RequestPermissionParams, PermissionOutcome } from '../../../acp/types/permissions';
-import { ACP_BACKENDS } from '../../../acp/backends/registry';
+import type { App } from "obsidian";
+import {
+	AcpConnection,
+	type ConnectionOptions,
+} from "../../../acp/core/connection";
+import { SessionManager } from "../../../acp/core/session-manager";
+import type {
+	RequestPermissionParams,
+	PermissionOutcome,
+} from "../../../acp/types/permissions";
+import { ACP_BACKENDS } from "../../../acp/backends/registry";
 
 /**
  * 连接配置
@@ -19,13 +25,15 @@ export interface ConnectionConfig {
 	/** 获取手动设置的 CLI 路径 */
 	getManualCliPath: () => string | undefined;
 	/** 获取权限设置 */
-	getPermissionSettings: () => ConnectionOptions['permissionSettings'];
+	getPermissionSettings: () => ConnectionOptions["permissionSettings"];
 	/** 保存设置 */
 	saveSettings: () => Promise<void>;
 	/** 获取 MCP 服务器配置 */
-	getMcpServers: () => ConnectionOptions['mcpServers'];
+	getMcpServers: () => ConnectionOptions["mcpServers"];
 	/** 处理权限请求 */
-	onPermissionRequest: (params: RequestPermissionParams) => Promise<PermissionOutcome>;
+	onPermissionRequest: (
+		params: RequestPermissionParams,
+	) => Promise<PermissionOutcome>;
 }
 
 /**
@@ -33,9 +41,15 @@ export interface ConnectionConfig {
  */
 export interface ConnectionCallbacks {
 	/** 状态变化 */
-	onStatusChange: (status: 'disconnected' | 'connecting' | 'connected' | 'error', agentName?: string) => void;
+	onStatusChange: (
+		status: "disconnected" | "connecting" | "connected" | "error",
+		agentName?: string,
+	) => void;
 	/** 连接成功 */
-	onConnected: (connection: AcpConnection, sessionManager: SessionManager) => void;
+	onConnected: (
+		connection: AcpConnection,
+		sessionManager: SessionManager,
+	) => void;
 	/** 连接失败 */
 	onError: (error: Error) => void;
 }
@@ -52,7 +66,11 @@ export class ConnectionManager {
 	private sessionManager: SessionManager | null = null;
 	private isConnecting: boolean = false;
 
-	constructor(app: App, config: ConnectionConfig, callbacks: ConnectionCallbacks) {
+	constructor(
+		app: App,
+		config: ConnectionConfig,
+		callbacks: ConnectionCallbacks,
+	) {
 		this.app = app;
 		this.config = config;
 		this.callbacks = callbacks;
@@ -76,7 +94,10 @@ export class ConnectionManager {
 	 * 是否已连接
 	 */
 	public get isConnected(): boolean {
-		return this.connection?.isConnected === true && this.sessionManager !== null;
+		return (
+			this.connection?.isConnected === true &&
+			this.sessionManager !== null
+		);
 	}
 
 	/**
@@ -94,17 +115,20 @@ export class ConnectionManager {
 		this.isConnecting = true;
 
 		try {
-			this.callbacks.onStatusChange('connecting', 'Claude Code');
+			this.callbacks.onStatusChange("connecting", "Claude Code");
 
 			const backendConfig = ACP_BACKENDS.claude;
 			const manualPath = this.config.getManualCliPath();
-			const cliPath = manualPath || backendConfig.defaultCliPath || 'npx @zed-industries/claude-code-acp';
+			const cliPath =
+				manualPath ||
+				backendConfig.defaultCliPath ||
+				"npx @zed-industries/claude-code-acp";
 			const workingDir = this.config.getWorkingDirectory();
 
 			this.connection = new AcpConnection();
 
 			await this.connection.connect({
-				backendId: 'claude',
+				backendId: "claude",
 				cliPath,
 				workingDir,
 				acpArgs: backendConfig.acpArgs || [],
@@ -120,13 +144,13 @@ export class ConnectionManager {
 				onPermissionRequest: this.config.onPermissionRequest,
 			});
 
-			this.callbacks.onStatusChange('connected', 'Claude Code');
+			this.callbacks.onStatusChange("connected", "Claude Code");
 			this.callbacks.onConnected(this.connection, this.sessionManager);
 
 			return true;
 		} catch (error) {
-			console.error('[ConnectionManager] 连接失败:', error);
-			this.callbacks.onStatusChange('error');
+			console.error("[ConnectionManager] 连接失败:", error);
+			this.callbacks.onStatusChange("error");
 			this.callbacks.onError(error as Error);
 
 			if (this.connection) {
@@ -155,7 +179,7 @@ export class ConnectionManager {
 			this.connection = null;
 		}
 
-		this.callbacks.onStatusChange('disconnected');
+		this.callbacks.onStatusChange("disconnected");
 	}
 
 	/**
@@ -171,7 +195,7 @@ export class ConnectionManager {
 			await this.sessionManager.start();
 			return true;
 		} catch (error) {
-			console.error('[ConnectionManager] 重建会话失败:', error);
+			console.error("[ConnectionManager] 重建会话失败:", error);
 			return false;
 		}
 	}

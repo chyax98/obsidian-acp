@@ -5,13 +5,7 @@
  */
 
 // 类型定义
-export type {
-	AcpBackendId,
-	AcpBackendConfig,
-} from './types';
+export type { AcpBackendId, AcpBackendConfig } from "./types";
 
 // 后端注册表
-export {
-	ACP_BACKENDS,
-	getBackendConfig,
-} from './registry';
+export { ACP_BACKENDS, getBackendConfig } from "./registry";

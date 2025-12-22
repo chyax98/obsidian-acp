@@ -100,12 +100,15 @@ export class AcpSettingTab extends PluginSettingTab {
 		installDiv.style.backgroundColor = "var(--background-secondary)";
 		installDiv.style.borderRadius = "4px";
 		installDiv.innerHTML = `
-			<strong>默认命令:</strong> <code>npx @zed-industries/claude-code-acp</code><br>
-			<small>需要 Node.js 18+，首次运行会自动安装</small><br><br>
-			<strong>⚠️ 如果连接失败 (ENOENT):</strong><br>
-			<small>Obsidian 无法访问 shell 环境变量，需要使用 <strong>绝对路径</strong>。</small><br>
-			<small>在终端运行 <code>which npx</code> 获取路径，然后填写：</small><br>
-			<code>/完整路径/npx @zed-industries/claude-code-acp</code>
+			<strong>方式一：npx（默认，自动更新）</strong><br>
+			<code>npx @zed-industries/claude-code-acp</code><br>
+			<small>需要 Node.js 18+，首次运行会自动下载</small><br><br>
+			<strong>方式二：全局安装（推荐，启动更快）</strong><br>
+			<small>终端运行：<code>npm install -g @zed-industries/claude-code-acp</code></small><br>
+			<small>然后填写：<code>claude-code-acp</code> 或绝对路径</small><br><br>
+			<strong>⚠️ 连接失败 (ENOENT)?</strong><br>
+			<small>Obsidian 无法访问 shell PATH，需要使用<strong>绝对路径</strong>：</small><br>
+			<small><code>which claude-code-acp</code> 或 <code>which npx</code> 获取路径</small>
 		`;
 	}
 

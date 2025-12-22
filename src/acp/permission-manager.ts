@@ -125,7 +125,10 @@ export class PermissionManager {
 
 		this.isProcessing = true;
 		const queued = this.requestQueue.shift();
-		if (!queued) return;
+		if (!queued) {
+			this.isProcessing = false;
+			return;
+		}
 
 		console.log(
 			"[PermissionManager] 开始处理队列请求:",

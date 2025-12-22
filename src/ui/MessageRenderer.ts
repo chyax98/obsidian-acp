@@ -850,32 +850,410 @@ export class MessageRenderer {
 
 	/**
 	 * 渲染工具调用内容（T12 增强）
+	 *
+	 * 展示结构：
+	 * 1. 输入参数（rawInput）- 让用户知道工具接收了什么参数
+	 * 2. 相关位置（locations）- 涉及的文件位置
+	 * 3. 输出结果（content）- 工具执行的结果
 	 */
 	private static renderToolCallContent(contentEl: HTMLElement, toolCall: ToolCall, app?: App): void {
-		// 渲染 locations（如果存在）
-		if (toolCall.locations && toolCall.locations.length > 0 && app) {
-			this.renderToolCallLocations(contentEl, toolCall.locations, app);
+		const kind = toolCall.kind?.toLowerCase() || '';
+		const hasRawInput = toolCall.rawInput && Object.keys(toolCall.rawInput).length > 0;
+		const hasContent = toolCall.content && toolCall.content.length > 0;
+		const hasLocations = toolCall.locations && toolCall.locations.length > 0;
+
+		// 1. 渲染输入参数（始终显示，让用户知道执行了什么）
+		if (hasRawInput) {
+			this.renderToolCallInput(contentEl, toolCall.rawInput!, kind, app);
 		}
 
-		if (!toolCall.content || toolCall.content.length === 0) {
+		// 2. 渲染 locations（如果存在）
+		if (hasLocations && app) {
+			this.renderToolCallLocations(contentEl, toolCall.locations!, app);
+		}
+
+		// 3. 渲染输出结果
+		if (hasContent) {
+			this.renderToolCallOutput(contentEl, toolCall, app);
+		} else if (!hasRawInput && !hasLocations) {
+			// 只有在完全没有内容时才显示"无内容"
 			contentEl.createDiv({
 				cls: 'acp-tool-call-empty',
 				text: '（无内容）',
 			});
-			return;
+		}
+	}
+
+	/**
+	 * 渲染工具调用的输入参数
+	 */
+	private static renderToolCallInput(
+		container: HTMLElement,
+		rawInput: Record<string, unknown>,
+		kind: string,
+		app?: App,
+	): void {
+		// 先检查是否有可渲染的内容，避免创建空 section
+		const visibleKeys = Object.keys(rawInput).filter(k => !k.startsWith('_'));
+		if (visibleKeys.length === 0) return;
+
+		const inputSection = container.createDiv({ cls: 'acp-tool-call-section acp-tool-call-input' });
+
+		// 区分处理不同类型的工具
+		if (kind === 'read' || kind === 'write' || kind === 'edit' || kind === 'patch') {
+			// 文件操作：显示文件路径（可点击）
+			const filePath = this.getStringParam(rawInput, ['path', 'file_path', 'filename']);
+			if (filePath) {
+				this.renderFilePathInput(inputSection, filePath, app);
+			}
+
+			// 如果是 Edit，显示 old_string 和 new_string
+			if ((kind === 'edit' || kind === 'patch') && (rawInput.old_string || rawInput.new_string)) {
+				this.renderEditInput(inputSection, rawInput);
+			}
+
+			// 如果是 Write，显示要写入的内容预览
+			const writeContent = this.getStringParam(rawInput, ['content']);
+			if (kind === 'write' && writeContent) {
+				this.renderWriteInput(inputSection, writeContent);
+			}
+
+			// 显示其他参数（offset, limit 等）
+			const otherParams = this.getOtherParams(rawInput, ['path', 'file_path', 'filename', 'old_string', 'new_string', 'content']);
+			if (Object.keys(otherParams).length > 0) {
+				this.renderOtherParams(inputSection, otherParams);
+			}
+		} else if (kind === 'bash' || kind === 'execute' || kind === 'shell' || kind === 'terminal') {
+			// 命令执行：显示命令
+			const command = this.getStringParam(rawInput, ['command']);
+			if (command) {
+				this.renderCommandInput(inputSection, command);
+			} else {
+				// 显示所有参数
+				this.renderAllParams(inputSection, rawInput);
+			}
+		} else if (kind === 'search' || kind === 'grep' || kind === 'find' || kind === 'glob') {
+			// 搜索类：显示搜索参数
+			this.renderSearchInput(inputSection, rawInput);
+		} else {
+			// 其他：显示所有参数
+			this.renderAllParams(inputSection, rawInput);
+		}
+	}
+
+	/**
+	 * 安全获取字符串参数（从多个可能的 key 中）
+	 */
+	private static getStringParam(rawInput: Record<string, unknown>, keys: string[]): string | undefined {
+		for (const key of keys) {
+			const value = rawInput[key];
+			if (typeof value === 'string' && value.length > 0) {
+				return value;
+			}
+		}
+		return undefined;
+	}
+
+	/**
+	 * 渲染文件路径输入
+	 */
+	private static renderFilePathInput(container: HTMLElement, filePath: string, app?: App): void {
+		const row = container.createDiv({ cls: 'acp-input-row acp-input-file' });
+
+		// 标签
+		const labelEl = row.createDiv({ cls: 'acp-input-label' });
+		const iconEl = labelEl.createSpan({ cls: 'acp-input-icon' });
+		setIcon(iconEl, 'file-text');
+		labelEl.createSpan({ text: '文件' });
+
+		// 值：文件路径（可点击）
+		const valueEl = row.createDiv({ cls: 'acp-input-value acp-input-path' });
+		valueEl.textContent = filePath;
+
+		if (app) {
+			valueEl.addClass('acp-input-path-clickable');
+			valueEl.addEventListener('click', () => {
+				this.openFile(app, filePath);
+			});
+		}
+	}
+
+	/**
+	 * 渲染编辑操作的输入（old_string -> new_string）
+	 */
+	private static renderEditInput(container: HTMLElement, rawInput: Record<string, unknown>): void {
+		const oldStr = rawInput.old_string as string | undefined;
+		const newStr = rawInput.new_string as string | undefined;
+
+		if (!oldStr && !newStr) return;
+
+		const editSection = container.createDiv({ cls: 'acp-input-edit-section' });
+
+		// 标题
+		const headerEl = editSection.createDiv({ cls: 'acp-input-edit-header' });
+		const iconEl = headerEl.createSpan({ cls: 'acp-input-icon' });
+		setIcon(iconEl, 'replace');
+		headerEl.createSpan({ text: '替换内容' });
+
+		// Diff 预览
+		const diffEl = editSection.createDiv({ cls: 'acp-input-edit-diff' });
+		const preEl = diffEl.createEl('pre', { cls: 'acp-diff acp-diff-compact' });
+
+		// 删除的内容（旧）
+		if (oldStr) {
+			const oldLines = oldStr.split('\n');
+			for (let i = 0; i < oldLines.length; i++) {
+				const lineEl = preEl.createEl('div', { cls: 'acp-diff-line acp-diff-removed' });
+				const lineNumEl = lineEl.createEl('span', { cls: 'acp-diff-line-number' });
+				lineNumEl.textContent = (i + 1).toString().padStart(3, ' ');
+				const contentEl = lineEl.createEl('span', { cls: 'acp-diff-line-content' });
+				contentEl.textContent = `-${oldLines[i]}`;
+			}
+		}
+
+		// 新增的内容（新）
+		if (newStr) {
+			const newLines = newStr.split('\n');
+			for (let i = 0; i < newLines.length; i++) {
+				const lineEl = preEl.createEl('div', { cls: 'acp-diff-line acp-diff-added' });
+				const lineNumEl = lineEl.createEl('span', { cls: 'acp-diff-line-number' });
+				lineNumEl.textContent = (i + 1).toString().padStart(3, ' ');
+				const contentEl = lineEl.createEl('span', { cls: 'acp-diff-line-content' });
+				contentEl.textContent = `+${newLines[i]}`;
+			}
+		}
+	}
+
+	/**
+	 * 渲染写入操作的内容预览
+	 */
+	private static renderWriteInput(container: HTMLElement, content: string): void {
+		const writeSection = container.createDiv({ cls: 'acp-input-write-section' });
+
+		// 标题
+		const headerEl = writeSection.createDiv({ cls: 'acp-input-write-header' });
+		const iconEl = headerEl.createSpan({ cls: 'acp-input-icon' });
+		setIcon(iconEl, 'file-plus');
+		headerEl.createSpan({ text: '写入内容' });
+
+		// 内容预览
+		const contentEl = writeSection.createDiv({ cls: 'acp-input-write-content' });
+		const preEl = contentEl.createEl('pre');
+		const codeEl = preEl.createEl('code');
+
+		// 限制显示行数
+		const lines = content.split('\n');
+		const maxLines = 20;
+		if (lines.length > maxLines) {
+			codeEl.textContent = lines.slice(0, maxLines).join('\n') + `\n... (${lines.length - maxLines} 行省略)`;
+		} else {
+			codeEl.textContent = content;
+		}
+	}
+
+	/**
+	 * 渲染命令输入
+	 */
+	private static renderCommandInput(container: HTMLElement, command: string): void {
+		const row = container.createDiv({ cls: 'acp-input-row acp-input-command' });
+
+		// 标签
+		const labelEl = row.createDiv({ cls: 'acp-input-label' });
+		const iconEl = labelEl.createSpan({ cls: 'acp-input-icon' });
+		setIcon(iconEl, 'terminal');
+		labelEl.createSpan({ text: '命令' });
+
+		// 值：命令内容
+		const valueEl = row.createDiv({ cls: 'acp-input-value' });
+		const preEl = valueEl.createEl('pre', { cls: 'acp-command-pre' });
+		const codeEl = preEl.createEl('code');
+		codeEl.textContent = command;
+
+		// 复制按钮
+		const copyBtn = valueEl.createDiv({ cls: 'acp-copy-button acp-copy-button-inline' });
+		setIcon(copyBtn, 'copy');
+
+		copyBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			void navigator.clipboard.writeText(command).then(() => {
+				new Notice('已复制命令');
+				copyBtn.empty();
+				setIcon(copyBtn, 'check');
+				setTimeout(() => {
+					copyBtn.empty();
+					setIcon(copyBtn, 'copy');
+				}, 1500);
+			});
+		});
+	}
+
+	/**
+	 * 渲染搜索输入
+	 */
+	private static renderSearchInput(container: HTMLElement, rawInput: Record<string, unknown>): void {
+		const pattern = rawInput.pattern || rawInput.query || rawInput.search;
+		const path = rawInput.path || rawInput.directory;
+		const glob = rawInput.glob || rawInput.include;
+
+		if (pattern) {
+			this.renderInputRow(container, 'search', '模式', String(pattern), true);
+		}
+
+		if (path) {
+			this.renderInputRow(container, 'folder', '路径', String(path), false);
+		}
+
+		if (glob) {
+			this.renderInputRow(container, 'filter', '过滤', String(glob), true);
+		}
+
+		// 其他参数
+		const otherParams = this.getOtherParams(rawInput, ['pattern', 'query', 'search', 'path', 'directory', 'glob', 'include']);
+		if (Object.keys(otherParams).length > 0) {
+			this.renderOtherParams(container, otherParams);
+		}
+	}
+
+	/**
+	 * 渲染输入行（通用方法）
+	 *
+	 * @param container - 容器
+	 * @param icon - 图标名称
+	 * @param label - 标签文本
+	 * @param value - 值
+	 * @param useCode - 是否使用 code 标签包裹值
+	 */
+	private static renderInputRow(
+		container: HTMLElement,
+		icon: string,
+		label: string,
+		value: string,
+		useCode: boolean,
+	): void {
+		const row = container.createDiv({ cls: 'acp-input-row' });
+
+		const labelEl = row.createDiv({ cls: 'acp-input-label' });
+		const iconEl = labelEl.createSpan({ cls: 'acp-input-icon' });
+		setIcon(iconEl, icon);
+		labelEl.createSpan({ text: label });
+
+		const valueEl = row.createDiv({ cls: useCode ? 'acp-input-value acp-input-pattern' : 'acp-input-value' });
+		if (useCode) {
+			valueEl.createEl('code', { text: value });
+		} else {
+			valueEl.textContent = value;
+		}
+	}
+
+	/**
+	 * 渲染所有参数（通用）
+	 */
+	private static renderAllParams(container: HTMLElement, rawInput: Record<string, unknown>): void {
+		const keys = Object.keys(rawInput).filter(k => !k.startsWith('_'));
+		if (keys.length === 0) return;
+
+		for (const key of keys) {
+			const value = rawInput[key];
+			const row = container.createDiv({ cls: 'acp-input-row' });
+
+			const labelEl = row.createDiv({ cls: 'acp-input-label' });
+			labelEl.textContent = key;
+
+			const valueEl = row.createDiv({ cls: 'acp-input-value' });
+			this.renderParamValue(valueEl, value);
+		}
+	}
+
+	/**
+	 * 渲染其他参数
+	 */
+	private static renderOtherParams(container: HTMLElement, params: Record<string, unknown>): void {
+		const keys = Object.keys(params);
+		if (keys.length === 0) return;
+
+		const otherSection = container.createDiv({ cls: 'acp-input-other' });
+
+		for (const key of keys) {
+			const value = params[key];
+			const row = otherSection.createDiv({ cls: 'acp-input-row acp-input-row-small' });
+
+			const labelEl = row.createDiv({ cls: 'acp-input-label' });
+			labelEl.textContent = key;
+
+			const valueEl = row.createDiv({ cls: 'acp-input-value' });
+			this.renderParamValue(valueEl, value);
+		}
+	}
+
+	/**
+	 * 渲染参数值
+	 */
+	private static renderParamValue(container: HTMLElement, value: unknown): void {
+		if (value === null || value === undefined) {
+			container.createSpan({ cls: 'acp-input-null', text: 'null' });
+		} else if (typeof value === 'string') {
+			if (value.length > 200) {
+				container.textContent = value.slice(0, 197) + '...';
+			} else {
+				container.textContent = value;
+			}
+		} else if (typeof value === 'number' || typeof value === 'boolean') {
+			container.createEl('code', { text: String(value) });
+		} else if (Array.isArray(value)) {
+			container.createEl('code', { text: JSON.stringify(value) });
+		} else if (typeof value === 'object') {
+			const json = JSON.stringify(value, null, 2);
+			if (json.length > 300) {
+				container.createEl('code', { text: json.slice(0, 297) + '...' });
+			} else {
+				container.createEl('pre').createEl('code', { text: json });
+			}
+		} else {
+			container.textContent = String(value);
+		}
+	}
+
+	/**
+	 * 获取除指定 key 外的其他参数
+	 */
+	private static getOtherParams(
+		rawInput: Record<string, unknown>,
+		excludeKeys: string[],
+	): Record<string, unknown> {
+		const result: Record<string, unknown> = {};
+		for (const key of Object.keys(rawInput)) {
+			if (!excludeKeys.includes(key) && !key.startsWith('_')) {
+				result[key] = rawInput[key];
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 渲染工具调用的输出结果
+	 */
+	private static renderToolCallOutput(contentEl: HTMLElement, toolCall: ToolCall, app?: App): void {
+		if (!toolCall.content || toolCall.content.length === 0) return;
+
+		const outputSection = contentEl.createDiv({ cls: 'acp-tool-call-section acp-tool-call-output' });
+
+		// 输出标题（如果有输入，需要区分）
+		if (toolCall.rawInput && Object.keys(toolCall.rawInput).length > 0) {
+			const headerEl = outputSection.createDiv({ cls: 'acp-output-header' });
+			const iconEl = headerEl.createSpan({ cls: 'acp-output-icon' });
+			setIcon(iconEl, 'arrow-right');
+			headerEl.createSpan({ text: '输出' });
 		}
 
 		// 渲染每个内容块
 		for (const content of toolCall.content) {
-			const blockEl = contentEl.createDiv({ cls: 'acp-tool-call-content-block' });
+			const blockEl = outputSection.createDiv({ cls: 'acp-tool-call-content-block' });
 
 			switch (content.type) {
 				case 'content': {
 					blockEl.addClass('acp-tool-call-content-text');
-					// content 类型有嵌套的 content 属性
 					const textContent = content.content;
 					if (textContent && textContent.type === 'text') {
-						// T12 增强：添加复制按钮
 						this.renderTextContentWithCopy(blockEl, textContent.text || '');
 					}
 					break;
@@ -883,13 +1261,11 @@ export class MessageRenderer {
 
 				case 'diff':
 					blockEl.addClass('acp-tool-call-content-diff');
-					// T12 增强：带行号和文件路径点击的 diff
 					this.renderDiffEnhanced(blockEl, content, app);
 					break;
 
 				case 'terminal': {
 					blockEl.addClass('acp-tool-call-content-terminal');
-					// T12 增强：显示命令和输出
 					const command = toolCall.rawInput?.command as string | undefined;
 					this.renderTerminalOutput(blockEl, command, content.terminalId);
 					break;

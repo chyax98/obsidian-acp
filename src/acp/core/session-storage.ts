@@ -8,7 +8,7 @@
  */
 
 import type { App } from 'obsidian';
-import type { SessionExportData } from './session-manager';
+import type { SessionExportData } from './types';
 
 /**
  * 会话元数据（用于列表显示）

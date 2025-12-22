@@ -109,9 +109,10 @@ export class CommandMenuHelper {
 		});
 
 		filteredCommands.forEach((cmd, index) => {
-			const item = this.menuEl!.createDiv({
+			const item = this.menuEl?.createDiv({
 				cls: 'acp-command-menu-item',
 			});
+			if (!item) return;
 
 			if (index === 0) {
 				item.addClass('acp-command-menu-item-selected');

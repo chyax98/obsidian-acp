@@ -53,7 +53,8 @@ export class DiffRenderer {
 		app?: App,
 		onOpenFile?: (path: string) => void,
 	): void {
-		const filePath = diffContent.path!;
+		const filePath = diffContent.path;
+		if (!filePath) return;
 		const pathHeaderEl = wrapperEl.createDiv({ cls: 'acp-diff-path' });
 
 		// 文件路径

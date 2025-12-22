@@ -116,7 +116,8 @@ export class PermissionManager {
 		}
 
 		this.isProcessing = true;
-		const queued = this.requestQueue.shift()!;
+		const queued = this.requestQueue.shift();
+		if (!queued) return;
 
 		console.log('[PermissionManager] 开始处理队列请求:', queued.request.toolName);
 

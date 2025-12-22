@@ -397,7 +397,9 @@ export class AcpConnection {
 		// 使用通用环境增强函数处理 nvm 等版本管理器路径
 		const env = enhanceEnvForNodeScript(cliPath || spawnCommand, { ...process.env, ...customEnv });
 
-		console.log(`[ACP] connectClaude: command=${spawnCommand}, args=${spawnArgs.join(' ')}, cwd=${workingDir}`);
+		console.log(`[ACP] 启动 Claude Code 进程: ${spawnCommand} ${spawnArgs.join(' ')}`);
+		console.log(`[ACP] 工作目录: ${workingDir}`);
+		console.log(`[ACP] 提示: 首次运行 npx 可能需要下载包，请耐心等待...`);
 
 		this.child = spawn(spawnCommand, spawnArgs, {
 			cwd: workingDir,
@@ -405,6 +407,8 @@ export class AcpConnection {
 			env,
 			shell: false, // macOS 上必须是 false
 		});
+
+		console.log(`[ACP] 进程已启动 (PID: ${this.child.pid})`);
 	}
 
 
@@ -695,10 +699,34 @@ export class AcpConnection {
 	 * 发送请求并等待响应
 	 */
 	private sendRequest<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> {
-		// 超时时间: session/prompt 2 分钟，initialize 15 秒，其他 20 秒
-		const timeoutDuration = method === AcpMethod.SESSION_PROMPT ? 120000
-			: method === AcpMethod.INITIALIZE ? 15000
-				: 20000;
+		// 超时时间:
+		// - session/prompt: 2 分钟（Agent 思考和执行时间）
+		// - initialize: 15 秒（协议握手）
+		// - session/new: 60 秒（需要启动 MCP 服务器，特别是 BM25 索引构建可能很慢）
+		// - 其他: 20 秒
+		let timeoutDuration: number;
+
+		if (method === AcpMethod.SESSION_PROMPT) {
+			timeoutDuration = 120000;  // 2 分钟
+		} else if (method === AcpMethod.INITIALIZE) {
+			timeoutDuration = 15000;  // 15 秒
+		} else if (method === AcpMethod.SESSION_NEW) {
+			// session/new 需要更长时间，特别是有 MCP 服务器时
+			// 包括：
+			// 1. 首次 npx 下载包（可能 30-60 秒）
+			// 2. MCP 服务器启动和索引构建（BM25 可能很慢）
+			// 3. Claude Code 初始化
+			const mcpServerCount = (params as { mcpServers?: unknown[] })?.mcpServers?.length || 0;
+			const baseDuration = 90000;  // 基础 90 秒（考虑 npx 首次下载）
+			const perServerDuration = 30000;  // 每个 MCP 服务器额外 30 秒
+			timeoutDuration = baseDuration + (mcpServerCount * perServerDuration);
+			// 最大 3 分钟
+			timeoutDuration = Math.min(timeoutDuration, 180000);
+
+			console.log(`[ACP] session/new 超时设置: ${timeoutDuration / 1000}s (${mcpServerCount} 个 MCP 服务器)`);
+		} else {
+			timeoutDuration = 20000;  // 默认 20 秒
+		}
 
 		// 创建请求
 		const { id, promise } = this.requestQueue.create<T>(method, timeoutDuration);
@@ -802,16 +830,28 @@ export class AcpConnection {
 			},
 		};
 
-		const response = await Promise.race([
-			this.sendRequest<InitializeResponse>(AcpMethod.INITIALIZE, params),
-			new Promise<never>((_, reject) =>
-				setTimeout(() => reject(new Error('初始化超时 (15s)')), 15000),
-			),
-		]);
+		console.log('[ACP] 发送 initialize 请求...');
+		const startTime = Date.now();
 
-		this.isInitialized = true;
-		this.initializeResponse = response;
-		return response;
+		try {
+			const response = await Promise.race([
+				this.sendRequest<InitializeResponse>(AcpMethod.INITIALIZE, params),
+				new Promise<never>((_, reject) =>
+					setTimeout(() => reject(new Error('初始化超时 (15s)')), 15000),
+				),
+			]);
+
+			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+			console.log(`[ACP] initialize 成功 (耗时 ${elapsed}s)`);
+
+			this.isInitialized = true;
+			this.initializeResponse = response;
+			return response;
+		} catch (error) {
+			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+			console.error(`[ACP] initialize 失败 (耗时 ${elapsed}s):`, error);
+			throw error;
+		}
 	}
 
 	/**
@@ -943,16 +983,25 @@ export class AcpConnection {
 			mcpServers,
 		};
 
-		// 调试日志
-		// console.log('[ACP] session/new 参数:', JSON.stringify(params, null, 2));
+		console.log(`[ACP] 发送 session/new 请求 (${mcpServers.length} 个 MCP 服务器)...`);
+		const startTime = Date.now();
 
-		const response = await this.sendRequest<NewSessionResponse>(
-			AcpMethod.SESSION_NEW,
-			params as unknown as Record<string, unknown>,
-		);
+		try {
+			const response = await this.sendRequest<NewSessionResponse>(
+				AcpMethod.SESSION_NEW,
+				params as unknown as Record<string, unknown>,
+			);
 
-		this.sessionId = response.sessionId;
-		return response;
+			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+			console.log(`[ACP] session/new 成功 (耗时 ${elapsed}s)`);
+
+			this.sessionId = response.sessionId;
+			return response;
+		} catch (error) {
+			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+			console.error(`[ACP] session/new 失败 (耗时 ${elapsed}s):`, error);
+			throw error;
+		}
 	}
 
 	/**

@@ -29,6 +29,6 @@
       "@typescript-eslint/no-non-null-assertion": "warn",
       "complexity": ["warn", 20],
       "max-depth": ["warn", 5],
-      "max-lines": ["warn", 800]
+      "max-lines": ["warn", 1000]
     }
   }

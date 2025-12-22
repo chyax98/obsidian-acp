@@ -17,6 +17,15 @@ import type {
 import { ACP_BACKENDS } from "../../../acp/backends/registry";
 
 /**
+ * 环境变量设置
+ */
+export interface EnvSettings {
+	apiKey?: string;
+	apiUrl?: string;
+	httpProxy?: string;
+}
+
+/**
  * 连接配置
  */
 export interface ConnectionConfig {
@@ -30,6 +39,8 @@ export interface ConnectionConfig {
 	saveSettings: () => Promise<void>;
 	/** 获取 MCP 服务器配置 */
 	getMcpServers: () => ConnectionOptions["mcpServers"];
+	/** 获取环境变量设置 */
+	getEnvSettings: () => EnvSettings;
 	/** 处理权限请求 */
 	onPermissionRequest: (
 		params: RequestPermissionParams,
@@ -125,6 +136,20 @@ export class ConnectionManager {
 				"npx @zed-industries/claude-code-acp";
 			const workingDir = this.config.getWorkingDirectory();
 
+			// 构建环境变量（只传递用户填写的字段）
+			const envSettings = this.config.getEnvSettings();
+			const env: Record<string, string> = {};
+			if (envSettings.apiKey) {
+				env.ANTHROPIC_AUTH_TOKEN = envSettings.apiKey;
+			}
+			if (envSettings.apiUrl) {
+				env.ANTHROPIC_BASE_URL = envSettings.apiUrl;
+			}
+			if (envSettings.httpProxy) {
+				env.HTTP_PROXY = envSettings.httpProxy;
+				env.HTTPS_PROXY = envSettings.httpProxy;
+			}
+
 			this.connection = new AcpConnection();
 
 			await this.connection.connect({
@@ -132,6 +157,7 @@ export class ConnectionManager {
 				cliPath,
 				workingDir,
 				acpArgs: backendConfig.acpArgs || [],
+				env: Object.keys(env).length > 0 ? env : undefined,
 				app: this.app,
 				permissionSettings: this.config.getPermissionSettings(),
 				saveSettings: this.config.saveSettings,

@@ -78,6 +78,9 @@ export interface AcpPluginSettings {
 	/** 自定义 API Base URL（留空则使用默认）*/
 	apiUrl?: string;
 
+	/** HTTP 代理（留空则不使用）*/
+	httpProxy?: string;
+
 	/** 是否显示工具调用详情 */
 	showToolCallDetails: boolean;
 
@@ -99,6 +102,7 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
 	customWorkingDir: undefined,
 	apiKey: undefined,
 	apiUrl: undefined,
+	httpProxy: undefined,
 	showToolCallDetails: true,
 	permission: {
 		mode: "interactive", // 默认每次询问

@@ -43,6 +43,9 @@ export class AcpSettingTab extends PluginSettingTab {
 		// Agent 配置
 		this.renderAgentSection(containerEl);
 
+		// 环境变量配置
+		this.renderEnvSection(containerEl);
+
 		// MCP 服务器配置
 		this.renderMcpSection(containerEl);
 
@@ -110,6 +113,65 @@ export class AcpSettingTab extends PluginSettingTab {
 			<small>Obsidian 无法访问 shell PATH，需要使用<strong>绝对路径</strong>：</small><br>
 			<small><code>which claude-code-acp</code> 或 <code>which npx</code> 获取路径</small>
 		`;
+	}
+
+	/**
+	 * 环境变量配置部分
+	 */
+	private renderEnvSection(containerEl: HTMLElement): void {
+		containerEl.createEl("h3", { text: "环境变量（可选）" });
+
+		const envDescDiv = containerEl.createDiv({
+			cls: "setting-item-description",
+		});
+		envDescDiv.style.marginBottom = "1em";
+		envDescDiv.innerHTML = `
+			<small>配置 Claude Code 的环境变量。<strong>留空则使用系统默认配置</strong>。</small><br>
+			<small>适用于第三方 API 代理或自定义 API Key。</small>
+		`;
+
+		// API Key
+		new Setting(containerEl)
+			.setName("API Key")
+			.setDesc("ANTHROPIC_AUTH_TOKEN - 留空使用系统 Claude Code 认证")
+			.addText((text) => {
+				text.inputEl.style.width = "300px";
+				text.inputEl.type = "password";
+				text.setPlaceholder("留空使用默认")
+					.setValue(this.plugin.settings.apiKey || "")
+					.onChange(async (value) => {
+						this.plugin.settings.apiKey = value.trim() || undefined;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// Base URL
+		new Setting(containerEl)
+			.setName("API Base URL")
+			.setDesc("ANTHROPIC_BASE_URL - 留空使用官方 API")
+			.addText((text) => {
+				text.inputEl.style.width = "300px";
+				text.setPlaceholder("https://api.anthropic.com")
+					.setValue(this.plugin.settings.apiUrl || "")
+					.onChange(async (value) => {
+						this.plugin.settings.apiUrl = value.trim() || undefined;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// HTTP Proxy
+		new Setting(containerEl)
+			.setName("HTTP 代理")
+			.setDesc("HTTP_PROXY / HTTPS_PROXY - 留空不使用代理")
+			.addText((text) => {
+				text.inputEl.style.width = "300px";
+				text.setPlaceholder("http://127.0.0.1:7890")
+					.setValue(this.plugin.settings.httpProxy || "")
+					.onChange(async (value) => {
+						this.plugin.settings.httpProxy = value.trim() || undefined;
+						await this.plugin.saveSettings();
+					});
+			});
 	}
 
 	/**

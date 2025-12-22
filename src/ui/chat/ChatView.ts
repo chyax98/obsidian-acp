@@ -153,6 +153,11 @@ export class AcpChatView extends ItemView {
 				getPermissionSettings: () => this.plugin.settings.permission,
 				saveSettings: () => this.plugin.saveSettings(),
 				getMcpServers: () => this.plugin.settings.mcpServers,
+				getEnvSettings: () => ({
+					apiKey: this.plugin.settings.apiKey,
+					apiUrl: this.plugin.settings.apiUrl,
+					httpProxy: this.plugin.settings.httpProxy,
+				}),
 				onPermissionRequest: (params) =>
 					this.handlePermissionRequest(params),
 			},

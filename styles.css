@@ -309,6 +309,38 @@
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
+/* 模型/模式选择器 */
+.acp-model-selector,
+.acp-mode-selector {
+	padding: 6px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 0.85em;
+	cursor: pointer;
+	transition: all 0.15s;
+	min-width: 80px;
+}
+
+.acp-model-selector:hover,
+.acp-mode-selector:hover {
+	border-color: var(--interactive-accent);
+}
+
+.acp-model-selector:focus,
+.acp-mode-selector:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+.acp-model-selector:disabled,
+.acp-mode-selector:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
 /* 命令提示 */
 .acp-commands-hint {
 	margin-top: 8px;
@@ -2135,6 +2167,20 @@
 
 .acp-new-chat-btn:active {
 	background-color: var(--background-modifier-active-hover);
+}
+
+.acp-new-chat-btn.acp-loading {
+	cursor: wait;
+	opacity: 0.7;
+}
+
+.acp-new-chat-btn.acp-loading .svg-icon {
+	animation: spin 1s linear infinite;
+}
+
+.acp-new-chat-btn:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
 }
 
 /* 状态指示器（小圆点） */

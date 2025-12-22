@@ -11,8 +11,8 @@ import type { AvailableCommand } from "../../../acp/types/updates";
  * 命令菜单回调
  */
 export interface CommandMenuCallbacks {
-	/** 执行命令 */
-	onExecute: (command: AvailableCommand) => Promise<void>;
+	/** 执行命令（填充到输入框，不自动发送） */
+	onExecute: (command: AvailableCommand) => void;
 	/** 连接检查 */
 	isConnected: () => boolean;
 	/** 触发连接 */
@@ -204,7 +204,7 @@ export class CommandMenuHelper {
 	/**
 	 * 选择命令（回车确认）
 	 */
-	public async select(command?: AvailableCommand): Promise<void> {
+	public select(command?: AvailableCommand): void {
 		// 如果没有传入命令，使用当前选中的
 		if (!command && this.menuEl) {
 			const items = Array.from(
@@ -224,7 +224,7 @@ export class CommandMenuHelper {
 		// 隐藏菜单
 		this.hide();
 
-		// 执行命令
-		await this.callbacks.onExecute(command);
+		// 执行命令（填充到输入框，不自动发送）
+		this.callbacks.onExecute(command);
 	}
 }

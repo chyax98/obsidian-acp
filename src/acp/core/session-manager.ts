@@ -21,6 +21,10 @@ import type {
 	AvailableCommand,
 	CurrentModeUpdateData,
 	AvailableCommandsUpdateData,
+	AvailableModel,
+	SessionModelState,
+	AvailableMode,
+	SessionModeState,
 } from "../types";
 import { StreamingMessageBuffer } from "./message-buffer";
 import { SessionExporter } from "./session-export";
@@ -86,6 +90,10 @@ export class SessionManager {
 	private _state: SessionState = "idle";
 	private _sessionId: string | null = null;
 
+	// 模型和模式状态
+	private _modelState: SessionModelState | null = null;
+	private _modeState: SessionModeState | null = null;
+
 	// 历史
 	private _messages: Message[] = [];
 	private _turns: Turn[] = [];
@@ -142,6 +150,12 @@ export class SessionManager {
 	/** 可用命令更新回调 */
 	public onAvailableCommandsUpdate: (commands: AvailableCommand[]) => void =
 		() => {};
+
+	/** 模型状态更新回调 */
+	public onModelStateChange: (state: SessionModelState) => void = () => {};
+
+	/** 模式状态更新回调 */
+	public onModeStateChange: (state: SessionModeState) => void = () => {};
 
 	// ========================================================================
 	// 构造函数
@@ -209,6 +223,40 @@ export class SessionManager {
 	}
 
 	// ========================================================================
+	// 模型/模式状态访问
+	// ========================================================================
+
+	/** 获取当前模型状态 */
+	public get modelState(): SessionModelState | null {
+		return this._modelState;
+	}
+
+	/** 获取可用模型列表 */
+	public get availableModels(): AvailableModel[] {
+		return this._modelState?.availableModels || [];
+	}
+
+	/** 获取当前模型 ID */
+	public get currentModelId(): string | null {
+		return this._modelState?.currentModelId || null;
+	}
+
+	/** 获取当前模式状态 */
+	public get modeState(): SessionModeState | null {
+		return this._modeState;
+	}
+
+	/** 获取可用模式列表 */
+	public get availableModes(): AvailableMode[] {
+		return this._modeState?.availableModes || [];
+	}
+
+	/** 获取当前模式 ID */
+	public get currentModeId(): string | null {
+		return this._modeState?.currentModeId || null;
+	}
+
+	// ========================================================================
 	// 历史访问
 	// ========================================================================
 
@@ -237,6 +285,16 @@ export class SessionManager {
 		const response = await this.connection.newSession(cwd);
 		this._sessionId = response.sessionId;
 		this.workingDir = cwd;
+
+		// 保存模型和模式状态
+		if (response.models) {
+			this._modelState = response.models;
+			this.onModelStateChange(response.models);
+		}
+		if (response.modes) {
+			this._modeState = response.modes;
+			this.onModeStateChange(response.modes);
+		}
 	}
 
 	public async sendPrompt(
@@ -314,6 +372,28 @@ export class SessionManager {
 		this.completeTurn("cancelled");
 	}
 
+	/**
+	 * 切换模式
+	 * 注意：模型切换不支持，ACP 协议没有定义模型切换方法
+	 * @see https://agentclientprotocol.com/protocol/session-modes
+	 */
+	public async setMode(modeId: string): Promise<void> {
+		if (!this._sessionId) {
+			throw new Error("没有活动会话");
+		}
+
+		await this.connection.setMode(modeId);
+
+		// 更新本地状态
+		if (this._modeState) {
+			this._modeState = {
+				...this._modeState,
+				currentModeId: modeId,
+			};
+			this.onModeStateChange(this._modeState);
+		}
+	}
+
 	public end(): void {
 		if (this.currentTurn) {
 			this.completeTurn("cancelled");
@@ -368,6 +448,8 @@ export class SessionManager {
 		if (this.currentTurn.assistantMessage) {
 			this.messageBuffer.complete(this.currentTurn.assistantMessage.id);
 			this.currentTurn.assistantMessage.isStreaming = false;
+			// 通知 UI 更新，移除流式状态样式
+			this.onMessage(this.currentTurn.assistantMessage, false);
 		}
 
 		this.currentTurn.stopReason = stopReason;
@@ -492,21 +574,41 @@ export class SessionManager {
 	private handleToolCall(update: ToolCallUpdateData): void {
 		if (!this.currentTurn) return;
 
-		// 打断当前消息流
-		this.interruptCurrentMessage();
+		// 检查是否已存在相同 ID 的工具调用（ACP 会发送多次更新）
+		const existingToolCall = this.currentTurn.toolCalls.find(
+			(tc) => tc.toolCallId === update.toolCallId,
+		);
 
-		const toolCall: ToolCall = {
-			toolCallId: update.toolCallId,
-			title: update.title || "工具调用",
-			kind: update.kind || "other",
-			status: (update.status as ToolCallStatus) || "pending",
-			locations: update.locations,
-			rawInput: update.rawInput,
-			startTime: Date.now(),
-		};
+		if (existingToolCall) {
+			// 更新已存在的工具调用（不需要打断消息流）
+			if (update.title) existingToolCall.title = update.title;
+			if (update.kind) existingToolCall.kind = update.kind;
+			if (update.status)
+				existingToolCall.status = update.status as ToolCallStatus;
+			if (update.locations) existingToolCall.locations = update.locations;
+			// 只有当新的 rawInput 有数据时才更新
+			if (update.rawInput && Object.keys(update.rawInput).length > 0) {
+				existingToolCall.rawInput = update.rawInput;
+			}
+			if (update.content) existingToolCall.content = update.content;
+			this.onToolCall(existingToolCall);
+		} else {
+			// 创建新的工具调用时，打断当前消息流
+			this.interruptCurrentMessage();
 
-		this.currentTurn.toolCalls.push(toolCall);
-		this.onToolCall(toolCall);
+			const toolCall: ToolCall = {
+				toolCallId: update.toolCallId,
+				title: update.title || "工具调用",
+				kind: update.kind || "other",
+				status: (update.status as ToolCallStatus) || "pending",
+				locations: update.locations,
+				rawInput: update.rawInput,
+				startTime: Date.now(),
+			};
+
+			this.currentTurn.toolCalls.push(toolCall);
+			this.onToolCall(toolCall);
+		}
 	}
 
 	private interruptCurrentMessage(): void {

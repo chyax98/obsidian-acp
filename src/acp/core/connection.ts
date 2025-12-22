@@ -30,6 +30,7 @@ import type {
 	PromptContent,
 	NewSessionResponse,
 	SessionNewParams,
+	SetSessionModeResponse,
 } from "../types";
 import { JSONRPC_VERSION, createRequest, AcpMethod } from "../types";
 import { RequestQueue } from "./request-queue";
@@ -683,6 +684,7 @@ export class AcpConnection {
 
 			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 			console.log(`[ACP] session/new 成功 (耗时 ${elapsed}s)`);
+			console.log(`[ACP] session/new 响应:`, JSON.stringify(response, null, 2));
 
 			this.sessionId = response.sessionId;
 			return response;
@@ -720,6 +722,26 @@ export class AcpConnection {
 		await this.sendRequest(AcpMethod.SESSION_CANCEL, {
 			sessionId: this.sessionId,
 		});
+	}
+
+	/**
+	 * 切换会话模式
+	 * @see https://agentclientprotocol.com/protocol/session-modes
+	 */
+	public async setMode(modeId: string): Promise<SetSessionModeResponse> {
+		if (!this.sessionId) {
+			throw new Error("没有活动的 ACP 会话");
+		}
+
+		console.log(`[ACP] 切换模式: ${modeId}`);
+
+		return await this.sendRequest<SetSessionModeResponse>(
+			AcpMethod.SESSION_SET_MODE,
+			{
+				sessionId: this.sessionId,
+				modeId,
+			},
+		);
 	}
 
 	// ========================================================================

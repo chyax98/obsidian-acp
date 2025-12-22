@@ -23,6 +23,50 @@ export interface NewSessionParams {
 }
 
 /**
+ * 可用模型信息
+ */
+export interface AvailableModel {
+	/** 模型 ID */
+	modelId: string;
+	/** 模型名称 */
+	name: string;
+	/** 模型描述 */
+	description?: string;
+}
+
+/**
+ * 模型状态
+ */
+export interface SessionModelState {
+	/** 可用模型列表 */
+	availableModels: AvailableModel[];
+	/** 当前模型 ID */
+	currentModelId: string;
+}
+
+/**
+ * 可用模式信息
+ */
+export interface AvailableMode {
+	/** 模式 ID */
+	id: string;
+	/** 模式名称 */
+	name: string;
+	/** 模式描述 */
+	description?: string;
+}
+
+/**
+ * 模式状态
+ */
+export interface SessionModeState {
+	/** 可用模式列表 */
+	availableModes: AvailableMode[];
+	/** 当前模式 ID */
+	currentModeId: string;
+}
+
+/**
  * 新建会话响应
  */
 export interface NewSessionResponse {
@@ -30,6 +74,10 @@ export interface NewSessionResponse {
 	_meta?: MetaData;
 	/** 分配的会话 ID */
 	sessionId: string;
+	/** 模型状态 */
+	models?: SessionModelState;
+	/** 模式状态 */
+	modes?: SessionModeState;
 }
 
 // ============================================================================
@@ -172,6 +220,30 @@ export interface CancelSessionParams {
 }
 
 // ============================================================================
+// 会话模型 (Session Model)
+// ============================================================================
+
+/**
+ * 设置会话模型请求参数
+ */
+export interface SetSessionModelParams {
+	/** 扩展元数据 */
+	_meta?: MetaData;
+	/** 会话 ID */
+	sessionId: string;
+	/** 模型 ID */
+	modelId: string;
+}
+
+/**
+ * 设置会话模型响应
+ */
+export interface SetSessionModelResponse {
+	/** 扩展元数据 */
+	_meta?: MetaData;
+}
+
+// ============================================================================
 // 会话模式 (Session Mode)
 // ============================================================================
 
@@ -183,8 +255,8 @@ export interface SetSessionModeParams {
 	_meta?: MetaData;
 	/** 会话 ID */
 	sessionId: string;
-	/** 模式名称 */
-	mode: string;
+	/** 模式 ID */
+	modeId: string;
 }
 
 /**

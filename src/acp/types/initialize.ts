@@ -217,7 +217,7 @@ export const AcpMethod = {
 	/** 会话更新通知 */
 	SESSION_UPDATE: "session/update",
 	/** 设置会话模式 */
-	SESSION_SET_MODE: "session/setMode",
+	SESSION_SET_MODE: "session/set_mode",
 	/** 读取文本文件 */
 	FS_READ_TEXT_FILE: "fs/readTextFile",
 	/** 写入文本文件 */

@@ -20,7 +20,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 # Obsidian ACP Plugin
 
 **版本**: 1.0
-**日期**: 2025-12-21
+**日期**: 2025-12-22
 **状态**: 只支持 Claude Code
 
 ---
@@ -37,6 +37,10 @@ Obsidian ACP Plugin 通过 ACP (Agent Client Protocol) 协议将 Claude Code 集
 - **@ 引用文件**: 输入 @ 弹出文件搜索
 - **拖拽文件**: 从文件树拖拽到聊天输入
 - **选中文本**: 命令面板发送选中文本到 Chat
+- **斜杠命令**: 输入 / 显示可用命令菜单
+- **模式切换**: 支持 default/plan 等模式
+- **会话历史**: 保存和加载历史对话
+- **导出对话**: 导出为 Markdown 文件
 
 ---
 
@@ -74,8 +78,16 @@ src/
 │   │   └── registry.ts        # Claude Code 配置
 │   └── types/                 # ACP 协议类型
 └── ui/
-    ├── ChatView.ts            # 聊天界面
-    ├── MessageRenderer.ts     # 消息渲染
+    ├── chat/
+    │   ├── ChatView.ts        # 聊天主界面
+    │   └── helpers/           # UI 辅助类
+    ├── renderers/
+    │   ├── message-renderer.ts    # 消息渲染（Markdown + 图片）
+    │   ├── tool-call-renderer.ts  # 工具调用卡片
+    │   ├── diff-renderer.ts       # Diff 视图
+    │   ├── plan-renderer.ts       # Plan 列表
+    │   ├── thought-renderer.ts    # 思考过程
+    │   └── terminal-renderer.ts   # 终端输出
     ├── FileInputSuggest.ts    # @ 文件引用
     ├── SettingsTab.ts         # 设置页面
     └── PermissionModal.ts     # 权限对话框
@@ -116,10 +128,26 @@ npx @zed-industries/claude-code-acp
 | `initialize` | 初始化连接，交换能力声明 |
 | `session/new` | 创建新会话 |
 | `session/prompt` | 发送用户消息 |
-| `session/update` | 接收流式更新 |
+| `session/update` | 接收流式更新（通知） |
 | `session/cancel` | 取消当前请求 |
-| `fs/read_text_file` | 读取文件 |
-| `fs/write_text_file` | 写入文件 |
+| `session/set_mode` | 切换会话模式 |
+| `fs/readTextFile` | 读取文件 |
+| `fs/writeTextFile` | 写入文件 |
+
+### 渲染支持
+
+**SessionUpdate 类型**（全部已实现）：
+- `agent_message_chunk` - Agent 消息（Markdown + 图片）
+- `agent_thought_chunk` - Agent 思考过程
+- `tool_call` / `tool_call_update` - 工具调用卡片
+- `plan` - Plan 计划列表
+- `available_commands_update` - 可用命令
+- `current_mode_update` - 模式更新
+
+**Tool Call Content 类型**（全部已实现）：
+- `content` - 文本内容
+- `diff` - Diff 视图（带行号、高亮、文件路径点击）
+- `terminal` - 终端输出
 
 ### 权限系统
 
@@ -152,8 +180,7 @@ npx @zed-industries/claude-code-acp
 2. **Agent 检测系统** - 不需要检测，直接使用 npx
 3. **"始终拒绝" 按钮** - 笔记场景不需要
 4. **复杂权限规则** - 只需要 2 种模式
-5. **Terminal 支持** - Obsidian 不是 IDE
-6. **Session Modes UI** - 不需要模式切换
+5. **Terminal 交互** - Obsidian 不是 IDE，只显示输出不支持交互
 
 ---
 
@@ -163,4 +190,4 @@ npx @zed-industries/claude-code-acp
 
 ---
 
-**最后更新**: 2025-12-21
+**最后更新**: 2025-12-22

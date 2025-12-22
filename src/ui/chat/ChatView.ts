@@ -15,6 +15,7 @@ import type {
 	PlanEntry,
 	SessionState,
 } from "../../acp/core/session-manager";
+import type { SessionModeState } from "../../acp/types";
 import { PermissionModal } from "../PermissionModal";
 import type {
 	RequestPermissionParams,
@@ -71,6 +72,7 @@ export class AcpChatView extends ItemView {
 	private statusIndicatorEl!: HTMLElement;
 	private backToCurrentButton: HTMLButtonElement | null = null;
 	private emptyStateEl: HTMLElement | null = null;
+	private modeSelectorEl: HTMLSelectElement | null = null;
 
 	// 状态
 	private currentTurnContainer: HTMLElement | null = null;
@@ -200,11 +202,8 @@ export class AcpChatView extends ItemView {
 		_conn: AcpConnection,
 		sm: SessionManager,
 	): void {
+		// 仅设置回调，会话启动由 ConnectionManager.ensureConnected 负责
 		this.setupSessionCallbacks(sm);
-		void sm.start().then(() => {
-			this.hideEmptyState();
-			this.updateUIState("idle");
-		});
 	}
 
 	private onExitHistoryMode(): void {
@@ -313,6 +312,16 @@ export class AcpChatView extends ItemView {
 			cls: "acp-input-buttons",
 		});
 
+		// 模式选择器（注意：模型切换不支持，ACP 协议没有定义模型切换方法）
+		this.modeSelectorEl = buttonContainer.createEl("select", {
+			cls: "acp-mode-selector",
+			attr: { "aria-label": "选择模式" },
+		});
+		this.modeSelectorEl.style.display = "none";
+		this.modeSelectorEl.addEventListener("change", () =>
+			void this.handleModeChange(),
+		);
+
 		this.sendButtonEl = buttonContainer.createEl("button", {
 			cls: "acp-send-button mod-cta",
 			text: "发送",
@@ -360,7 +369,7 @@ export class AcpChatView extends ItemView {
 				}
 				if (e.key === "Enter" && !e.shiftKey) {
 					e.preventDefault();
-					void this.commandMenu.select();
+					this.commandMenu.select();
 					return;
 				}
 				if (e.key === "Escape") {
@@ -434,22 +443,46 @@ export class AcpChatView extends ItemView {
 		this.sendButtonEl.textContent = "连接中...";
 		const success = await this.connectionManager?.ensureConnected();
 		this.setInputSending(false);
-		if (success) new Notice("已连接到 Claude Code");
+
+		if (success) {
+			this.hideEmptyState();
+			this.updateUIState("idle");
+			new Notice("已连接到 Claude Code");
+		}
 	}
 
 	private async handleNewChat(): Promise<void> {
-		this.clearMessages();
-		this.currentTurnContainer = null;
-		this.isFirstMessage = true;
-		this.showEmptyState();
+		// 防止重复点击
+		if (this.newChatButtonEl.disabled) return;
 
-		const success = await this.connectionManager?.resetSession();
-		if (success) {
-			this.hideEmptyState();
-			this.addSystemMessage("✨ 新对话已开始");
-			new Notice("新对话已开始");
-		} else {
-			new Notice("输入消息开始新对话");
+		// 设置加载状态
+		this.newChatButtonEl.disabled = true;
+		this.inputEl.disabled = true;
+		this.sendButtonEl.disabled = true;
+		setIcon(this.newChatButtonEl, "loader-2");
+		this.newChatButtonEl.addClass("acp-loading");
+
+		try {
+			this.clearMessages();
+			this.currentTurnContainer = null;
+			this.isFirstMessage = true;
+			this.showEmptyState();
+
+			const success = await this.connectionManager?.resetSession();
+			if (success) {
+				this.hideEmptyState();
+				this.addSystemMessage("✨ 新对话已开始");
+				new Notice("新对话已开始");
+			} else {
+				new Notice("输入消息开始新对话");
+			}
+		} finally {
+			// 恢复按钮状态
+			this.newChatButtonEl.disabled = false;
+			this.inputEl.disabled = false;
+			this.sendButtonEl.disabled = false;
+			setIcon(this.newChatButtonEl, "plus");
+			this.newChatButtonEl.removeClass("acp-loading");
 		}
 	}
 
@@ -517,6 +550,7 @@ export class AcpChatView extends ItemView {
 		};
 		sm.onAvailableCommandsUpdate = (cmds) =>
 			this.commandMenu?.setCommands(cmds);
+		sm.onModeStateChange = (state) => this.updateModeSelector(state);
 	}
 
 	private getTurnContainer(): HTMLElement {
@@ -658,6 +692,10 @@ export class AcpChatView extends ItemView {
 			return;
 		}
 
+		// 连接成功后更新 UI
+		this.hideEmptyState();
+		this.updateUIState("idle");
+
 		this.inputHistory?.add(text);
 		this.inputEl.value = "";
 
@@ -687,7 +725,8 @@ export class AcpChatView extends ItemView {
 		}
 	}
 
-	private async handleCommandClick(command: AvailableCommand): Promise<void> {
+	private handleCommandClick(command: AvailableCommand): void {
+		// 始终只填充输入框，不自动发送，让用户可以添加额外内容后手动发送
 		if (command.input?.hint) {
 			this.inputEl.value = `/${command.name} ${command.input.hint}`;
 			this.inputEl.focus();
@@ -697,8 +736,55 @@ export class AcpChatView extends ItemView {
 				this.inputEl.value.length,
 			);
 		} else {
-			this.inputEl.value = `/${command.name}`;
-			await this.handleSend();
+			this.inputEl.value = `/${command.name} `;
+			this.inputEl.focus();
+			// 光标放在末尾，用户可以继续输入
+			this.inputEl.setSelectionRange(
+				this.inputEl.value.length,
+				this.inputEl.value.length,
+			);
+		}
+		// 隐藏命令菜单
+		this.commandMenu?.hide();
+	}
+
+	// ========================================================================
+	// 模式选择（注意：模型切换不支持，ACP 协议没有定义模型切换方法）
+	// ========================================================================
+
+	private updateModeSelector(state: SessionModeState): void {
+		if (!this.modeSelectorEl) return;
+
+		this.modeSelectorEl.empty();
+		for (const mode of state.availableModes) {
+			const option = this.modeSelectorEl.createEl("option", {
+				value: mode.id,
+				text: mode.name,
+			});
+			if (mode.id === state.currentModeId) {
+				option.selected = true;
+			}
+		}
+
+		this.modeSelectorEl.style.display =
+			state.availableModes.length > 1 ? "" : "none";
+	}
+
+	private async handleModeChange(): Promise<void> {
+		if (!this.modeSelectorEl) return;
+
+		const modeId = this.modeSelectorEl.value;
+		const sm = this.connectionManager?.getSessionManager();
+		if (!sm) return;
+
+		try {
+			await sm.setMode(modeId);
+			const modeName =
+				sm.availableModes.find((m) => m.id === modeId)?.name || modeId;
+			new Notice(`已切换模式: ${modeName}`);
+		} catch (error) {
+			console.error("[ChatView] 切换模式失败:", error);
+			new Notice("切换模式失败: " + (error as Error).message);
 		}
 	}
 
@@ -729,7 +815,13 @@ export class AcpChatView extends ItemView {
 			? "inline-block"
 			: "none";
 
-		if (state === "idle") this.setInputSending(false);
+		if (state === "idle") {
+			this.setInputSending(false);
+			// 清除所有残留的流式状态（光标闪烁）
+			this.messagesEl
+				?.querySelectorAll(".acp-message-streaming")
+				.forEach((el) => el.removeClass("acp-message-streaming"));
+		}
 	}
 
 	private updateConnectionStatus(

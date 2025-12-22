@@ -76,6 +76,7 @@ export class ConnectionManager {
 	private connection: AcpConnection | null = null;
 	private sessionManager: SessionManager | null = null;
 	private isConnecting: boolean = false;
+	private sessionStartPromise: Promise<void> | null = null;
 
 	constructor(
 		app: App,
@@ -102,23 +103,36 @@ export class ConnectionManager {
 	}
 
 	/**
-	 * 是否已连接
+	 * 是否已连接且会话已启动
 	 */
 	public get isConnected(): boolean {
 		return (
 			this.connection?.isConnected === true &&
+			this.connection?.hasActiveSession === true &&
 			this.sessionManager !== null
 		);
 	}
 
 	/**
-	 * 确保已连接
+	 * 确保已连接且会话已启动
 	 */
 	public async ensureConnected(): Promise<boolean> {
+		// 已完全连接
 		if (this.isConnected) {
 			return true;
 		}
 
+		// 正在启动会话，等待完成
+		if (this.sessionStartPromise) {
+			try {
+				await this.sessionStartPromise;
+				return this.isConnected;
+			} catch {
+				return false;
+			}
+		}
+
+		// 正在连接中，返回 false（避免重复连接）
 		if (this.isConnecting) {
 			return false;
 		}
@@ -170,8 +184,14 @@ export class ConnectionManager {
 				onPermissionRequest: this.config.onPermissionRequest,
 			});
 
+			// 先触发 connected 回调（用于设置 UI 回调）
 			this.callbacks.onStatusChange("connected", "Claude Code");
 			this.callbacks.onConnected(this.connection, this.sessionManager);
+
+			// 启动会话并等待完成
+			this.sessionStartPromise = this.sessionManager.start();
+			await this.sessionStartPromise;
+			this.sessionStartPromise = null;
 
 			return true;
 		} catch (error) {
@@ -184,6 +204,7 @@ export class ConnectionManager {
 				this.connection = null;
 			}
 			this.sessionManager = null;
+			this.sessionStartPromise = null;
 
 			return false;
 		} finally {

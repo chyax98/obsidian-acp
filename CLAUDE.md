@@ -19,28 +19,29 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 # Obsidian ACP Plugin
 
-**版本**: 1.0
-**日期**: 2025-12-22
-**状态**: 只支持 Claude Code
+**版本**: 0.3.0
+**日期**: 2025-12-23
+**状态**: 支持多 Agent (Claude Code, Goose, OpenCode, 自定义)
 
 ---
 
 ## 项目简介
 
-Obsidian ACP Plugin 通过 ACP (Agent Client Protocol) 协议将 Claude Code 集成到 Obsidian 中，让用户在笔记环境中使用 AI 助手。
+Obsidian ACP Plugin 通过 ACP (Agent Client Protocol) 协议将多个 AI Agent 集成到 Obsidian 中，让用户在笔记环境中使用 AI 助手。
 
 ### 核心特性
 
-- **Claude Code 集成**: 通过 `npx @zed-industries/claude-code-acp` 启动
+- **多 Agent 支持**: Claude Code, Goose, OpenCode, 自定义 Agent
 - **文件操作**: AI 可读写 Obsidian Vault 中的文件
 - **权限控制**: 2 种模式（每次询问 / 完全信任）
 - **@ 引用文件**: 输入 @ 弹出文件搜索
 - **拖拽文件**: 从文件树拖拽到聊天输入
 - **选中文本**: 命令面板发送选中文本到 Chat
-- **斜杠命令**: 输入 / 显示可用命令菜单
+- **斜杠命令**: 输入 / 显示可用命令菜单（动态由 Agent 提供）
 - **模式切换**: 支持 default/plan 等模式
 - **会话历史**: 保存和加载历史对话
 - **导出对话**: 导出为 Markdown 文件
+- **MCP 能力感知**: 根据 Agent 能力自动过滤 MCP 服务器
 
 ---
 
@@ -57,10 +58,12 @@ Obsidian ACP Plugin 通过 ACP (Agent Client Protocol) 协议将 Claude Code 集
                                                     │
                                          JSON-RPC 2.0 over stdio
                                                     │
-                                                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│               子进程: npx @zed-industries/claude-code-acp        │
-└─────────────────────────────────────────────────────────────────┘
+                            ┌───────────────────────┼───────────────────────┐
+                            ▼                       ▼                       ▼
+┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐ ┌─────────────┐
+│   Claude Code     │ │      Goose        │ │     OpenCode      │ │  自定义 CLI  │
+│ (npx claude-acp)  │ │   (goose acp)     │ │  (opencode acp)   │ │             │
+└───────────────────┘ └───────────────────┘ └───────────────────┘ └─────────────┘
 ```
 
 ### 目录结构
@@ -72,10 +75,11 @@ src/
 │   ├── core/
 │   │   ├── connection.ts      # ACP JSON-RPC 通信
 │   │   ├── session-manager.ts # 会话状态管理
+│   │   ├── mcp-config.ts      # MCP 配置与能力过滤
 │   │   └── message-buffer.ts  # 流式消息缓冲
 │   ├── backends/
-│   │   ├── types.ts           # 类型定义 (只有 'claude')
-│   │   └── registry.ts        # Claude Code 配置
+│   │   ├── types.ts           # 多 Agent 类型定义
+│   │   └── registry.ts        # Agent 注册表 (Claude, Goose, OpenCode)
 │   └── types/                 # ACP 协议类型
 └── ui/
     ├── chat/
@@ -89,7 +93,7 @@ src/
     │   ├── thought-renderer.ts    # 思考过程
     │   └── terminal-renderer.ts   # 终端输出
     ├── FileInputSuggest.ts    # @ 文件引用
-    ├── SettingsTab.ts         # 设置页面
+    ├── SettingsTab.ts         # 设置页面 (Agent 选择与配置)
     └── PermissionModal.ts     # 权限对话框
 ```
 
@@ -115,11 +119,14 @@ npm run build
 
 ## ACP 协议
 
-### 启动命令
+### 支持的 Agent
 
-```bash
-npx @zed-industries/claude-code-acp
-```
+| Agent | 启动命令 | ACP 参数 |
+|-------|---------|---------|
+| Claude Code | `npx @zed-industries/claude-code-acp` | 无 |
+| Goose | `goose` | `acp` |
+| OpenCode | `opencode` | `acp` |
+| 自定义 | 用户配置 | 用户配置 |
 
 ### 核心方法
 
@@ -176,11 +183,10 @@ npx @zed-industries/claude-code-acp
 
 以下功能已被明确拒绝，不要实现：
 
-1. **多 Agent 支持** - 只支持 Claude Code
-2. **Agent 检测系统** - 不需要检测，直接使用 npx
-3. **"始终拒绝" 按钮** - 笔记场景不需要
-4. **复杂权限规则** - 只需要 2 种模式
-5. **Terminal 交互** - Obsidian 不是 IDE，只显示输出不支持交互
+1. **Agent 自动检测** - 用户手动选择 Agent，不自动检测
+2. **"始终拒绝" 按钮** - 笔记场景不需要
+3. **复杂权限规则** - 只需要 2 种模式
+4. **Terminal 交互** - Obsidian 不是 IDE，只显示输出不支持交互
 
 ---
 
@@ -190,4 +196,4 @@ npx @zed-industries/claude-code-acp
 
 ---
 
-**最后更新**: 2025-12-22
+**最后更新**: 2025-12-23

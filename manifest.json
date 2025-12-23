@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-acp",
 	"name": "ACP Agent Client",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"minAppVersion": "1.0.0",
 	"description": "Agent Client Protocol integration for Obsidian - Connect with Claude Code, Codex, Gemini and more AI agents",
 	"author": "chyax98",

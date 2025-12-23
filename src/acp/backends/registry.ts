@@ -1,14 +1,20 @@
 /**
  * ACP Agent 后端注册表
- * 只支持 Claude Code
+ *
+ * 支持多个 ACP 兼容 Agent：Claude Code, Goose, OpenCode
  */
 
 import type { AcpBackendConfig, AcpBackendId } from "./types";
 
 /**
- * Claude Code 配置
+ * 内置 Agent 配置
+ *
+ * 不包含 "custom" 类型，自定义 Agent 由用户配置
  */
-export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
+export const ACP_BACKENDS: Record<
+	Exclude<AcpBackendId, "custom">,
+	AcpBackendConfig
+> = {
 	claude: {
 		id: "claude",
 		name: "Claude Code",
@@ -20,27 +26,80 @@ export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 		supportsStreaming: false,
 		acpArgs: [],
 	},
+	goose: {
+		id: "goose",
+		name: "Goose",
+		description: "Block (Square) 开源 AI Agent，Rust 原生 ACP 实现",
+		cliCommand: "goose",
+		defaultCliPath: "goose",
+		authRequired: false,
+		enabled: true,
+		supportsStreaming: false,
+		acpArgs: ["acp"],
+	},
+	opencode: {
+		id: "opencode",
+		name: "OpenCode",
+		description: "开源多模型 AI Agent，支持 30+ 提供商",
+		cliCommand: "opencode",
+		defaultCliPath: "opencode",
+		authRequired: false,
+		enabled: true,
+		supportsStreaming: false,
+		acpArgs: ["acp"],
+	},
 };
 
 /**
- * 获取 Claude Code 配置
+ * 获取 Agent 配置
+ *
+ * @param id Agent ID
+ * @returns Agent 配置，如果不存在返回 undefined
  */
 export function getBackendConfig(
 	id: AcpBackendId,
 ): AcpBackendConfig | undefined {
+	if (id === "custom") return undefined;
 	return ACP_BACKENDS[id];
 }
 
 /**
- * 获取 Claude Code 的 ACP 启动参数
+ * 获取 Agent 的 ACP 启动参数
+ *
+ * @param id Agent ID
+ * @returns ACP 启动参数数组
  */
-export function getBackendAcpArgs(_id: AcpBackendId): string[] {
-	return [];
+export function getBackendAcpArgs(id: AcpBackendId): string[] {
+	if (id === "custom") return [];
+	return ACP_BACKENDS[id]?.acpArgs || [];
 }
 
 /**
- * 获取 Claude Code 的启动命令
+ * 获取 Agent 的启动命令
+ *
+ * @param id Agent ID
+ * @returns 启动命令字符串
  */
-export function getBackendStartCommand(_id: AcpBackendId): string {
-	return "npx @zed-industries/claude-code-acp";
+export function getBackendStartCommand(id: AcpBackendId): string {
+	if (id === "custom") return "";
+	return ACP_BACKENDS[id]?.defaultCliPath || ACP_BACKENDS[id]?.cliCommand || "";
+}
+
+/**
+ * 获取所有可用的 Agent 列表
+ *
+ * @returns Agent 配置数组
+ */
+export function getAllBackends(): AcpBackendConfig[] {
+	return Object.values(ACP_BACKENDS);
+}
+
+/**
+ * 检查是否为内置 Agent
+ *
+ * @param id Agent ID
+ * @returns 是否为内置 Agent
+ */
+export function isBuiltinBackend(id: AcpBackendId): boolean {
+	return id !== "custom" && id in ACP_BACKENDS;
 }

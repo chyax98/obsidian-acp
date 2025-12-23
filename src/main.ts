@@ -8,6 +8,7 @@ import type { WorkspaceLeaf, Editor } from "obsidian";
 import { Plugin, Notice } from "obsidian";
 import { AcpSettingTab } from "./ui/SettingsTab";
 import { AcpChatView, ACP_CHAT_VIEW_TYPE } from "./ui/ChatView";
+import type { AcpBackendId, CustomAgentConfig } from "./acp/backends";
 
 // ============================================================================
 // 类型定义
@@ -60,9 +61,12 @@ export interface McpServerConfig {
 /**
  * 插件设置接口
  *
- * 专注于 Claude Code SDK 模式，简化配置。
+ * 支持多个 ACP Agent：Claude Code, Goose, OpenCode, 自定义
  */
 export interface AcpPluginSettings {
+	/** 当前选中的 Agent */
+	currentAgentId: AcpBackendId;
+
 	/** 工作目录模式 */
 	workingDir: "vault" | "current-note-folder" | "custom";
 
@@ -72,7 +76,10 @@ export interface AcpPluginSettings {
 	/** 手动配置的 Agent 路径 (backendId -> path) */
 	manualAgentPaths?: Record<string, string>;
 
-	/** 自定义 API Key（留空则使用系统 Claude Code 认证）*/
+	/** 自定义 Agent 配置（当 currentAgentId === 'custom' 时使用） */
+	customAgent?: CustomAgentConfig;
+
+	/** 自定义 API Key（留空则使用系统认证）*/
 	apiKey?: string;
 
 	/** 自定义 API Base URL（留空则使用默认）*/
@@ -101,6 +108,7 @@ export interface AcpPluginSettings {
  * 默认设置
  */
 const DEFAULT_SETTINGS: AcpPluginSettings = {
+	currentAgentId: "claude", // 默认使用 Claude Code
 	workingDir: "vault",
 	customWorkingDir: undefined,
 	apiKey: undefined,

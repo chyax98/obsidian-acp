@@ -70,6 +70,7 @@ export class AcpChatView extends ItemView {
 	private historyButtonEl!: HTMLButtonElement;
 	private connectButtonEl!: HTMLButtonElement;
 	private statusIndicatorEl!: HTMLElement;
+	private headerTitleEl!: HTMLElement;
 	private backToCurrentButton: HTMLButtonElement | null = null;
 	private emptyStateEl: HTMLElement | null = null;
 	private modeSelectorEl: HTMLSelectElement | null = null;
@@ -149,9 +150,12 @@ export class AcpChatView extends ItemView {
 		this.connectionManager = new ConnectionManager(
 			this.app,
 			{
+				getCurrentAgentId: () =>
+					this.plugin.settings.currentAgentId || "claude",
+				getCustomAgentConfig: () => this.plugin.settings.customAgent,
 				getWorkingDirectory: () => this.getWorkingDirectory(),
-				getManualCliPath: () =>
-					this.plugin.settings.manualAgentPaths?.claude,
+				getManualCliPath: (agentId) =>
+					this.plugin.settings.manualAgentPaths?.[agentId],
 				getPermissionSettings: () => this.plugin.settings.permission,
 				saveSettings: () => this.plugin.saveSettings(),
 				getMcpServers: () => this.plugin.settings.mcpServers,
@@ -229,7 +233,10 @@ export class AcpChatView extends ItemView {
 			cls: "acp-status-dot acp-status-disconnected",
 			attr: { "aria-label": "未连接" },
 		});
-		leftSection.createDiv({ cls: "acp-header-title", text: "Claude Code" });
+		this.headerTitleEl = leftSection.createDiv({
+			cls: "acp-header-title",
+			text: "ACP Agent",
+		});
 
 		this.connectButtonEl = leftSection.createEl("button", {
 			cls: "acp-connect-btn",
@@ -448,7 +455,8 @@ export class AcpChatView extends ItemView {
 		if (success) {
 			this.hideEmptyState();
 			this.updateUIState("idle");
-			new Notice("已连接到 Claude Code");
+			const agentName = this.headerTitleEl?.textContent || "Agent";
+			new Notice(`已连接到 ${agentName}`);
 		}
 	}
 
@@ -528,7 +536,8 @@ export class AcpChatView extends ItemView {
 
 		try {
 			const data = sm.toJSON();
-			await this.historyManager?.saveSession(data, "Claude Code");
+			const agentName = this.headerTitleEl?.textContent || "Agent";
+			await this.historyManager?.saveSession(data, agentName);
 		} catch (error) {
 			console.error("[ChatView] 自动保存会话失败:", error);
 		}
@@ -838,6 +847,11 @@ export class AcpChatView extends ItemView {
 			error: "连接错误",
 		};
 		this.statusIndicatorEl.setAttribute("aria-label", tooltips[status]);
+
+		// 更新标题显示当前 Agent 名称
+		if (agentName) {
+			this.headerTitleEl.textContent = agentName;
+		}
 
 		if (status === "connected") {
 			this.connectButtonEl.style.display = "none";

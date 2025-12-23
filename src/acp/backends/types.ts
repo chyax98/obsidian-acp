@@ -9,9 +9,14 @@
 // ============================================================================
 
 /**
- * 只支持 Claude Code
+ * 支持的 Agent 后端 ID
+ *
+ * - claude: Anthropic Claude Code (Zed ACP 适配器)
+ * - goose: Block (Square) Goose
+ * - opencode: OpenCode 多模型 Agent
+ * - custom: 用户自定义 Agent
  */
-export type AcpBackendId = "claude";
+export type AcpBackendId = "claude" | "goose" | "opencode" | "custom";
 
 // ============================================================================
 // 后端配置接口

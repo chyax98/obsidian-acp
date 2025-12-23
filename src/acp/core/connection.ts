@@ -15,6 +15,7 @@ import { spawn } from "child_process";
 import { Platform } from "obsidian";
 
 import type { AcpBackendId } from "../backends";
+import { getBackendConfig } from "../backends";
 import { enhanceEnvForNodeScript } from "../utils/env-utils";
 import type {
 	AcpRequest,
@@ -204,46 +205,59 @@ export class AcpConnection {
 	// 连接方法
 	// ========================================================================
 
-	private connectClaude(
+	/**
+	 * 启动 ACP Agent 进程
+	 *
+	 * 根据后端配置启动相应的 Agent 进程。支持：
+	 * - 内置 Agent (claude, goose, opencode)
+	 * - 自定义 Agent (custom)
+	 */
+	private connectAgent(
+		backendId: AcpBackendId,
 		workingDir: string,
 		cliPath?: string,
 		customEnv?: Record<string, string>,
 	): void {
-		const isWindows = Platform.isWin === true;
+		// 获取后端配置
+		const backendConfig = getBackendConfig(backendId);
 
-		let spawnCommand: string;
-		let spawnArgs: string[];
+		// 确定启动命令和参数
+		let effectiveCliPath: string;
+		let effectiveAcpArgs: string[];
 
 		if (cliPath) {
-			const parts = cliPath.split(" ");
-			if (parts[0] === "npx") {
-				spawnCommand = isWindows ? "npx.cmd" : "npx";
-				spawnArgs = parts.slice(1);
-			} else {
-				spawnCommand = parts[0];
-				spawnArgs = parts.slice(1);
-			}
+			// 用户自定义 CLI 路径
+			effectiveCliPath = cliPath;
+			effectiveAcpArgs = backendConfig?.acpArgs || [];
+		} else if (backendConfig) {
+			// 使用内置配置
+			effectiveCliPath =
+				backendConfig.defaultCliPath || backendConfig.cliCommand || "";
+			effectiveAcpArgs = backendConfig.acpArgs || [];
 		} else {
-			spawnCommand = isWindows ? "npx.cmd" : "npx";
-			spawnArgs = ["@zed-industries/claude-code-acp"];
+			// 自定义 Agent，需要用户提供 cliPath
+			throw new Error(`未知的 Agent: ${backendId}，请提供 CLI 路径`);
 		}
 
-		const env = enhanceEnvForNodeScript(cliPath || spawnCommand, {
-			...process.env,
+		// 合并环境变量
+		const mergedEnv = {
 			...customEnv,
-		});
+			...backendConfig?.env,
+		};
 
-		console.log(
-			`[ACP] 启动 Claude Code 进程: ${spawnCommand} ${spawnArgs.join(" ")}`,
+		// 使用 createSpawnConfig 生成启动配置
+		const { command, args, options } = createSpawnConfig(
+			effectiveCliPath,
+			workingDir,
+			effectiveAcpArgs,
+			mergedEnv,
 		);
+
+		const agentName = backendConfig?.name || backendId;
+		console.log(`[ACP] 启动 ${agentName} 进程: ${command} ${args.join(" ")}`);
 		console.log(`[ACP] 工作目录: ${workingDir}`);
 
-		this.child = spawn(spawnCommand, spawnArgs, {
-			cwd: workingDir,
-			stdio: ["pipe", "pipe", "pipe"],
-			env,
-			shell: false,
-		});
+		this.child = spawn(command, args, options);
 
 		console.log(`[ACP] 进程已启动 (PID: ${this.child.pid})`);
 	}
@@ -291,7 +305,12 @@ export class AcpConnection {
 		);
 
 		try {
-			this.connectClaude(this.workingDir, options.cliPath, options.env);
+			this.connectAgent(
+				options.backendId,
+				this.workingDir,
+				options.cliPath,
+				options.env,
+			);
 			await this.setupProcessHandlers();
 			await this.initialize();
 
@@ -668,9 +687,16 @@ export class AcpConnection {
 		// 更新文件处理器的工作目录
 		this.fileHandler?.setWorkingDir(cwd);
 
-		// 使用 McpConfigProcessor 获取配置
+		// 获取 Agent 的 MCP 能力
+		const mcpCapabilities =
+			this.initializeResponse?.capabilities?.mcpCapabilities;
+
+		// 使用 McpConfigProcessor 获取配置，根据能力过滤
 		const mcpProcessor = new McpConfigProcessor(cwd, this.app);
-		const mcpServers = mcpProcessor.getServersConfig(this.mcpServers);
+		const mcpServers = mcpProcessor.getServersConfig(
+			this.mcpServers,
+			mcpCapabilities,
+		);
 
 		const params: SessionNewParams = {
 			cwd,

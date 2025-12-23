@@ -14,7 +14,8 @@ import type {
 	RequestPermissionParams,
 	PermissionOutcome,
 } from "../../../acp/types/permissions";
-import { ACP_BACKENDS } from "../../../acp/backends/registry";
+import type { AcpBackendId, CustomAgentConfig } from "../../../acp/backends";
+import { getBackendConfig } from "../../../acp/backends/registry";
 
 /**
  * 环境变量设置
@@ -29,10 +30,14 @@ export interface EnvSettings {
  * 连接配置
  */
 export interface ConnectionConfig {
+	/** 获取当前选中的 Agent ID */
+	getCurrentAgentId: () => AcpBackendId;
+	/** 获取自定义 Agent 配置 */
+	getCustomAgentConfig: () => CustomAgentConfig | undefined;
 	/** 获取工作目录 */
 	getWorkingDirectory: () => string;
 	/** 获取手动设置的 CLI 路径 */
-	getManualCliPath: () => string | undefined;
+	getManualCliPath: (agentId: AcpBackendId) => string | undefined;
 	/** 获取权限设置 */
 	getPermissionSettings: () => ConnectionOptions["permissionSettings"];
 	/** 保存设置 */
@@ -80,6 +85,9 @@ export class ConnectionManager {
 	private isConnecting: boolean = false;
 	private sessionStartPromise: Promise<void> | null = null;
 
+	/** 当前已连接的 Agent ID */
+	private connectedAgentId: AcpBackendId | null = null;
+
 	constructor(
 		app: App,
 		config: ConnectionConfig,
@@ -88,6 +96,13 @@ export class ConnectionManager {
 		this.app = app;
 		this.config = config;
 		this.callbacks = callbacks;
+	}
+
+	/**
+	 * 获取当前连接的 Agent ID
+	 */
+	public getConnectedAgentId(): AcpBackendId | null {
+		return this.connectedAgentId;
 	}
 
 	/**
@@ -119,7 +134,18 @@ export class ConnectionManager {
 	 * 确保已连接且会话已启动
 	 */
 	public async ensureConnected(): Promise<boolean> {
-		// 已完全连接
+		// 获取当前选中的 Agent
+		const agentId = this.config.getCurrentAgentId();
+
+		// 检查是否需要切换 Agent
+		if (this.isConnected && this.connectedAgentId !== agentId) {
+			console.log(
+				`[ConnectionManager] Agent 已切换: ${this.connectedAgentId} -> ${agentId}，断开旧连接`,
+			);
+			this.disconnect();
+		}
+
+		// 已完全连接（且 Agent 未变化）
 		if (this.isConnected) {
 			return true;
 		}
@@ -142,14 +168,37 @@ export class ConnectionManager {
 		this.isConnecting = true;
 
 		try {
-			this.callbacks.onStatusChange("connecting", "Claude Code");
+			const customAgentConfig = this.config.getCustomAgentConfig();
 
-			const backendConfig = ACP_BACKENDS.claude;
-			const manualPath = this.config.getManualCliPath();
-			const cliPath =
-				manualPath ||
-				backendConfig.defaultCliPath ||
-				"npx @zed-industries/claude-code-acp";
+			// 获取 Agent 名称和配置
+			let agentName: string;
+			let cliPath: string;
+			let acpArgs: string[] = [];
+
+			if (agentId === "custom" && customAgentConfig) {
+				// 自定义 Agent
+				agentName = customAgentConfig.name || "自定义 Agent";
+				cliPath = customAgentConfig.cliPath;
+				acpArgs = customAgentConfig.acpArgs || [];
+			} else {
+				// 内置 Agent
+				const backendConfig = getBackendConfig(agentId);
+				agentName = backendConfig?.name || agentId;
+				const manualPath = this.config.getManualCliPath(agentId);
+				cliPath =
+					manualPath ||
+					backendConfig?.defaultCliPath ||
+					backendConfig?.cliCommand ||
+					"";
+				acpArgs = backendConfig?.acpArgs || [];
+			}
+
+			if (!cliPath) {
+				throw new Error(`未配置 ${agentName} 的 CLI 路径`);
+			}
+
+			this.callbacks.onStatusChange("connecting", agentName);
+
 			const workingDir = this.config.getWorkingDirectory();
 
 			// 构建环境变量（只传递用户填写的字段）
@@ -169,10 +218,10 @@ export class ConnectionManager {
 			this.connection = new AcpConnection();
 
 			await this.connection.connect({
-				backendId: "claude",
+				backendId: agentId,
 				cliPath,
 				workingDir,
-				acpArgs: backendConfig.acpArgs || [],
+				acpArgs,
 				env: Object.keys(env).length > 0 ? env : undefined,
 				app: this.app,
 				permissionSettings: this.config.getPermissionSettings(),
@@ -187,8 +236,11 @@ export class ConnectionManager {
 				onPermissionRequest: this.config.onPermissionRequest,
 			});
 
+			// 记录已连接的 Agent ID
+			this.connectedAgentId = agentId;
+
 			// 先触发 connected 回调（用于设置 UI 回调）
-			this.callbacks.onStatusChange("connected", "Claude Code");
+			this.callbacks.onStatusChange("connected", agentName);
 			this.callbacks.onConnected(this.connection, this.sessionManager);
 
 			// 启动会话并等待完成
@@ -229,6 +281,7 @@ export class ConnectionManager {
 			this.connection = null;
 		}
 
+		this.connectedAgentId = null;
 		this.callbacks.onStatusChange("disconnected");
 	}
 

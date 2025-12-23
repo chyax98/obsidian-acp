@@ -1,11 +1,25 @@
 /**
  * ACP Agent 后端模块导出入口
  *
- * 只支持 Claude Code
+ * 支持多个 ACP Agent: Claude Code, Goose, OpenCode
  */
 
 // 类型定义
-export type { AcpBackendId, AcpBackendConfig } from "./types";
+export type {
+	AcpBackendId,
+	AcpBackendConfig,
+	CustomAgentConfig,
+	DetectableAcpCli,
+	BackendDetectionStatus,
+	BackendRuntimeState,
+} from "./types";
 
 // 后端注册表
-export { ACP_BACKENDS, getBackendConfig } from "./registry";
+export {
+	ACP_BACKENDS,
+	getBackendConfig,
+	getBackendAcpArgs,
+	getBackendStartCommand,
+	getAllBackends,
+	isBuiltinBackend,
+} from "./registry";

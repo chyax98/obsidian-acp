@@ -2,7 +2,7 @@
  * ACP 插件设置页面
  *
  * 提供：
- * - Claude Code 配置
+ * - Agent 选择与配置 (Claude Code, Goose, OpenCode, 自定义)
  * - MCP 服务器管理
  * - 工作目录配置
  * - 权限管理
@@ -12,7 +12,8 @@ import type { App } from "obsidian";
 import { PluginSettingTab, Setting, Notice } from "obsidian";
 import type AcpPlugin from "../main";
 import type { McpServerConfig } from "../main";
-import { ACP_BACKENDS } from "../acp/backends/registry";
+import type { AcpBackendId } from "../acp/backends";
+import { ACP_BACKENDS, getAllBackends } from "../acp/backends/registry";
 import { McpServerModal } from "./McpServerModal";
 
 /**
@@ -38,7 +39,7 @@ export class AcpSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 		});
 		descDiv.style.marginBottom = "1.5em";
-		descDiv.setText("通过 ACP 协议连接 Claude Code");
+		descDiv.setText("通过 ACP 协议连接 AI Agent");
 
 		// Agent 配置
 		this.renderAgentSection(containerEl);
@@ -63,38 +64,126 @@ export class AcpSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Agent 配置部分 - 只显示 Claude Code
+	 * Agent 配置部分 - 支持多个 Agent
 	 */
 	private renderAgentSection(containerEl: HTMLElement): void {
 		containerEl.createEl("h3", { text: "Agent 配置" });
 
-		const config = ACP_BACKENDS.claude;
+		const currentAgentId = this.plugin.settings.currentAgentId || "claude";
 
-		// Claude Code 配置
+		// Agent 选择下拉框
 		new Setting(containerEl)
-			.setName(config.name)
+			.setName("选择 Agent")
+			.setDesc("选择要使用的 ACP Agent")
+			.addDropdown((dropdown) => {
+				// 添加内置 Agent
+				for (const backend of getAllBackends()) {
+					dropdown.addOption(backend.id, backend.name);
+				}
+				// 添加自定义选项
+				dropdown.addOption("custom", "自定义 Agent");
+
+				dropdown
+					.setValue(currentAgentId)
+					.onChange(async (value) => {
+						const newAgentId = value as AcpBackendId;
+						const oldAgentId = this.plugin.settings.currentAgentId;
+
+						this.plugin.settings.currentAgentId = newAgentId;
+						await this.plugin.saveSettings();
+
+						// 提示用户
+						const newName = this.getAgentDisplayName(newAgentId);
+						if (oldAgentId !== newAgentId) {
+							new Notice(
+								`已切换到 ${newName}\n返回聊天时将自动重新连接`,
+								3000,
+							);
+						}
+
+						this.display(); // 重新渲染
+					});
+			});
+
+		// 根据选中的 Agent 显示对应配置
+		if (currentAgentId === "custom") {
+			this.renderCustomAgentConfig(containerEl);
+		} else {
+			this.renderBuiltinAgentConfig(containerEl, currentAgentId);
+		}
+	}
+
+	/**
+	 * 获取 Agent 显示名称
+	 */
+	private getAgentDisplayName(id: AcpBackendId): string {
+		if (id === "custom") {
+			return this.plugin.settings.customAgent?.name || "自定义 Agent";
+		}
+		return ACP_BACKENDS[id]?.name || id;
+	}
+
+	/**
+	 * 渲染内置 Agent 配置
+	 */
+	private renderBuiltinAgentConfig(
+		containerEl: HTMLElement,
+		agentId: Exclude<AcpBackendId, "custom">,
+	): void {
+		const config = ACP_BACKENDS[agentId];
+		if (!config) return;
+
+		// Agent 描述
+		const descDiv = containerEl.createDiv({
+			cls: "setting-item-description",
+		});
+		descDiv.style.marginTop = "0.5em";
+		descDiv.style.marginBottom = "1em";
+		descDiv.style.padding = "0.5em";
+		descDiv.style.backgroundColor = "var(--background-secondary)";
+		descDiv.style.borderRadius = "4px";
+		descDiv.innerHTML = `
+			<strong>${config.name}</strong><br>
+			<small>${config.description || ""}</small>
+		`;
+
+		// CLI 路径配置
+		new Setting(containerEl)
+			.setName("CLI 路径")
 			.setDesc("自定义启动命令（留空使用默认）")
 			.addText((text) => {
 				text.inputEl.style.width = "300px";
 				text.setPlaceholder(config.defaultCliPath || "")
 					.setValue(
-						this.plugin.settings.manualAgentPaths?.claude || "",
+						this.plugin.settings.manualAgentPaths?.[agentId] || "",
 					)
 					.onChange(async (value) => {
 						if (!this.plugin.settings.manualAgentPaths) {
 							this.plugin.settings.manualAgentPaths = {};
 						}
 						if (value.trim()) {
-							this.plugin.settings.manualAgentPaths.claude =
+							this.plugin.settings.manualAgentPaths[agentId] =
 								value.trim();
 						} else {
-							delete this.plugin.settings.manualAgentPaths.claude;
+							delete this.plugin.settings.manualAgentPaths[
+								agentId
+							];
 						}
 						await this.plugin.saveSettings();
 					});
 			});
 
-		// 安装说明
+		// 各 Agent 的安装说明
+		this.renderAgentInstallGuide(containerEl, agentId);
+	}
+
+	/**
+	 * 渲染各 Agent 的安装说明
+	 */
+	private renderAgentInstallGuide(
+		containerEl: HTMLElement,
+		agentId: Exclude<AcpBackendId, "custom">,
+	): void {
 		const installDiv = containerEl.createDiv({
 			cls: "setting-item-description",
 		});
@@ -102,16 +191,139 @@ export class AcpSettingTab extends PluginSettingTab {
 		installDiv.style.padding = "0.5em";
 		installDiv.style.backgroundColor = "var(--background-secondary)";
 		installDiv.style.borderRadius = "4px";
-		installDiv.innerHTML = `
-			<strong>方式一：npx（默认，自动更新）</strong><br>
-			<code>npx @zed-industries/claude-code-acp</code><br>
-			<small>需要 Node.js 18+，首次运行会自动下载</small><br><br>
-			<strong>方式二：全局安装（推荐，启动更快）</strong><br>
-			<small>终端运行：<code>npm install -g @zed-industries/claude-code-acp</code></small><br>
-			<small>然后填写：<code>claude-code-acp</code> 或绝对路径</small><br><br>
-			<strong>⚠️ 连接失败 (ENOENT)?</strong><br>
-			<small>Obsidian 无法访问 shell PATH，需要使用<strong>绝对路径</strong>：</small><br>
-			<small><code>which claude-code-acp</code> 或 <code>which npx</code> 获取路径</small>
+
+		switch (agentId) {
+			case "claude":
+				installDiv.innerHTML = `
+					<strong>方式一：npx（默认，自动更新）</strong><br>
+					<code>npx @zed-industries/claude-code-acp</code><br>
+					<small>需要 Node.js 18+，首次运行会自动下载</small><br><br>
+					<strong>方式二：全局安装（推荐，启动更快）</strong><br>
+					<small>终端运行：<code>npm install -g @zed-industries/claude-code-acp</code></small><br>
+					<small>然后填写：<code>claude-code-acp</code> 或绝对路径</small><br><br>
+					<strong>⚠️ 连接失败 (ENOENT)?</strong><br>
+					<small>Obsidian 无法访问 shell PATH，需要使用<strong>绝对路径</strong>：</small><br>
+					<small><code>which claude-code-acp</code> 或 <code>which npx</code> 获取路径</small>
+				`;
+				break;
+			case "goose":
+				installDiv.innerHTML = `
+					<strong>安装 Goose</strong><br>
+					<small>macOS: <code>brew install block/tap/goose</code></small><br>
+					<small>其他系统: 访问 <a href="https://github.com/block/goose">github.com/block/goose</a></small><br><br>
+					<strong>验证安装</strong><br>
+					<small>终端运行：<code>goose --version</code></small><br><br>
+					<strong>⚠️ 连接失败?</strong><br>
+					<small>使用绝对路径：<code>which goose</code> 获取路径</small>
+				`;
+				break;
+			case "opencode":
+				installDiv.innerHTML = `
+					<strong>安装 OpenCode</strong><br>
+					<small>npm: <code>npm install -g opencode-ai</code></small><br>
+					<small>验证: <code>opencode --version</code></small><br><br>
+					<strong>配置 API Key</strong><br>
+					<small>首次运行 <code>opencode</code> 会引导配置，或使用 <code>opencode auth login</code></small><br><br>
+					<strong>⚠️ 连接失败?</strong><br>
+					<small>使用绝对路径：<code>which opencode</code> 获取路径</small>
+				`;
+				break;
+		}
+	}
+
+	/**
+	 * 渲染自定义 Agent 配置
+	 */
+	private renderCustomAgentConfig(containerEl: HTMLElement): void {
+		const customConfig = this.plugin.settings.customAgent || {
+			name: "",
+			cliPath: "",
+			acpArgs: [],
+			authRequired: false,
+		};
+
+		// 名称
+		new Setting(containerEl)
+			.setName("Agent 名称")
+			.setDesc("自定义 Agent 的显示名称")
+			.addText((text) => {
+				text.inputEl.style.width = "200px";
+				text.setPlaceholder("My Agent")
+					.setValue(customConfig.name)
+					.onChange(async (value) => {
+						if (!this.plugin.settings.customAgent) {
+							this.plugin.settings.customAgent = {
+								name: "",
+								cliPath: "",
+								acpArgs: [],
+								authRequired: false,
+							};
+						}
+						this.plugin.settings.customAgent.name = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// CLI 路径
+		new Setting(containerEl)
+			.setName("CLI 命令")
+			.setDesc("完整的启动命令或绝对路径")
+			.addText((text) => {
+				text.inputEl.style.width = "300px";
+				text.setPlaceholder("/path/to/my-agent")
+					.setValue(customConfig.cliPath)
+					.onChange(async (value) => {
+						if (!this.plugin.settings.customAgent) {
+							this.plugin.settings.customAgent = {
+								name: "",
+								cliPath: "",
+								acpArgs: [],
+								authRequired: false,
+							};
+						}
+						this.plugin.settings.customAgent.cliPath = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// ACP 参数
+		new Setting(containerEl)
+			.setName("ACP 启动参数")
+			.setDesc("启用 ACP 模式的参数，用空格分隔")
+			.addText((text) => {
+				text.inputEl.style.width = "200px";
+				text.setPlaceholder("acp 或 --acp")
+					.setValue(customConfig.acpArgs.join(" "))
+					.onChange(async (value) => {
+						if (!this.plugin.settings.customAgent) {
+							this.plugin.settings.customAgent = {
+								name: "",
+								cliPath: "",
+								acpArgs: [],
+								authRequired: false,
+							};
+						}
+						this.plugin.settings.customAgent.acpArgs = value
+							.split(" ")
+							.filter((s) => s.trim());
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// 参数说明
+		const argsHelpDiv = containerEl.createDiv({
+			cls: "setting-item-description",
+		});
+		argsHelpDiv.style.marginTop = "0.5em";
+		argsHelpDiv.style.padding = "0.5em";
+		argsHelpDiv.style.backgroundColor = "var(--background-secondary)";
+		argsHelpDiv.style.borderRadius = "4px";
+		argsHelpDiv.innerHTML = `
+			<strong>常见 ACP 参数格式</strong><br>
+			<small>• <code>acp</code> - 子命令形式（如 goose, opencode）</small><br>
+			<small>• <code>--acp</code> - 标志形式（如 kimi, auggie）</small><br>
+			<small>• <code>--experimental-acp</code> - 实验性标志（如 gemini）</small><br>
+			<small>• 留空 - NPM 适配器包（如 claude-code-acp）</small>
 		`;
 	}
 

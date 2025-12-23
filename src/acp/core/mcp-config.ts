@@ -1,10 +1,11 @@
 /**
  * MCP 服务器配置处理
  *
- * 处理 MCP 服务器配置的转换和变量替换
+ * 处理 MCP 服务器配置的转换和变量替换，
+ * 支持根据 Agent 能力过滤 MCP 服务器。
  */
 
-import type { SessionNewMcpServerConfig } from "../types";
+import type { SessionNewMcpServerConfig, McpCapabilities } from "../types";
 import type { McpServerConfig } from "./connection-types";
 
 /**
@@ -24,22 +25,83 @@ export class McpConfigProcessor {
 	/**
 	 * 获取 MCP 服务器配置
 	 *
-	 * 从 settings 读取已启用的 MCP 服务器，转换为 ACP 协议格式
+	 * 从 settings 读取已启用的 MCP 服务器，转换为 ACP 协议格式。
+	 * 可选地根据 Agent 的 MCP 能力过滤服务器。
+	 *
+	 * @param mcpServers 原始 MCP 服务器配置
+	 * @param capabilities Agent 的 MCP 能力声明（可选）
 	 */
 	public getServersConfig(
 		mcpServers: McpServerConfig[],
+		capabilities?: McpCapabilities,
 	): SessionNewMcpServerConfig[] {
 		// 过滤启用的服务器
-		const enabledServers = mcpServers.filter((server) => server.enabled);
+		let enabledServers = mcpServers.filter((server) => server.enabled);
 
 		if (enabledServers.length === 0) {
 			console.log("[ACP] 没有启用的 MCP 服务器");
 			return [];
 		}
 
+		// 根据 Agent 能力过滤服务器
+		if (capabilities) {
+			const originalCount = enabledServers.length;
+			enabledServers = this.filterByCapabilities(
+				enabledServers,
+				capabilities,
+			);
+			const filteredCount = originalCount - enabledServers.length;
+			if (filteredCount > 0) {
+				console.log(
+					`[ACP] 已过滤 ${filteredCount} 个不支持的 MCP 服务器`,
+				);
+			}
+		}
+
 		console.log(`[ACP] 准备 ${enabledServers.length} 个 MCP 服务器配置`);
 
 		return enabledServers.map((server) => this.buildServerConfig(server));
+	}
+
+	/**
+	 * 根据 Agent 能力过滤 MCP 服务器
+	 *
+	 * - stdio: 所有 Agent 必须支持
+	 * - http: 仅当 capabilities.http === true 时支持
+	 * - sse: 仅当 capabilities.sse === true 时支持
+	 */
+	private filterByCapabilities(
+		servers: McpServerConfig[],
+		capabilities: McpCapabilities,
+	): McpServerConfig[] {
+		return servers.filter((server) => {
+			switch (server.type) {
+				case "stdio":
+					// 所有 ACP Agent 必须支持 stdio
+					return true;
+				case "http":
+					if (capabilities.http !== true) {
+						console.log(
+							`[ACP] 过滤 MCP 服务器 "${server.name}": Agent 不支持 HTTP 传输`,
+						);
+						return false;
+					}
+					return true;
+				case "sse":
+					if (capabilities.sse !== true) {
+						console.log(
+							`[ACP] 过滤 MCP 服务器 "${server.name}": Agent 不支持 SSE 传输`,
+						);
+						return false;
+					}
+					return true;
+				default:
+					console.log(
+						`[ACP] 过滤 MCP 服务器 "${server.name}": 未知传输类型`,
+					);
+					return false;
+			}
+		});
 	}
 
 	/**

@@ -97,7 +97,7 @@ $env:ANTHROPIC_API_KEY="sk-ant-..."
 ### 想用全局安装？
 
 ```bash
-npm install -g @anthropic-ai/claude-code
+npm install -g @zed-industries/claude-code-acp
 ```
 
 然后在设置页面选择「全局安装」启动方式。

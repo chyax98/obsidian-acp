@@ -42,8 +42,8 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 | 方式 | 命令 | 说明 |
 |------|------|------|
-| npx（默认） | `npx @anthropic-ai/claude-code --acp` | 无需安装，每次自动获取最新版 |
-| 全局安装 | `claude --acp` | 需先运行 `npm i -g @anthropic-ai/claude-code` |
+| npx（默认） | `npx @zed-industries/claude-code-acp` | 无需安装，每次自动获取最新版 |
+| 全局安装 | `claude-code-acp` | 需先运行 `npm i -g @zed-industries/claude-code-acp` |
 
 ### 可选配置
 

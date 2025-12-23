@@ -9,6 +9,7 @@
 
 import type { App } from "obsidian";
 import type { SessionExportData } from "./types";
+import type { AcpBackendId } from "../backends/types";
 
 /**
  * 会话元数据（用于列表显示）
@@ -26,6 +27,8 @@ export interface SessionMeta {
 	messageCount: number;
 	/** Agent 名称 */
 	agentName?: string;
+	/** Agent ID */
+	agentId?: AcpBackendId;
 }
 
 /**
@@ -116,6 +119,7 @@ export class SessionStorage {
 	public async saveSession(
 		data: SessionExportData,
 		agentName?: string,
+		agentId?: AcpBackendId,
 	): Promise<string> {
 		if (!this.indexLoaded) {
 			await this.loadIndex();
@@ -138,6 +142,7 @@ export class SessionStorage {
 			updatedAt: Date.now(),
 			messageCount: data.messages.length,
 			agentName,
+			agentId,
 		};
 
 		// 创建完整的存储数据

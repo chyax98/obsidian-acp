@@ -9,11 +9,13 @@ import { Notice } from "obsidian";
 import {
 	SessionStorage,
 	type SessionMeta,
+	type StoredSession,
 } from "../../../acp/core/session-storage";
 import type {
 	SessionExportData,
 	Message,
 } from "../../../acp/core/session-manager";
+import type { AcpBackendId } from "../../../acp/backends/types";
 
 /**
  * 历史管理回调
@@ -80,11 +82,13 @@ export class HistoryManager {
 	public async saveSession(
 		data: SessionExportData,
 		agentName: string,
+		agentId?: AcpBackendId,
 	): Promise<string | null> {
 		try {
 			this.currentSessionId = await this.storage.saveSession(
 				data,
 				agentName,
+				agentId,
 			);
 			return this.currentSessionId;
 		} catch (error) {
@@ -167,5 +171,14 @@ export class HistoryManager {
 			new Notice("会话已删除");
 		}
 		return success;
+	}
+
+	/**
+	 * 获取完整的会话数据（用于 Agent 恢复等）
+	 */
+	public async getStoredSession(
+		sessionId: string,
+	): Promise<StoredSession | null> {
+		return await this.storage.loadSession(sessionId);
 	}
 }

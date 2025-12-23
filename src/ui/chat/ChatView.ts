@@ -26,6 +26,11 @@ import { MessageRenderer } from "../MessageRenderer";
 import type { SessionMeta } from "../../acp/core/session-storage";
 import { SessionHistoryModal } from "../SessionHistoryModal";
 import { FileInputSuggest } from "../FileInputSuggest";
+import type { AcpBackendId } from "../../acp/backends/types";
+import {
+	getBackendConfig,
+	getAllBackends,
+} from "../../acp/backends/registry";
 
 // 辅助类
 import {
@@ -70,7 +75,7 @@ export class AcpChatView extends ItemView {
 	private historyButtonEl!: HTMLButtonElement;
 	private connectButtonEl!: HTMLButtonElement;
 	private statusIndicatorEl!: HTMLElement;
-	private headerTitleEl!: HTMLElement;
+	private agentSelectorEl!: HTMLSelectElement;
 	private backToCurrentButton: HTMLButtonElement | null = null;
 	private emptyStateEl: HTMLElement | null = null;
 	private modeSelectorEl: HTMLSelectElement | null = null;
@@ -79,6 +84,10 @@ export class AcpChatView extends ItemView {
 	private currentTurnContainer: HTMLElement | null = null;
 	private isFirstMessage: boolean = true;
 	private fileInputSuggest: FileInputSuggest | null = null;
+
+	// 实例级 Agent 选择
+	private instanceAgentId: AcpBackendId = "claude";
+	private isAgentLocked: boolean = false;
 
 	constructor(leaf: WorkspaceLeaf, plugin: AcpPlugin) {
 		super(leaf);
@@ -99,6 +108,10 @@ export class AcpChatView extends ItemView {
 
 	public async onOpen(): Promise<void> {
 		this.markdownComponent.load();
+
+		// 初始化实例级 Agent ID（从全局设置读取默认值）
+		this.instanceAgentId =
+			this.plugin.settings.currentAgentId || "claude";
 
 		const container = this.contentEl;
 		container.empty();
@@ -150,8 +163,7 @@ export class AcpChatView extends ItemView {
 		this.connectionManager = new ConnectionManager(
 			this.app,
 			{
-				getCurrentAgentId: () =>
-					this.plugin.settings.currentAgentId || "claude",
+				getCurrentAgentId: () => this.instanceAgentId,
 				getCustomAgentConfig: () => this.plugin.settings.customAgent,
 				getWorkingDirectory: () => this.getWorkingDirectory(),
 				getManualCliPath: (agentId) =>
@@ -219,6 +231,8 @@ export class AcpChatView extends ItemView {
 			this.backToCurrentButton.style.display = "none";
 		}
 		this.sendButtonEl.style.display = "";
+		// 退出历史模式后更新选择器状态
+		this.updateAgentSelectorState();
 	}
 
 	// ========================================================================
@@ -233,9 +247,36 @@ export class AcpChatView extends ItemView {
 			cls: "acp-status-dot acp-status-disconnected",
 			attr: { "aria-label": "未连接" },
 		});
-		this.headerTitleEl = leftSection.createDiv({
-			cls: "acp-header-title",
-			text: "ACP Agent",
+
+		// Agent 选择器
+		this.agentSelectorEl = leftSection.createEl("select", {
+			cls: "acp-agent-select-compact",
+			attr: { "aria-label": "选择 Agent" },
+		});
+
+		// 添加内置 Agent 选项
+		for (const backend of getAllBackends()) {
+			this.agentSelectorEl.createEl("option", {
+				value: backend.id,
+				text: backend.name,
+			});
+		}
+
+		// 添加自定义 Agent 选项（如果已配置）
+		if (this.plugin.settings.customAgent?.cliPath) {
+			this.agentSelectorEl.createEl("option", {
+				value: "custom",
+				text:
+					this.plugin.settings.customAgent.name || "自定义 Agent",
+			});
+		}
+
+		// 设置当前值
+		this.agentSelectorEl.value = this.instanceAgentId;
+
+		// 监听变化
+		this.agentSelectorEl.addEventListener("change", () => {
+			void this.handleAgentChange();
 		});
 
 		this.connectButtonEl = leftSection.createEl("button", {
@@ -455,7 +496,7 @@ export class AcpChatView extends ItemView {
 		if (success) {
 			this.hideEmptyState();
 			this.updateUIState("idle");
-			const agentName = this.headerTitleEl?.textContent || "Agent";
+			const agentName = this.getAgentDisplayName(this.instanceAgentId);
 			new Notice(`已连接到 ${agentName}`);
 		}
 	}
@@ -492,6 +533,8 @@ export class AcpChatView extends ItemView {
 			this.sendButtonEl.disabled = false;
 			setIcon(this.newChatButtonEl, "plus");
 			this.newChatButtonEl.removeClass("acp-loading");
+			// 新对话后解锁 Agent 选择器
+			this.updateAgentSelectorState();
 		}
 	}
 
@@ -536,8 +579,12 @@ export class AcpChatView extends ItemView {
 
 		try {
 			const data = sm.toJSON();
-			const agentName = this.headerTitleEl?.textContent || "Agent";
-			await this.historyManager?.saveSession(data, agentName);
+			const agentName = this.getAgentDisplayName(this.instanceAgentId);
+			await this.historyManager?.saveSession(
+				data,
+				agentName,
+				this.instanceAgentId,
+			);
 		} catch (error) {
 			console.error("[ChatView] 自动保存会话失败:", error);
 		}
@@ -628,6 +675,8 @@ export class AcpChatView extends ItemView {
 		this.currentTurnContainer = null;
 		this.scrollHelper?.smartScroll();
 		void this.autoSaveSession();
+		// 对话开始后锁定 Agent 选择器
+		this.updateAgentSelectorState();
 	}
 
 	private handleError(error: Error): void {
@@ -848,11 +897,6 @@ export class AcpChatView extends ItemView {
 		};
 		this.statusIndicatorEl.setAttribute("aria-label", tooltips[status]);
 
-		// 更新标题显示当前 Agent 名称
-		if (agentName) {
-			this.headerTitleEl.textContent = agentName;
-		}
-
 		if (status === "connected") {
 			this.connectButtonEl.style.display = "none";
 			this.errorDisplay?.clearErrors();
@@ -871,6 +915,65 @@ export class AcpChatView extends ItemView {
 		this.inputEl.disabled = sending;
 		this.sendButtonEl.disabled = sending;
 		this.sendButtonEl.textContent = sending ? "发送中..." : "发送";
+	}
+
+	/**
+	 * 处理 Agent 切换
+	 */
+	private async handleAgentChange(): Promise<void> {
+		if (!this.agentSelectorEl || this.isAgentLocked) return;
+
+		const newAgentId = this.agentSelectorEl.value as AcpBackendId;
+		if (newAgentId === this.instanceAgentId) return;
+
+		// 1. 保存当前会话（如果有）
+		await this.autoSaveSession();
+
+		// 2. 断开现有连接
+		this.connectionManager?.disconnect();
+
+		// 3. 清空消息
+		this.clearMessages();
+		this.showEmptyState();
+
+		// 4. 更新实例 Agent
+		this.instanceAgentId = newAgentId;
+
+		// 5. 重置锁定状态（新会话）
+		this.isAgentLocked = false;
+		this.updateAgentSelectorState();
+
+		// 6. 通知用户
+		const agentName = this.getAgentDisplayName(newAgentId);
+		new Notice(`已切换到 ${agentName}`);
+	}
+
+	/**
+	 * 更新 Agent 选择器状态（锁定/解锁）
+	 */
+	private updateAgentSelectorState(): void {
+		if (!this.agentSelectorEl) return;
+
+		const sm = this.connectionManager?.getSessionManager();
+		const hasConversation = (sm?.turns.length ?? 0) > 0;
+
+		this.isAgentLocked = hasConversation;
+		this.agentSelectorEl.disabled = this.isAgentLocked;
+		this.agentSelectorEl.title = this.isAgentLocked
+			? "对话进行中，无法切换 Agent（请新建对话）"
+			: "选择 Agent";
+	}
+
+	/**
+	 * 获取 Agent 显示名称
+	 */
+	private getAgentDisplayName(id: AcpBackendId): string {
+		if (id === "custom") {
+			return (
+				this.plugin.settings.customAgent?.name || "自定义 Agent"
+			);
+		}
+		return getBackendConfig(id)?.name || id;
 	}
 
 	private showEmptyState(): void {
@@ -913,7 +1016,25 @@ export class AcpChatView extends ItemView {
 	}
 
 	public async loadHistorySession(sessionId: string): Promise<boolean> {
-		return (await this.historyManager?.loadSession(sessionId)) ?? false;
+		const loaded = (await this.historyManager?.loadSession(sessionId)) ?? false;
+		if (loaded) {
+			// 加载成功后，检查是否需要恢复 Agent
+			const storedSession =
+				await this.historyManager?.getStoredSession(sessionId);
+			if (storedSession?.meta.agentId) {
+				const sessionAgentId = storedSession.meta.agentId;
+				// 如果历史会话的 Agent 与当前不同，切换到历史 Agent
+				if (sessionAgentId !== this.instanceAgentId) {
+					this.instanceAgentId = sessionAgentId;
+					if (this.agentSelectorEl) {
+						this.agentSelectorEl.value = this.instanceAgentId;
+					}
+				}
+			}
+			// 历史模式锁定选择器
+			this.updateAgentSelectorState();
+		}
+		return loaded;
 	}
 
 	public async deleteHistorySession(sessionId: string): Promise<boolean> {

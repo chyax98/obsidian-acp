@@ -1,169 +1,87 @@
 # Obsidian ACP Plugin
 
-Agent Client Protocol (ACP) 集成插件 - 在 Obsidian 中连接多个 AI 编程助手，让 AI 理解并操作你的知识库。
+在 Obsidian 中使用 Claude Code，让 AI 理解并操作你的知识库。
 
-## ✨ 功能特性
+## 功能特性
 
-- 🤖 **多 Agent 支持**: Claude Code, Kimi, Codex ACP, Gemini CLI, Qwen Code
-- 🔄 **完整 ACP 协议**: 基于开放标准，全量事件类型支持
-- 🔍 **智能检测**: 5层优先级检测系统（环境变量→Vault配置→全局配置→手动输入→自动检测）
-- ⚡ **高性能流式**: 消息缓冲优化，减少 UI 更新 95%
-- 🛡️ **健壮性**: 自动重连、错误分类、超时管理
-- 💭 **思考过程**: 实时显示 Agent 内部思考（可折叠）
-- 📋 **工具调用**: 完整的工具调用展示和权限管理
-- 🎯 **模式指示**: 实时显示当前模式（ask/code/plan）
-- 🔒 **安全可控**: 细粒度权限管理，完全本地运行
-- 📚 **知识库感知**: AI 能理解 `[[双链]]` 语法和 frontmatter
+- **Claude Code 集成**: 通过 ACP 协议连接 Claude Code
+- **文件操作**: AI 可读写 Vault 中的文件
+- **@ 引用文件**: 输入 `@` 弹出文件搜索，快速引用笔记
+- **拖拽文件**: 从文件树拖拽到聊天输入框
+- **选中文本发送**: 命令面板发送选中文本到 Chat
+- **斜杠命令**: 输入 `/` 显示可用命令
+- **模式切换**: 支持 default / plan 模式
+- **权限控制**: 每次询问 / 完全信任 两种模式
+- **会话历史**: 保存和加载历史对话
+- **导出对话**: 导出为 Markdown 文件
 
-## 🚀 快速开始
-
-### 安装
+## 安装
 
 1. 下载最新 release
 2. 解压到 Vault 的 `.obsidian/plugins/obsidian-acp/`
 3. 在 Obsidian 设置中启用插件
 
-### 配置 Agent
+## 配置
 
-插件支持 5 个 AI Agent，根据需求选择安装：
+### 前置要求
 
-#### 🌟 推荐：Claude Code（编程能力最强）
+需要设置 Anthropic API Key（三选一）：
 
 ```bash
-# 方式 1：使用 npx（推荐，无需安装）
-# 插件会自动调用 npx @zed-industries/claude-code-acp
-
-# 方式 2：全局安装（避免每次下载）
-npm install -g @zed-industries/claude-code-acp
-
-# 需要：ANTHROPIC_API_KEY 环境变量
+# 方式 1：环境变量
 export ANTHROPIC_API_KEY="sk-ant-..."
+
+# 方式 2：插件设置页面填写
+
+# 方式 3：使用 Claude Pro/Max 订阅（OAuth 登录）
 ```
 
-#### 🇨🇳 推荐：Kimi（中文友好）
+### 启动方式
+
+插件支持两种启动方式（设置页面选择）：
+
+| 方式 | 命令 | 说明 |
+|------|------|------|
+| npx（默认） | `npx @anthropic-ai/claude-code --acp` | 无需安装，每次自动获取最新版 |
+| 全局安装 | `claude --acp` | 需先运行 `npm i -g @anthropic-ai/claude-code` |
+
+### 可选配置
+
+- **Base URL**: 自定义 API 端点（代理/中转）
+- **HTTP Proxy**: 代理服务器地址
+
+## 使用
+
+1. 点击左侧工具栏的 ACP 图标打开聊天面板
+2. 点击「连接」启动 Claude Code
+3. 开始对话
+
+### 快捷操作
+
+- `@` - 引用文件
+- `/` - 斜杠命令
+- 拖拽文件到输入框 - 添加文件引用
+- `Cmd/Ctrl + Enter` - 发送消息
+
+### 权限系统
+
+| 模式 | 说明 |
+|------|------|
+| 每次询问 | 文件读写操作弹窗确认 |
+| 完全信任 | 自动允许所有操作 |
+
+## 开发
 
 ```bash
-# 安装 Kimi CLI
-npm install -g @moonshot-ai/kimi-cli
-
-# 验证安装
-kimi --version
-```
-
-#### 🤖 Codex ACP（OpenAI）
-
-```bash
-# 使用 npx（推荐）
-# 插件会自动调用 npx @zed-industries/codex-acp
-
-# 需要：OPENAI_API_KEY 或 ChatGPT 订阅
-export OPENAI_API_KEY="sk-..."
-```
-
-#### 🔹 Gemini CLI（Google，免费额度）
-
-```bash
-# 安装 Gemini CLI
-npm install -g @google/gemini-cli
-
-# 或使用 Homebrew (macOS)
-brew install google-gemini/tap/gemini-cli
-
-# 配置认证（三选一）：
-# 1. Google Account OAuth (推荐)
-gemini auth login
-
-# 2. API Key
-export GOOGLE_API_KEY="..."
-
-# 3. Vertex AI
-export GOOGLE_CLOUD_PROJECT="..."
-```
-
-#### 🇨🇳 Qwen Code（阿里通义千问，完全免费）
-
-```bash
-# 安装 Qwen Code
-npm install -g qwen-code
-
-# 验证安装
-qwen --version
-
-# 无需 API Key，开箱即用！
-```
-
-### 使用
-
-1. 打开 ACP Chat 视图（左侧工具栏图标）
-2. 选择 Agent
-3. 点击"连接"
-4. 开始对话！
-
-## 📋 支持的 Agent
-
-| Agent | 状态 | 命令 | 说明 | 免费？ |
-|-------|------|------|------|--------|
-| **Claude Code** | ✅ 完全支持 | `npx @zed-industries/claude-code-acp` | Anthropic 官方，编程能力最强 | ❌ 需订阅 |
-| **Kimi** | ✅ 完全支持 | `kimi --acp` | Moonshot AI，中文友好 | ✅ 有免费额度 |
-| **Codex ACP** | ✅ 完全支持 | `npx @zed-industries/codex-acp` | OpenAI Codex，Zed 官方适配器 | ❌ 需订阅 |
-| **Gemini CLI** | ✅ 完全支持 | `npx @google/gemini-cli --experimental-acp` | Google 官方，ACP 参考实现 | ✅ 有免费额度 |
-| **Qwen Code** | ✅ 完全支持 | `qwen --experimental-acp` | 阿里通义千问，中文优秀 | ✅ 完全免费 |
-
-**选择建议**:
-- 💰 **预算充足**：Claude Code（编程能力最强）
-- 🇨🇳 **中文用户**：Kimi 或 Qwen Code（中文友好）
-- 🆓 **免费使用**：Qwen Code（完全免费）或 Gemini CLI（有免费额度）
-- 🔬 **尝鲜**：Gemini CLI（Google × Zed 联合发布，ACP 参考实现）
-
-## 🎯 测试结果
-
-```
-✅ Claude Code: 4/4 测试通过
-✅ 协议实现：100% 兼容
-✅ 检测系统：52/52 测试通过（100%）
-✅ 总计：59/60 测试通过（98.3%）
-```
-
-**新增：5层优先级检测系统**
-- PathValidator: 15 tests ✅
-- EnvDetector: 12 tests ✅
-- ConfigDetector: 15 tests ✅
-- PriorityDetector: 10 tests ✅
-
-## 📖 文档
-
-📚 **[完整文档中心](./docs/README.md)** - 查看所有文档
-
-**用户文档**:
-- [快速开始](./docs/user-guide/GETTING_STARTED.md) - 5 分钟上手指南
-- [Agent 配置](./docs/user-guide/AGENT_SETUP.md) - 每个 Agent 的详细配置教程
-- [权限系统](./docs/user-guide/PERMISSIONS.md) - 理解和配置权限管理
-- [常见问题 FAQ](./docs/user-guide/FAQ.md) - 安装、配置、使用问题解答
-
-**开发文档**:
-- [集成指南](./docs/development/INTEGRATION_GUIDE.md) - 5层检测系统集成
-- [检测系统总结](./docs/development/DETECTION_SYSTEM_SUMMARY.md) - 完整实现和技术细节
-
-## 🔧 开发
-
-```bash
+npm run dev          # 开发模式
 npm run build        # 构建
-npm test             # 测试
-./dev-deploy.sh      # 快速部署
+./dev-deploy.sh      # 部署到测试 Vault
 ```
 
-## 📊 质量
-
-- ✅ TypeScript: 0 errors
-- ✅ ESLint: 0 errors
-- ✅ 测试: 59/60 passed (98.3%)
-- ✅ 代码行数: 10,000+ (含新检测系统)
-
-## 📄 许可证
+## 许可证
 
 MIT
 
 ---
 
-**Version**: 0.2.0
-**Status**: ✅ Production Ready
+**Version**: 1.0.0

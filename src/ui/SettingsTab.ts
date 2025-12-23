@@ -471,6 +471,22 @@ export class AcpSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		// 请求超时时间
+		new Setting(containerEl)
+			.setName("请求超时时间")
+			.setDesc(`等待 Agent 响应的最大时间（当前: ${this.plugin.settings.promptTimeout} 秒）`)
+			.addSlider((slider) =>
+				slider
+					.setLimits(60, 600, 30)
+					.setValue(this.plugin.settings.promptTimeout)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.promptTimeout = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
 		// 调试模式
 		new Setting(containerEl)
 			.setName("调试模式")

@@ -41,6 +41,8 @@ export interface ConnectionConfig {
 	getMcpServers: () => ConnectionOptions["mcpServers"];
 	/** 获取环境变量设置 */
 	getEnvSettings: () => EnvSettings;
+	/** 获取请求超时时间（秒） */
+	getPromptTimeout: () => number;
 	/** 处理权限请求 */
 	onPermissionRequest: (
 		params: RequestPermissionParams,
@@ -176,6 +178,7 @@ export class ConnectionManager {
 				permissionSettings: this.config.getPermissionSettings(),
 				saveSettings: this.config.saveSettings,
 				mcpServers: this.config.getMcpServers(),
+				promptTimeout: this.config.getPromptTimeout(),
 			});
 
 			this.sessionManager = new SessionManager({

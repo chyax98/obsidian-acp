@@ -140,6 +140,9 @@ export class AcpConnection {
 	// MCP 服务器配置
 	private mcpServers: McpServerConfig[] = [];
 
+	// 请求超时时间（秒）
+	private promptTimeout: number = 300;
+
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private app: any = null;
 
@@ -258,6 +261,9 @@ export class AcpConnection {
 		}
 		if (options.mcpServers) {
 			this.mcpServers = options.mcpServers;
+		}
+		if (options.promptTimeout) {
+			this.promptTimeout = options.promptTimeout;
 		}
 
 		if (options.app && options.permissionSettings && options.saveSettings) {
@@ -517,7 +523,7 @@ export class AcpConnection {
 		let timeoutDuration: number;
 
 		if (method === AcpMethod.SESSION_PROMPT) {
-			timeoutDuration = 120000;
+			timeoutDuration = this.promptTimeout * 1000;
 		} else if (method === AcpMethod.INITIALIZE) {
 			timeoutDuration = 15000;
 		} else if (method === AcpMethod.SESSION_NEW) {

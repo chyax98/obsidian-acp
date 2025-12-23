@@ -160,6 +160,7 @@ export class AcpChatView extends ItemView {
 					apiUrl: this.plugin.settings.apiUrl,
 					httpProxy: this.plugin.settings.httpProxy,
 				}),
+				getPromptTimeout: () => this.plugin.settings.promptTimeout,
 				onPermissionRequest: (params) =>
 					this.handlePermissionRequest(params),
 			},

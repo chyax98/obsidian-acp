@@ -53,6 +53,8 @@ export interface ConnectionOptions {
 	saveSettings?: () => Promise<void>;
 	/** MCP 服务器配置 */
 	mcpServers?: McpServerConfig[];
+	/** 请求超时时间（秒） */
+	promptTimeout?: number;
 }
 
 /**

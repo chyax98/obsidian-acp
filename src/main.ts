@@ -92,6 +92,9 @@ export interface AcpPluginSettings {
 
 	/** MCP 服务器配置 */
 	mcpServers: McpServerConfig[];
+
+	/** 请求超时时间（秒） */
+	promptTimeout: number;
 }
 
 /**
@@ -109,6 +112,7 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
 		alwaysAllowedTools: {},
 	},
 	debugMode: false,
+	promptTimeout: 300, // 5 分钟
 	mcpServers: [
 		{
 			id: "vault",

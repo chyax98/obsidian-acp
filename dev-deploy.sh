@@ -4,7 +4,7 @@
 
 set -e
 
-PLUGIN_DIR="/Users/chyax/note-vsc/.obsidian/plugins/obsidian-acp"
+PLUGIN_DIR="$HOME/note-vsc/.obsidian/plugins/obsidian-acp"
 
 echo "🔨 构建插件..."
 npm run build

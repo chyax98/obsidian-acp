@@ -275,8 +275,15 @@ export class AcpChatView extends ItemView {
 		this.agentSelectorEl.value = this.instanceAgentId;
 
 		// 监听变化
-		this.agentSelectorEl.addEventListener("change", () => {
-			void this.handleAgentChange();
+		this.agentSelectorEl.addEventListener("change", async () => {
+			try {
+				await this.handleAgentChange();
+			} catch (error) {
+				console.error("[ChatView] 切换 Agent 失败:", error);
+				new Notice("切换 Agent 失败");
+				// 恢复选择器到原值
+				this.agentSelectorEl.value = this.instanceAgentId;
+			}
 		});
 
 		this.connectButtonEl = leftSection.createEl("button", {
@@ -924,6 +931,17 @@ export class AcpChatView extends ItemView {
 		if (!this.agentSelectorEl || this.isAgentLocked) return;
 
 		const newAgentId = this.agentSelectorEl.value as AcpBackendId;
+
+		// 验证 agentId 有效性
+		const isValidAgent =
+			newAgentId === "custom" ||
+			getAllBackends().some((b) => b.id === newAgentId);
+		if (!isValidAgent) {
+			console.warn("[ChatView] 无效的 Agent ID:", newAgentId);
+			this.agentSelectorEl.value = this.instanceAgentId;
+			return;
+		}
+
 		if (newAgentId === this.instanceAgentId) return;
 
 		// 1. 保存当前会话（如果有）

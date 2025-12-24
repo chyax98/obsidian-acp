@@ -29,7 +29,7 @@ import type {
 import { StreamingMessageBuffer } from "./message-buffer";
 import { SessionExporter } from "./session-export";
 
-// 类型导出（保持向后兼容）
+// 类型重导出
 export type {
 	SessionState,
 	StopReason,

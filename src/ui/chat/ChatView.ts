@@ -22,7 +22,12 @@ import type {
 	PermissionOutcome,
 } from "../../acp/types/permissions";
 import type { AvailableCommand } from "../../acp/types/updates";
-import { MessageRenderer } from "../MessageRenderer";
+import {
+	MessageRenderer,
+	ToolCallRenderer,
+	PlanRenderer,
+	ThoughtRenderer,
+} from "../renderers";
 import type { SessionMeta } from "../../acp/core/session-storage";
 import { SessionHistoryModal } from "../SessionHistoryModal";
 import { FileInputSuggest } from "../FileInputSuggest";
@@ -630,14 +635,14 @@ export class AcpChatView extends ItemView {
 	private handleMessage(message: Message, isNew: boolean): void {
 		const container = this.getTurnContainer();
 		if (isNew) {
-			void MessageRenderer.renderMessage(
+			void MessageRenderer.render(
 				container,
 				message,
 				this.markdownComponent,
 				this.app,
 			);
 		} else {
-			MessageRenderer.updateMessage(
+			MessageRenderer.update(
 				container,
 				message,
 				this.markdownComponent,
@@ -648,16 +653,12 @@ export class AcpChatView extends ItemView {
 	}
 
 	private handleToolCall(toolCall: ToolCall): void {
-		MessageRenderer.renderToolCall(
-			this.getTurnContainer(),
-			toolCall,
-			this.app,
-		);
+		ToolCallRenderer.render(this.getTurnContainer(), toolCall, this.app);
 		this.scrollHelper?.smartScroll();
 	}
 
 	private handlePlan(plan: PlanEntry[]): void {
-		MessageRenderer.renderPlan(this.getTurnContainer(), plan);
+		PlanRenderer.render(this.getTurnContainer(), plan);
 		this.scrollHelper?.smartScroll();
 	}
 
@@ -665,10 +666,7 @@ export class AcpChatView extends ItemView {
 		const sm = this.connectionManager?.getSessionManager();
 		const turn = sm?.activeTurn;
 		if (turn) {
-			MessageRenderer.renderThoughts(
-				this.getTurnContainer(),
-				turn.thoughts,
-			);
+			ThoughtRenderer.render(this.getTurnContainer(), turn.thoughts);
 			this.scrollHelper?.smartScroll();
 		}
 	}

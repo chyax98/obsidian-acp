@@ -1,7 +1,7 @@
 /**
  * ACP 模块
  *
- * Agent Client Protocol 实现，提供与 Claude Code 的通信能力。
+ * Agent Client Protocol 实现，提供与多个 AI Agent 的通信能力。
  */
 
 // 核心模块

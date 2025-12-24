@@ -1,13 +1,13 @@
 /**
  * Obsidian ACP Plugin - Agent Client Protocol 集成
  *
- * 通过 ACP 协议连接 Claude Code
+ * 通过 ACP 协议连接多个 AI Agent (Claude Code, Goose, OpenCode, 自定义)
  */
 
 import type { WorkspaceLeaf, Editor } from "obsidian";
 import { Plugin, Notice } from "obsidian";
 import { AcpSettingTab } from "./ui/SettingsTab";
-import { AcpChatView, ACP_CHAT_VIEW_TYPE } from "./ui/ChatView";
+import { AcpChatView, ACP_CHAT_VIEW_TYPE } from "./ui/chat/ChatView";
 import type { AcpBackendId, CustomAgentConfig } from "./acp/backends";
 
 // ============================================================================

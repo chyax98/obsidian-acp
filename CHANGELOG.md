@@ -4,6 +4,18 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.4.0] - 2025-12-24
+
+### 重构
+- **删除兼容层**：移除 `src/ui/MessageRenderer.ts` 和 `src/ui/ChatView.ts`
+- **合并部署脚本**：删除 `dev-deploy.sh`，统一使用 `install-to-vault.sh`
+- **脚本增强**：`install-to-vault.sh` 支持环境变量 `ACP_DEV_VAULT`
+- **清理过时注释**：更新所有"向后兼容"相关注释
+
+### 文档
+- **更新描述**：package.json/manifest.json 描述更新为实际支持的 Agent
+- **同步版本**：README/CHANGELOG/CLAUDE.md 版本号统一
+
 ## [0.3.0] - 2025-12-23
 
 ### 新增

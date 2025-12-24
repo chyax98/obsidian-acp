@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-acp",
-	"version": "0.3.0",
-	"description": "Agent Client Protocol integration for Obsidian - Connect with Claude Code, Codex, Gemini and more AI agents",
+	"version": "0.4.0",
+	"description": "Agent Client Protocol integration for Obsidian - Connect with Claude Code, Goose, OpenCode and custom AI agents",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
@@ -20,8 +20,8 @@
 		"acp",
 		"agent-client-protocol",
 		"claude-code",
-		"codex",
-		"gemini",
+		"goose",
+		"opencode",
 		"ai-agent"
 	],
 	"author": "ACP Plugin Team",

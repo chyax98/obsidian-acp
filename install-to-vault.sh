@@ -1,20 +1,30 @@
 #!/bin/bash
 
 # ACP 插件安装脚本
-# 用法: ./install-to-vault.sh /path/to/your/vault
+# 用法: ./install-to-vault.sh [vault_path]
+#
+# 如果不提供路径，将使用环境变量 ACP_DEV_VAULT 或提示输入
 
 set -e
 
-if [ -z "$1" ]; then
+# 确定 Vault 路径
+if [ -n "$1" ]; then
+    VAULT_PATH="$1"
+elif [ -n "$ACP_DEV_VAULT" ]; then
+    VAULT_PATH="$ACP_DEV_VAULT"
+    echo "📍 使用环境变量 ACP_DEV_VAULT: $VAULT_PATH"
+else
     echo "❌ 错误: 请提供 Vault 路径"
-    echo "用法: ./install-to-vault.sh /path/to/your/vault"
     echo ""
-    echo "示例:"
-    echo "  ./install-to-vault.sh ~/Documents/MyVault"
+    echo "用法:"
+    echo "  ./install-to-vault.sh /path/to/vault"
+    echo ""
+    echo "或设置环境变量:"
+    echo "  export ACP_DEV_VAULT=~/your-vault"
+    echo "  ./install-to-vault.sh"
     exit 1
 fi
 
-VAULT_PATH="$1"
 PLUGIN_DIR="$VAULT_PATH/.obsidian/plugins/obsidian-acp"
 
 echo "📦 安装 ACP 插件到: $VAULT_PATH"
@@ -22,13 +32,13 @@ echo ""
 
 # 检查 Vault 是否存在
 if [ ! -d "$VAULT_PATH" ]; then
-    echo "❌ 错误: Vault 目录不存在: $VAULT_PATH"
+    echo "❌ 错误: 目录不存在: $VAULT_PATH"
     exit 1
 fi
 
 # 检查是否是 Obsidian Vault
 if [ ! -d "$VAULT_PATH/.obsidian" ]; then
-    echo "⚠️  警告: 未找到 .obsidian 目录，可能不是有效的 Vault"
+    echo "⚠️  警告: 未找到 .obsidian 目录"
     read -p "是否继续? (y/N) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -36,15 +46,15 @@ if [ ! -d "$VAULT_PATH/.obsidian" ]; then
     fi
 fi
 
-# 创建插件目录
-echo "📁 创建插件目录..."
-mkdir -p "$PLUGIN_DIR"
-
-# 检查构建文件
-if [ ! -f "main.js" ]; then
-    echo "❌ 错误: main.js 不存在，请先运行 npm run build"
-    exit 1
+# 构建（如果 main.js 不存在或有 --build 参数）
+if [ ! -f "main.js" ] || [ "$2" = "--build" ]; then
+    echo "🔨 构建插件..."
+    npm run build
+    echo ""
 fi
+
+# 创建插件目录
+mkdir -p "$PLUGIN_DIR"
 
 # 复制文件
 echo "📋 复制文件..."
@@ -55,10 +65,4 @@ cp styles.css "$PLUGIN_DIR/"
 echo ""
 echo "✅ 安装完成！"
 echo ""
-echo "下一步:"
-echo "1. 重启 Obsidian"
-echo "2. 打开 设置 → 第三方插件"
-echo "3. 找到并启用 'ACP Agent Client'"
-echo "4. 点击左侧栏的机器人图标打开 ChatView"
-echo ""
-echo "📖 详细使用指南: README.md"
+echo "下一步: 在 Obsidian 中重新加载插件"

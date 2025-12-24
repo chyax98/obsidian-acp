@@ -19,8 +19,8 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 # Obsidian ACP Plugin
 
-**版本**: 0.3.0
-**日期**: 2025-12-23
+**版本**: 0.4.0
+**日期**: 2025-12-24
 **状态**: 支持多 Agent (Claude Code, Goose, OpenCode, 自定义)
 
 ---
@@ -108,10 +108,7 @@ npm run dev
 # 构建
 npm run build
 
-# 部署到 Vault
-./dev-deploy.sh
-
-# 安装到指定 Vault
+# 安装到 Vault（支持环境变量 ACP_DEV_VAULT）
 ./install-to-vault.sh /path/to/vault
 ```
 
@@ -196,4 +193,4 @@ npm run build
 
 ---
 
-**最后更新**: 2025-12-23
+**最后更新**: 2025-12-24

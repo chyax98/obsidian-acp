@@ -65,13 +65,13 @@ export class StreamingMessageBuffer {
 	 * @param messageId - 消息 ID
 	 * @param chunk - 文本 chunk
 	 * @param onUpdate - 更新回调
-	 * @param mode - 'accumulate'（追加）或 'replace'（替换）
+	 * @param mode - 'auto'（自动检测）、'accumulate'（追加）或 'replace'（替换）
 	 */
 	public append(
 		messageId: string,
 		chunk: string,
 		onUpdate: (content: string, isFinal: boolean) => void,
-		mode: "accumulate" | "replace" = "accumulate",
+		mode: "auto" | "accumulate" | "replace" = "auto",
 	): void {
 		let buffer = this.buffers.get(messageId);
 
@@ -88,7 +88,14 @@ export class StreamingMessageBuffer {
 		}
 
 		// 更新内容
-		if (mode === "accumulate") {
+		if (mode === "auto") {
+			// 智能检测：如果新 chunk 以当前内容为前缀，说明是累积的
+			if (chunk.startsWith(buffer.content)) {
+				buffer.content = chunk;
+			} else {
+				buffer.content += chunk;
+			}
+		} else if (mode === "accumulate") {
 			buffer.content += chunk;
 		} else {
 			buffer.content = chunk;

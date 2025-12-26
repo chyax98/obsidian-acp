@@ -24,6 +24,7 @@ export const ACP_BACKENDS: Record<
 		authRequired: false,
 		enabled: true,
 		supportsStreaming: false,
+		streamingMode: "cumulative", // Claude Code 每次发送完整累积内容
 		acpArgs: [],
 	},
 	goose: {
@@ -35,6 +36,7 @@ export const ACP_BACKENDS: Record<
 		authRequired: false,
 		enabled: true,
 		supportsStreaming: false,
+		streamingMode: "incremental", // Goose 每次发送增量内容
 		acpArgs: ["acp"],
 	},
 	opencode: {
@@ -46,6 +48,7 @@ export const ACP_BACKENDS: Record<
 		authRequired: false,
 		enabled: true,
 		supportsStreaming: false,
+		streamingMode: "incremental", // OpenCode 每次发送增量内容
 		acpArgs: ["acp"],
 	},
 };
@@ -102,4 +105,17 @@ export function getAllBackends(): AcpBackendConfig[] {
  */
 export function isBuiltinBackend(id: AcpBackendId): boolean {
 	return id !== "custom" && id in ACP_BACKENDS;
+}
+
+/**
+ * 获取 Agent 的流式消息模式
+ *
+ * @param id Agent ID
+ * @returns 'incremental' 或 'cumulative'，默认 'incremental'
+ */
+export function getBackendStreamingMode(
+	id: AcpBackendId,
+): "incremental" | "cumulative" {
+	if (id === "custom") return "incremental";
+	return ACP_BACKENDS[id]?.streamingMode || "incremental";
 }

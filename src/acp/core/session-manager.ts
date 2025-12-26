@@ -28,6 +28,8 @@ import type {
 } from "../types";
 import { StreamingMessageBuffer } from "./message-buffer";
 import { SessionExporter } from "./session-export";
+import { getBackendStreamingMode } from "../backends/registry";
+import type { AcpBackendId } from "../backends/types";
 
 // 类型重导出
 export type {
@@ -66,6 +68,8 @@ export interface SessionManagerConfig {
 	connection: AcpConnection;
 	/** 工作目录 */
 	workingDir?: string;
+	/** Agent ID（用于确定流式模式） */
+	agentId?: string;
 	/** 权限请求回调（可选，用于避免竞态条件） */
 	onPermissionRequest?: (
 		params: RequestPermissionParams,
@@ -85,6 +89,8 @@ export class SessionManager {
 	// 连接
 	private connection: AcpConnection;
 	private workingDir: string;
+	private agentId: AcpBackendId;
+	private streamingMode: "incremental" | "cumulative";
 
 	// 状态
 	private _state: SessionState = "idle";
@@ -164,6 +170,10 @@ export class SessionManager {
 	constructor(config: SessionManagerConfig) {
 		this.connection = config.connection;
 		this.workingDir = config.workingDir || process.cwd();
+		this.agentId = (config.agentId || "custom") as AcpBackendId;
+
+		// 根据 Agent 配置确定流式模式
+		this.streamingMode = getBackendStreamingMode(this.agentId);
 
 		// 如果传入了权限回调，立即设置，避免竞态条件
 		if (config.onPermissionRequest) {
@@ -512,6 +522,9 @@ export class SessionManager {
 			this.onMessage(message, true);
 		}
 
+		// 根据 Agent 配置选择消息处理模式
+		const bufferMode =
+			this.streamingMode === "cumulative" ? "replace" : "accumulate";
 		this.messageBuffer.append(
 			this.currentTurn.assistantMessage.id,
 			text,
@@ -521,7 +534,7 @@ export class SessionManager {
 					this.onMessage(this.currentTurn.assistantMessage, false);
 				}
 			},
-			"accumulate",
+			bufferMode,
 		);
 	}
 
@@ -566,7 +579,15 @@ export class SessionManager {
 		const text = content?.text || "";
 
 		if (text) {
-			this.currentTurn.thoughts.push(text);
+			// 根据 Agent 配置选择处理模式
+			if (this.streamingMode === "cumulative") {
+				// 累积模式：直接替换
+				this.currentTurn.thoughts = [text];
+			} else {
+				// 增量模式：追加到现有内容
+				const currentThought = this.currentTurn.thoughts[0] || "";
+				this.currentTurn.thoughts = [currentThought + text];
+			}
 			this.onThought(text);
 		}
 	}

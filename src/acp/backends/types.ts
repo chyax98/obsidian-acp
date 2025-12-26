@@ -79,6 +79,16 @@ export interface AcpBackendConfig {
 	supportsStreaming?: boolean;
 
 	/**
+	 * 流式消息模式
+	 *
+	 * - 'incremental': 增量模式，每次发送新增内容（OpenCode）
+	 * - 'cumulative': 累积模式，每次发送完整内容（Claude Code）
+	 *
+	 * 默认: 'incremental'
+	 */
+	streamingMode?: "incremental" | "cumulative";
+
+	/**
 	 * 环境变量
 	 *
 	 * 启动进程时传递的自定义环境变量。

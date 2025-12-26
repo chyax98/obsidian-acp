@@ -60,6 +60,16 @@ export class MessageRenderer {
 		app: App,
 		sourcePath: string = "",
 	): Promise<void> {
+		// 检查是否已存在相同 ID 的消息，避免重复渲染
+		const existing = container.querySelector(
+			`[data-message-id="${message.id}"]`,
+		);
+		if (existing) {
+			// 已存在，使用 update 更新
+			this.update(container, message, component, app, sourcePath);
+			return;
+		}
+
 		// 创建消息结构
 		const messageEl = container.createDiv({
 			cls: `acp-message acp-message-${message.role}`,

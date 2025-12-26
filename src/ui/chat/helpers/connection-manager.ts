@@ -233,6 +233,7 @@ export class ConnectionManager {
 			this.sessionManager = new SessionManager({
 				connection: this.connection,
 				workingDir,
+				agentId,
 				onPermissionRequest: this.config.onPermissionRequest,
 			});
 

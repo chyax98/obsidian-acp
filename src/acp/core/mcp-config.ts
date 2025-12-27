@@ -7,6 +7,7 @@
 
 import type { SessionNewMcpServerConfig, McpCapabilities } from "../types";
 import type { McpServerConfig } from "./connection-types";
+import { debug } from "../utils/logger";
 
 /**
  * MCP 配置处理器
@@ -39,7 +40,7 @@ export class McpConfigProcessor {
 		let enabledServers = mcpServers.filter((server) => server.enabled);
 
 		if (enabledServers.length === 0) {
-			console.log("[ACP] 没有启用的 MCP 服务器");
+			debug("[ACP] 没有启用的 MCP 服务器");
 			return [];
 		}
 
@@ -52,13 +53,13 @@ export class McpConfigProcessor {
 			);
 			const filteredCount = originalCount - enabledServers.length;
 			if (filteredCount > 0) {
-				console.log(
+				debug(
 					`[ACP] 已过滤 ${filteredCount} 个不支持的 MCP 服务器`,
 				);
 			}
 		}
 
-		console.log(`[ACP] 准备 ${enabledServers.length} 个 MCP 服务器配置`);
+		debug(`[ACP] 准备 ${enabledServers.length} 个 MCP 服务器配置`);
 
 		return enabledServers.map((server) => this.buildServerConfig(server));
 	}
@@ -81,7 +82,7 @@ export class McpConfigProcessor {
 					return true;
 				case "http":
 					if (capabilities.http !== true) {
-						console.log(
+						debug(
 							`[ACP] 过滤 MCP 服务器 "${server.name}": Agent 不支持 HTTP 传输`,
 						);
 						return false;
@@ -89,14 +90,14 @@ export class McpConfigProcessor {
 					return true;
 				case "sse":
 					if (capabilities.sse !== true) {
-						console.log(
+						debug(
 							`[ACP] 过滤 MCP 服务器 "${server.name}": Agent 不支持 SSE 传输`,
 						);
 						return false;
 					}
 					return true;
 				default:
-					console.log(
+					debug(
 						`[ACP] 过滤 MCP 服务器 "${server.name}": 未知传输类型`,
 					);
 					return false;
@@ -120,7 +121,7 @@ export class McpConfigProcessor {
 			config = this.buildSseConfig(server);
 		}
 
-		console.log(
+		debug(
 			`[ACP] MCP 服务器配置: ${server.name}`,
 			JSON.stringify(config, null, 2),
 		);

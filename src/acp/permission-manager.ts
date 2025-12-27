@@ -3,6 +3,7 @@ import { Notice } from "obsidian";
 import type { PermissionSettings } from "../main";
 import type { PermissionOption } from "./types/permissions";
 import { PermissionModal } from "../ui/PermissionModal";
+import { debug } from "./utils/logger";
 
 /**
  * 权限请求
@@ -63,11 +64,11 @@ export class PermissionManager {
 	): Promise<PermissionResponse> {
 		const { toolName, options } = request;
 
-		console.log("[PermissionManager] 权限请求:", toolName);
+		debug("[PermissionManager] 权限请求:", toolName);
 
 		// 模式 1: 完全信任 - 自动批准所有请求（不需要排队）
 		if (this.settings.mode === "trustAll") {
-			console.log("[PermissionManager] trustAll 模式，自动批准");
+			debug("[PermissionManager] trustAll 模式，自动批准");
 			// 使用 Agent 提供的 allow_once optionId
 			const allowOptionId =
 				this.findOptionId(options, "allow_once") || "allow";
@@ -79,7 +80,7 @@ export class PermissionManager {
 
 		// 检查是否已记录"始终允许"（不需要排队）
 		if (this.settings.alwaysAllowedTools[toolName]) {
-			console.log("[PermissionManager] 工具已在始终允许列表");
+			debug("[PermissionManager] 工具已在始终允许列表");
 			// 使用 Agent 提供的 allow_once optionId
 			const allowOptionId =
 				this.findOptionId(options, "allow_once") || "allow";
@@ -92,7 +93,7 @@ export class PermissionManager {
 		// 需要显示弹窗的请求加入队列
 		return new Promise((resolve) => {
 			this.requestQueue.push({ request, resolve });
-			console.log(
+			debug(
 				"[PermissionManager] 请求加入队列，当前队列长度:",
 				this.requestQueue.length,
 			);
@@ -130,14 +131,14 @@ export class PermissionManager {
 			return;
 		}
 
-		console.log(
+		debug(
 			"[PermissionManager] 开始处理队列请求:",
 			queued.request.toolName,
 		);
 
 		// 显示对话框并等待响应
 		void this.showPermissionDialog(queued.request).then((response) => {
-			console.log("[PermissionManager] 对话框响应:", response);
+			debug("[PermissionManager] 对话框响应:", response);
 			queued.resolve(response);
 			this.isProcessing = false;
 

@@ -30,6 +30,7 @@ import { StreamingMessageBuffer } from "./message-buffer";
 import { SessionExporter } from "./session-export";
 import { getBackendStreamingMode } from "../backends/registry";
 import type { AcpBackendId } from "../backends/types";
+import { debug, error as logError } from "../utils/logger";
 
 // 类型重导出
 export type {
@@ -376,7 +377,7 @@ export class SessionManager {
 		try {
 			await this.connection.cancelSession();
 		} catch (error) {
-			console.error("[SessionManager] 取消失败:", error);
+			logError("[SessionManager] 取消失败:", error);
 		}
 
 		this.completeTurn("cancelled");
@@ -574,7 +575,7 @@ export class SessionManager {
 		if (!this.currentTurn) return;
 
 		// 调试：打印原始数据
-		console.log("[ACP] agent_thought_chunk 原始数据:", JSON.stringify(update));
+		debug("[ACP] agent_thought_chunk 原始数据:", JSON.stringify(update));
 
 		// 尝试多种可能的字段
 		const updateAny = update as unknown as Record<string, unknown>;
@@ -617,11 +618,11 @@ export class SessionManager {
 		if (!this.currentTurn) return;
 
 		// 调试：打印原始工具调用数据（包含所有字段）
-		console.log("[ACP] tool_call 原始数据:", JSON.stringify(update, null, 2));
+		debug("[ACP] tool_call 原始数据:", JSON.stringify(update, null, 2));
 
 		// 提取入参：尝试多个可能的字段名
 		const rawInput = this.extractRawInput(update);
-		console.log("[ACP] tool_call 提取的 rawInput:", JSON.stringify(rawInput));
+		debug("[ACP] tool_call 提取的 rawInput:", JSON.stringify(rawInput));
 
 		// 检查是否已存在相同 ID 的工具调用（ACP 会发送多次更新）
 		const existingToolCall = this.currentTurn.toolCalls.find(

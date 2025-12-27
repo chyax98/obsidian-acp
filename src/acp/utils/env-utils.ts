@@ -4,6 +4,8 @@
  * 处理不同版本管理器（nvm, nvm-windows 等）的环境变量增强
  */
 
+import { debug } from "./logger";
+
 /**
  * 增强环境变量以支持版本管理器（nvm）
  *
@@ -51,7 +53,7 @@ export function enhanceEnvForNodeScript(
 			const pathSeparator = ":";
 			env.PATH = `${nvmBinDir}${pathSeparator}${env.PATH || ""}`;
 			// eslint-disable-next-line no-console
-			console.log(
+			debug(
 				`[EnvUtils] 检测到 Unix nvm 路径，添加到 PATH: ${nvmBinDir}`,
 			);
 			return env;
@@ -73,7 +75,7 @@ export function enhanceEnvForNodeScript(
 			env.PATH = `${nvmBinDir}${pathSeparator}${env.PATH || ""}`;
 			// 使用 console.warn 避免 no-console 警告
 			// eslint-disable-next-line no-console
-			console.log(
+			debug(
 				`[EnvUtils] 检测到 Windows nvm 路径，添加到 PATH: ${nvmBinDir}`,
 			);
 			return env;

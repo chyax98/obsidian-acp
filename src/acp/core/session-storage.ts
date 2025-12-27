@@ -10,6 +10,7 @@
 import type { App } from "obsidian";
 import type { SessionExportData } from "./types";
 import type { AcpBackendId } from "../backends/types";
+import { error as logError } from "../utils/logger";
 
 /**
  * 会话元数据（用于列表显示）
@@ -89,7 +90,7 @@ export class SessionStorage {
 				this.sessionIndex = [];
 			}
 		} catch (error) {
-			console.error("[SessionStorage] 加载索引失败:", error);
+			logError("[SessionStorage] 加载索引失败:", error);
 			this.sessionIndex = [];
 		}
 
@@ -109,7 +110,7 @@ export class SessionStorage {
 				JSON.stringify(this.sessionIndex, null, 2),
 			);
 		} catch (error) {
-			console.error("[SessionStorage] 保存索引失败:", error);
+			logError("[SessionStorage] 保存索引失败:", error);
 		}
 	}
 
@@ -187,7 +188,7 @@ export class SessionStorage {
 			const content = await adapter.read(filePath);
 			return JSON.parse(content) as StoredSession;
 		} catch (error) {
-			console.error("[SessionStorage] 加载会话失败:", error);
+			logError("[SessionStorage] 加载会话失败:", error);
 			return null;
 		}
 	}
@@ -217,7 +218,7 @@ export class SessionStorage {
 
 			return true;
 		} catch (error) {
-			console.error("[SessionStorage] 删除会话失败:", error);
+			logError("[SessionStorage] 删除会话失败:", error);
 			return false;
 		}
 	}

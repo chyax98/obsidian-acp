@@ -8,8 +8,6 @@
  * - 会话管理
  */
 
-/* eslint-disable no-console */
-
 import type { ChildProcess, SpawnOptions } from "child_process";
 import { spawn } from "child_process";
 import { Platform } from "obsidian";
@@ -17,6 +15,7 @@ import { Platform } from "obsidian";
 import type { AcpBackendId } from "../backends";
 import { getBackendConfig } from "../backends";
 import { enhanceEnvForNodeScript } from "../utils/env-utils";
+import { debug, warn, error as logError } from "../utils/logger";
 import type {
 	AcpRequest,
 	AcpResponse,
@@ -93,10 +92,10 @@ export function createSpawnConfig(
 
 	const useShell = isWindows && !isMac;
 
-	console.log(
+	debug(
 		`[ACP] createSpawnConfig: isWindows=${isWindows}, isMac=${isMac}, useShell=${useShell}`,
 	);
-	console.log(
+	debug(
 		`[ACP] createSpawnConfig: command=${spawnCommand}, args=${spawnArgs.join(" ")}`,
 	);
 
@@ -184,7 +183,7 @@ export class AcpConnection {
 		}
 
 		if (this.retryCount >= this.maxRetries) {
-			console.error(
+			logError(
 				`[ACP] 重连失败: 已达到最大重试次数 (${this.maxRetries})`,
 			);
 			throw new Error(`连接失败: 已重试 ${this.maxRetries} 次`);
@@ -193,7 +192,7 @@ export class AcpConnection {
 		const delay = Math.min(1000 * Math.pow(2, this.retryCount), 10000);
 		this.retryCount++;
 
-		console.log(
+		debug(
 			`[ACP] 重连中... (第 ${this.retryCount}/${this.maxRetries} 次，延迟 ${delay}ms)`,
 		);
 
@@ -254,12 +253,12 @@ export class AcpConnection {
 		);
 
 		const agentName = backendConfig?.name || backendId;
-		console.log(`[ACP] 启动 ${agentName} 进程: ${command} ${args.join(" ")}`);
-		console.log(`[ACP] 工作目录: ${workingDir}`);
+		debug(`[ACP] 启动 ${agentName} 进程: ${command} ${args.join(" ")}`);
+		debug(`[ACP] 工作目录: ${workingDir}`);
 
 		this.child = spawn(command, args, options);
 
-		console.log(`[ACP] 进程已启动 (PID: ${this.child.pid})`);
+		debug(`[ACP] 进程已启动 (PID: ${this.child.pid})`);
 	}
 
 	// ========================================================================
@@ -328,7 +327,7 @@ export class AcpConnection {
 				error instanceof Error ? error.message : String(error);
 			const classifiedError = classifyError(errorMsg, this.backend);
 
-			console.error(
+			logError(
 				`[ACP] 连接失败: ${classifiedError.type} - ${classifiedError.message} (可重试: ${classifiedError.retryable})`,
 			);
 
@@ -363,7 +362,7 @@ export class AcpConnection {
 	}
 
 	public cancelConnection(): void {
-		console.log("[ACP] 用户取消连接");
+		debug("[ACP] 用户取消连接");
 		this.isCancelling = true;
 		this.disconnect();
 	}
@@ -384,7 +383,7 @@ export class AcpConnection {
 
 		this.child.on("exit", (code, signal) => {
 			if (code !== 0) {
-				console.warn(
+				warn(
 					`[ACP] 进程异常退出: code=${code}, signal=${signal}`,
 				);
 			}
@@ -434,7 +433,7 @@ export class AcpConnection {
 		try {
 			if ("method" in message) {
 				this.handleIncomingRequest(message).catch((error) => {
-					console.error("[ACP] 处理请求失败:", error);
+					logError("[ACP] 处理请求失败:", error);
 				});
 				return;
 			}
@@ -443,7 +442,7 @@ export class AcpConnection {
 				this.handleResponse(message);
 			}
 		} catch (error) {
-			console.error("[ACP] 消息处理错误:", error);
+			logError("[ACP] 消息处理错误:", error);
 		}
 	}
 
@@ -515,7 +514,7 @@ export class AcpConnection {
 					break;
 
 				default:
-					console.log(`[ACP] 未处理的方法: ${method}`);
+					debug(`[ACP] 未处理的方法: ${method}`);
 			}
 
 			if ("id" in message && message.id !== undefined) {
@@ -554,7 +553,7 @@ export class AcpConnection {
 				baseDuration + mcpServerCount * perServerDuration,
 				180000,
 			);
-			console.log(
+			debug(
 				`[ACP] session/new 超时设置: ${timeoutDuration / 1000}s (${mcpServerCount} 个 MCP 服务器)`,
 			);
 		} else {
@@ -573,7 +572,7 @@ export class AcpConnection {
 
 	private sendMessage(message: AcpRequest | AcpNotification): void {
 		if (!this.child?.stdin) {
-			console.error("[ACP] 无法发送消息: 子进程不可用");
+			logError("[ACP] 无法发送消息: 子进程不可用");
 			return;
 		}
 
@@ -584,7 +583,7 @@ export class AcpConnection {
 
 	private sendResponse(id: RequestId, result: unknown): void {
 		if (!this.child?.stdin) {
-			console.error("[ACP] 无法发送响应: 子进程不可用");
+			logError("[ACP] 无法发送响应: 子进程不可用");
 			return;
 		}
 
@@ -644,7 +643,7 @@ export class AcpConnection {
 			},
 		};
 
-		console.log("[ACP] 发送 initialize 请求...");
+		debug("[ACP] 发送 initialize 请求...");
 		const startTime = Date.now();
 
 		try {
@@ -662,14 +661,14 @@ export class AcpConnection {
 			]);
 
 			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-			console.log(`[ACP] initialize 成功 (耗时 ${elapsed}s)`);
+			debug(`[ACP] initialize 成功 (耗时 ${elapsed}s)`);
 
 			this.isInitialized = true;
 			this.initializeResponse = response;
 			return response;
 		} catch (error) {
 			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-			console.error(`[ACP] initialize 失败 (耗时 ${elapsed}s):`, error);
+			logError(`[ACP] initialize 失败 (耗时 ${elapsed}s):`, error);
 			throw error;
 		}
 	}
@@ -690,7 +689,7 @@ export class AcpConnection {
 		// 获取 Agent 的 MCP 能力
 		const mcpCapabilities =
 			this.initializeResponse?.capabilities?.mcpCapabilities;
-		console.log(`[ACP] Agent MCP 能力:`, JSON.stringify(mcpCapabilities));
+		debug(`[ACP] Agent MCP 能力:`, JSON.stringify(mcpCapabilities));
 
 		// 使用 McpConfigProcessor 获取配置，根据能力过滤
 		const mcpProcessor = new McpConfigProcessor(cwd, this.app);
@@ -704,10 +703,10 @@ export class AcpConnection {
 			mcpServers,
 		};
 
-		console.log(
+		debug(
 			`[ACP] 发送 session/new 请求 (${mcpServers.length} 个 MCP 服务器)...`,
 		);
-		console.log(`[ACP] session/new 参数:`, JSON.stringify(params, null, 2));
+		debug(`[ACP] session/new 参数:`, JSON.stringify(params, null, 2));
 		const startTime = Date.now();
 
 		try {
@@ -717,14 +716,14 @@ export class AcpConnection {
 			);
 
 			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-			console.log(`[ACP] session/new 成功 (耗时 ${elapsed}s)`);
-			console.log(`[ACP] session/new 响应:`, JSON.stringify(response, null, 2));
+			debug(`[ACP] session/new 成功 (耗时 ${elapsed}s)`);
+			debug(`[ACP] session/new 响应:`, JSON.stringify(response, null, 2));
 
 			this.sessionId = response.sessionId;
 			return response;
 		} catch (error) {
 			const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-			console.error(`[ACP] session/new 失败 (耗时 ${elapsed}s):`, error);
+			logError(`[ACP] session/new 失败 (耗时 ${elapsed}s):`, error);
 			throw error;
 		}
 	}
@@ -767,7 +766,7 @@ export class AcpConnection {
 			throw new Error("没有活动的 ACP 会话");
 		}
 
-		console.log(`[ACP] 切换模式: ${modeId}`);
+		debug(`[ACP] 切换模式: ${modeId}`);
 
 		return await this.sendRequest<SetSessionModeResponse>(
 			AcpMethod.SESSION_SET_MODE,
@@ -785,7 +784,7 @@ export class AcpConnection {
 	private async handlePermissionRequest(
 		params: RequestPermissionParams,
 	): Promise<{ outcome: { outcome: string; optionId: string } }> {
-		console.log("[ACP] 收到权限请求:", params.toolCall?.title);
+		debug("[ACP] 收到权限请求:", params.toolCall?.title);
 
 		this.pausePromptTimeouts();
 
@@ -804,7 +803,7 @@ export class AcpConnection {
 					await this.permissionManager.handlePermissionRequest(
 						request,
 					);
-				console.log("[ACP] PermissionManager 响应:", response);
+				debug("[ACP] PermissionManager 响应:", response);
 
 				if (response.outcome === "cancelled") {
 					return {
@@ -824,7 +823,7 @@ export class AcpConnection {
 			}
 
 			const userChoice = await this.onPermissionRequest(params);
-			console.log("[ACP] 用户选择:", userChoice);
+			debug("[ACP] 用户选择:", userChoice);
 
 			if (userChoice.type === "cancelled") {
 				const rejectOptionId =
@@ -856,10 +855,10 @@ export class AcpConnection {
 					optionId: agentOptionId,
 				},
 			};
-			console.log("[ACP] 发送权限响应:", JSON.stringify(result));
+			debug("[ACP] 发送权限响应:", JSON.stringify(result));
 			return result;
 		} catch (error) {
-			console.error("[ACP] 权限请求处理失败:", error);
+			logError("[ACP] 权限请求处理失败:", error);
 			return {
 				outcome: {
 					outcome: "rejected",

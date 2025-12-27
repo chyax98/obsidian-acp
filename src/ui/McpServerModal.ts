@@ -7,6 +7,7 @@
 import type { App } from "obsidian";
 import { Modal, Setting, Notice } from "obsidian";
 import type { McpServerConfig } from "../main";
+import { warn } from "../acp/utils/logger";
 
 /**
  * MCP 服务器配置 Modal
@@ -332,7 +333,7 @@ export class JsonImportModal extends Modal {
 
 				// 如果有警告但也有有效配置，显示警告但继续
 				if (result.errors.length > 0) {
-					console.warn("[MCP Import]", result.errors);
+					warn("[MCP Import]", result.errors);
 				}
 
 				this.onImport(result.servers, this.replaceAll);

@@ -28,6 +28,7 @@ import {
 	PlanRenderer,
 	ThoughtRenderer,
 } from "../renderers";
+import { warn, error as logError } from "../../acp/utils/logger";
 import type { SessionMeta } from "../../acp/core/session-storage";
 import { SessionHistoryModal } from "../SessionHistoryModal";
 import { FileInputSuggest } from "../FileInputSuggest";
@@ -274,7 +275,7 @@ export class AcpChatView extends ItemView {
 			try {
 				await this.handleAgentChange();
 			} catch (error) {
-				console.error("[ChatView] 切换 Agent 失败:", error);
+				logError("[ChatView] 切换 Agent 失败:", error);
 				new Notice("切换 Agent 失败");
 				// 恢复选择器到原值
 				this.agentSelectorEl.value = this.instanceAgentId;
@@ -479,7 +480,7 @@ export class AcpChatView extends ItemView {
 				if (typeof basePath === "string") return basePath;
 			}
 		} catch (error) {
-			console.warn("[ChatView] Vault API 失败:", error);
+			warn("[ChatView] Vault API 失败:", error);
 		}
 
 		if (this.plugin.settings.customWorkingDir)
@@ -563,7 +564,7 @@ export class AcpChatView extends ItemView {
 			await this.app.vault.create(finalPath, markdown);
 			new Notice(`对话已导出到: ${finalPath}`);
 		} catch (error) {
-			console.error("[ChatView] 导出失败:", error);
+			logError("[ChatView] 导出失败:", error);
 			new Notice("导出失败: " + (error as Error).message);
 		}
 	}
@@ -588,7 +589,7 @@ export class AcpChatView extends ItemView {
 				this.instanceAgentId,
 			);
 		} catch (error) {
-			console.error("[ChatView] 自动保存会话失败:", error);
+			logError("[ChatView] 自动保存会话失败:", error);
 		}
 	}
 
@@ -675,7 +676,7 @@ export class AcpChatView extends ItemView {
 	}
 
 	private handleError(error: Error): void {
-		console.error("[ChatView] 错误:", error);
+		logError("[ChatView] 错误:", error);
 		this.addSystemMessage(`❌ 错误: ${error.message}`);
 		new Notice(`错误: ${error.message}`);
 	}
@@ -722,7 +723,7 @@ export class AcpChatView extends ItemView {
 				);
 				modal.open();
 			} catch (error) {
-				console.error("[ChatView] 权限请求处理失败:", error);
+				logError("[ChatView] 权限请求处理失败:", error);
 				resolve({ type: "cancelled" });
 			}
 		});
@@ -765,7 +766,7 @@ export class AcpChatView extends ItemView {
 			if (!sm) throw new Error("会话管理器未初始化");
 			await sm.sendPrompt(text, fullText);
 		} catch (error) {
-			console.error("[ChatView] 发送失败:", error);
+			logError("[ChatView] 发送失败:", error);
 			this.errorDisplay?.showError(error as Error, "send");
 			this.setInputSending(false);
 		}
@@ -775,7 +776,7 @@ export class AcpChatView extends ItemView {
 		try {
 			await this.connectionManager?.getSessionManager()?.cancel();
 		} catch (error) {
-			console.error("[ChatView] 取消失败:", error);
+			logError("[ChatView] 取消失败:", error);
 		}
 	}
 
@@ -837,7 +838,7 @@ export class AcpChatView extends ItemView {
 				sm.availableModes.find((m) => m.id === modeId)?.name || modeId;
 			new Notice(`已切换模式: ${modeName}`);
 		} catch (error) {
-			console.error("[ChatView] 切换模式失败:", error);
+			logError("[ChatView] 切换模式失败:", error);
 			new Notice("切换模式失败: " + (error as Error).message);
 		}
 	}
@@ -923,7 +924,7 @@ export class AcpChatView extends ItemView {
 		// 验证 agentId 有效性
 		const isValidAgent = getAllBackends().some((b) => b.id === newAgentId);
 		if (!isValidAgent) {
-			console.warn("[ChatView] 无效的 Agent ID:", newAgentId);
+			warn("[ChatView] 无效的 Agent ID:", newAgentId);
 			this.agentSelectorEl.value = this.instanceAgentId;
 			return;
 		}
@@ -1050,7 +1051,7 @@ export class AcpChatView extends ItemView {
 					this.historyManager?.listSessions() ?? Promise.resolve([]),
 			}).open();
 		} catch (error) {
-			console.error("[ChatView] 打开会话历史失败:", error);
+			logError("[ChatView] 打开会话历史失败:", error);
 			new Notice("无法打开会话历史");
 		}
 	}

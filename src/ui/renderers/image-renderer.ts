@@ -9,6 +9,7 @@
 
 import type { App } from "obsidian";
 import { setIcon, Modal, TFile } from "obsidian";
+import { error as logError } from "../../acp/utils/logger";
 
 /**
  * 图片渲染器
@@ -97,7 +98,7 @@ export class ImageRenderer {
 			imgEl.src = dataUri;
 			this.setupImageEvents(imgEl, imageWrapper, app);
 		} catch (error) {
-			console.error("[ImageRenderer] file:// URI 处理失败:", error);
+			logError("[ImageRenderer] file:// URI 处理失败:", error);
 			this.showError(imageWrapper);
 		}
 	}

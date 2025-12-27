@@ -12,6 +12,7 @@ import { MarkdownRenderer, setIcon, Notice } from "obsidian";
 import type { Message } from "../../acp/core/session-manager";
 import { ImageRenderer } from "./image-renderer";
 import { formatTimestamp } from "./utils";
+import { warn, error as logError } from "../../acp/utils/logger";
 
 /**
  * 流式渲染节流配置
@@ -130,7 +131,7 @@ export class MessageRenderer {
 			`[data-message-id="${message.id}"]`,
 		);
 		if (!messageEl) {
-			console.warn("[MessageRenderer] 找不到消息元素:", message.id);
+			warn("[MessageRenderer] 找不到消息元素:", message.id);
 			return;
 		}
 
@@ -138,7 +139,7 @@ export class MessageRenderer {
 			".acp-message-content",
 		) as HTMLElement;
 		if (!contentEl) {
-			console.warn("[MessageRenderer] 找不到消息内容元素:", message.id);
+			warn("[MessageRenderer] 找不到消息内容元素:", message.id);
 			return;
 		}
 
@@ -331,7 +332,7 @@ export class MessageRenderer {
 						sourcePath,
 						component,
 					).catch((error) => {
-						console.error(
+						logError(
 							"[MessageRenderer] Markdown 渲染失败:",
 							error,
 						);
@@ -375,7 +376,7 @@ export class MessageRenderer {
 					component,
 				);
 			} catch (error) {
-				console.error("[MessageRenderer] Markdown 渲染失败:", error);
+				logError("[MessageRenderer] Markdown 渲染失败:", error);
 				contentEl.textContent = content;
 			}
 		}
@@ -409,7 +410,7 @@ export class MessageRenderer {
 						component,
 					);
 				} catch (error) {
-					console.error(
+					logError(
 						"[MessageRenderer] Markdown 渲染失败:",
 						error,
 					);
@@ -436,7 +437,7 @@ export class MessageRenderer {
 					component,
 				);
 			} catch (error) {
-				console.error("[MessageRenderer] Markdown 渲染失败:", error);
+				logError("[MessageRenderer] Markdown 渲染失败:", error);
 				container.createDiv({ text: textAfter });
 			}
 		}

@@ -16,6 +16,7 @@ import type {
 } from "../../../acp/types/permissions";
 import type { AcpBackendId } from "../../../acp/backends";
 import { getBackendConfig } from "../../../acp/backends/registry";
+import { debug, error as logError } from "../../../acp/utils/logger";
 
 /**
  * 环境变量设置
@@ -137,7 +138,7 @@ export class ConnectionManager {
 
 		// 检查是否需要切换 Agent
 		if (this.isConnected && this.connectedAgentId !== agentId) {
-			console.log(
+			debug(
 				`[ConnectionManager] Agent 已切换: ${this.connectedAgentId} -> ${agentId}，断开旧连接`,
 			);
 			this.disconnect();
@@ -235,7 +236,7 @@ export class ConnectionManager {
 
 			return true;
 		} catch (error) {
-			console.error("[ConnectionManager] 连接失败:", error);
+			logError("[ConnectionManager] 连接失败:", error);
 			this.callbacks.onStatusChange("error");
 			this.callbacks.onError(error as Error);
 
@@ -283,7 +284,7 @@ export class ConnectionManager {
 			await this.sessionManager.start();
 			return true;
 		} catch (error) {
-			console.error("[ConnectionManager] 重建会话失败:", error);
+			logError("[ConnectionManager] 重建会话失败:", error);
 			return false;
 		}
 	}

@@ -11,6 +11,7 @@ import {
 	type SessionMeta,
 	type StoredSession,
 } from "../../../acp/core/session-storage";
+import { error as logError } from "../../../acp/utils/logger";
 import type {
 	SessionExportData,
 	Message,
@@ -92,7 +93,7 @@ export class HistoryManager {
 			);
 			return this.currentSessionId;
 		} catch (error) {
-			console.error("[HistoryManager] 保存会话失败:", error);
+			logError("[HistoryManager] 保存会话失败:", error);
 			return null;
 		}
 	}
@@ -138,7 +139,7 @@ export class HistoryManager {
 			new Notice("查看历史会话（只读）");
 			return true;
 		} catch (error) {
-			console.error("[HistoryManager] 加载会话失败:", error);
+			logError("[HistoryManager] 加载会话失败:", error);
 			new Notice("加载会话失败");
 			return false;
 		}

@@ -8,7 +8,6 @@
 export type {
 	AcpBackendId,
 	AcpBackendConfig,
-	CustomAgentConfig,
 	DetectableAcpCli,
 	BackendDetectionStatus,
 	BackendRuntimeState,

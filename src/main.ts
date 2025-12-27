@@ -1,14 +1,14 @@
 /**
  * Obsidian ACP Plugin - Agent Client Protocol 集成
  *
- * 通过 ACP 协议连接多个 AI Agent (Claude Code, Goose, OpenCode, 自定义)
+ * 通过 ACP 协议连接多个 AI Agent (Claude Code, Goose, OpenCode)
  */
 
 import type { WorkspaceLeaf, Editor } from "obsidian";
 import { Plugin, Notice } from "obsidian";
 import { AcpSettingTab } from "./ui/SettingsTab";
 import { AcpChatView, ACP_CHAT_VIEW_TYPE } from "./ui/chat/ChatView";
-import type { AcpBackendId, CustomAgentConfig } from "./acp/backends";
+import type { AcpBackendId } from "./acp/backends";
 
 // ============================================================================
 // 类型定义
@@ -61,7 +61,7 @@ export interface McpServerConfig {
 /**
  * 插件设置接口
  *
- * 支持多个 ACP Agent：Claude Code, Goose, OpenCode, 自定义
+ * 支持多个 ACP Agent：Claude Code, Goose, OpenCode
  */
 export interface AcpPluginSettings {
 	/** 当前选中的 Agent */
@@ -75,9 +75,6 @@ export interface AcpPluginSettings {
 
 	/** 手动配置的 Agent 路径 (backendId -> path) */
 	manualAgentPaths?: Record<string, string>;
-
-	/** 自定义 Agent 配置（当 currentAgentId === 'custom' 时使用） */
-	customAgent?: CustomAgentConfig;
 
 	/** 自定义 API Key（留空则使用系统认证）*/
 	apiKey?: string;

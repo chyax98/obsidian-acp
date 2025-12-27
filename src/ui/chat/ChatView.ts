@@ -169,7 +169,6 @@ export class AcpChatView extends ItemView {
 			this.app,
 			{
 				getCurrentAgentId: () => this.instanceAgentId,
-				getCustomAgentConfig: () => this.plugin.settings.customAgent,
 				getWorkingDirectory: () => this.getWorkingDirectory(),
 				getManualCliPath: (agentId) =>
 					this.plugin.settings.manualAgentPaths?.[agentId],
@@ -264,15 +263,6 @@ export class AcpChatView extends ItemView {
 			this.agentSelectorEl.createEl("option", {
 				value: backend.id,
 				text: backend.name,
-			});
-		}
-
-		// 添加自定义 Agent 选项（如果已配置）
-		if (this.plugin.settings.customAgent?.cliPath) {
-			this.agentSelectorEl.createEl("option", {
-				value: "custom",
-				text:
-					this.plugin.settings.customAgent.name || "自定义 Agent",
 			});
 		}
 
@@ -931,9 +921,7 @@ export class AcpChatView extends ItemView {
 		const newAgentId = this.agentSelectorEl.value as AcpBackendId;
 
 		// 验证 agentId 有效性
-		const isValidAgent =
-			newAgentId === "custom" ||
-			getAllBackends().some((b) => b.id === newAgentId);
+		const isValidAgent = getAllBackends().some((b) => b.id === newAgentId);
 		if (!isValidAgent) {
 			console.warn("[ChatView] 无效的 Agent ID:", newAgentId);
 			this.agentSelectorEl.value = this.instanceAgentId;
@@ -984,12 +972,7 @@ export class AcpChatView extends ItemView {
 	 * 获取 Agent 显示名称
 	 */
 	private getAgentDisplayName(id: AcpBackendId): string {
-		if (id === "custom") {
-			return (
-				this.plugin.settings.customAgent?.name || "自定义 Agent"
-			);
-		}
-		return getBackendConfig(id)?.name || id;
+		return getBackendConfig(id).name || id;
 	}
 
 	private showEmptyState(): void {

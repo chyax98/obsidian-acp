@@ -79,7 +79,6 @@ export class AcpSettingTab extends PluginSettingTab {
 				for (const backend of getAllBackends()) {
 					dropdown.addOption(backend.id, backend.name);
 				}
-				dropdown.addOption("custom", "自定义 Agent");
 
 				dropdown
 					.setValue(currentAgentId)
@@ -92,14 +91,8 @@ export class AcpSettingTab extends PluginSettingTab {
 
 		// 平铺展示所有内置 Agent
 		for (const backend of getAllBackends()) {
-			this.renderAgentCard(
-				containerEl,
-				backend.id as Exclude<AcpBackendId, "custom">,
-			);
+			this.renderAgentCard(containerEl, backend.id);
 		}
-
-		// 自定义 Agent 配置
-		this.renderCustomAgentCard(containerEl);
 	}
 
 	/**
@@ -107,7 +100,7 @@ export class AcpSettingTab extends PluginSettingTab {
 	 */
 	private renderAgentCard(
 		containerEl: HTMLElement,
-		agentId: Exclude<AcpBackendId, "custom">,
+		agentId: AcpBackendId,
 	): void {
 		const config = ACP_BACKENDS[agentId];
 		if (!config) return;
@@ -164,7 +157,7 @@ export class AcpSettingTab extends PluginSettingTab {
 	 */
 	private renderAgentInstallGuideCollapsible(
 		containerEl: HTMLElement,
-		agentId: Exclude<AcpBackendId, "custom">,
+		agentId: AcpBackendId,
 	): void {
 		const detailsEl = containerEl.createEl("details");
 		detailsEl.style.marginTop = "0.5em";
@@ -211,95 +204,6 @@ export class AcpSettingTab extends PluginSettingTab {
 				`;
 				break;
 		}
-	}
-
-	/**
-	 * 渲染自定义 Agent 配置卡片
-	 */
-	private renderCustomAgentCard(containerEl: HTMLElement): void {
-		const cardEl = containerEl.createDiv({ cls: "acp-agent-card" });
-		cardEl.style.marginTop = "1.5em";
-		cardEl.style.padding = "1em";
-		cardEl.style.backgroundColor = "var(--background-secondary)";
-		cardEl.style.borderRadius = "8px";
-
-		// 标题
-		const headerEl = cardEl.createDiv({ cls: "acp-agent-card-header" });
-		headerEl.createEl("strong", { text: "自定义 Agent" });
-		const descEl = headerEl.createEl("small");
-		descEl.style.display = "block";
-		descEl.style.marginTop = "0.25em";
-		descEl.style.color = "var(--text-muted)";
-		descEl.setText("配置其他支持 ACP 协议的 Agent");
-
-		const customConfig = this.plugin.settings.customAgent || {
-			name: "",
-			cliPath: "",
-			acpArgs: [],
-			authRequired: false,
-		};
-
-		// 名称
-		new Setting(cardEl)
-			.setName("名称")
-			.setDesc("显示在选择器中的名称")
-			.addText((text) => {
-				text.inputEl.style.width = "180px";
-				text.setPlaceholder("My Agent")
-					.setValue(customConfig.name)
-					.onChange(async (value) => {
-						const agent = this.ensureCustomAgent();
-						agent.name = value;
-						await this.plugin.saveSettings();
-					});
-			});
-
-		// CLI 命令
-		new Setting(cardEl)
-			.setName("CLI 命令")
-			.setDesc("完整路径或命令")
-			.addText((text) => {
-				text.inputEl.style.width = "280px";
-				text.setPlaceholder("/path/to/agent")
-					.setValue(customConfig.cliPath)
-					.onChange(async (value) => {
-						const agent = this.ensureCustomAgent();
-						agent.cliPath = value;
-						await this.plugin.saveSettings();
-					});
-			});
-
-		// ACP 参数
-		new Setting(cardEl)
-			.setName("ACP 参数")
-			.setDesc("启用 ACP 模式的参数（空格分隔）")
-			.addText((text) => {
-				text.inputEl.style.width = "180px";
-				text.setPlaceholder("acp 或 --acp")
-					.setValue(customConfig.acpArgs.join(" "))
-					.onChange(async (value) => {
-						const agent = this.ensureCustomAgent();
-						agent.acpArgs = value.split(" ").filter((s) => s.trim());
-						await this.plugin.saveSettings();
-					});
-			});
-	}
-
-	/**
-	 * 确保 customAgent 配置存在并返回
-	 */
-	private ensureCustomAgent(): NonNullable<
-		typeof this.plugin.settings.customAgent
-	> {
-		if (!this.plugin.settings.customAgent) {
-			this.plugin.settings.customAgent = {
-				name: "",
-				cliPath: "",
-				acpArgs: [],
-				authRequired: false,
-			};
-		}
-		return this.plugin.settings.customAgent;
 	}
 
 	/**

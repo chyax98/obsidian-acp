@@ -14,9 +14,8 @@
  * - claude: Anthropic Claude Code (Zed ACP 适配器)
  * - goose: Block (Square) Goose
  * - opencode: OpenCode 多模型 Agent
- * - custom: 用户自定义 Agent
  */
-export type AcpBackendId = "claude" | "goose" | "opencode" | "custom";
+export type AcpBackendId = "claude" | "goose" | "opencode";
 
 // ============================================================================
 // 后端配置接口
@@ -94,32 +93,6 @@ export interface AcpBackendConfig {
 	 * 启动进程时传递的自定义环境变量。
 	 * 与 process.env 合并。
 	 */
-	env?: Record<string, string>;
-}
-
-// ============================================================================
-// 用户自定义配置
-// ============================================================================
-
-/**
- * 用户自定义 Agent 配置
- *
- * 用于设置界面，允许用户配置自定义 Agent。
- */
-export interface CustomAgentConfig {
-	/** 显示名称 */
-	name: string;
-
-	/** CLI 完整路径或命令 */
-	cliPath: string;
-
-	/** ACP 启动参数 */
-	acpArgs: string[];
-
-	/** 是否需要认证 */
-	authRequired: boolean;
-
-	/** 环境变量 */
 	env?: Record<string, string>;
 }
 

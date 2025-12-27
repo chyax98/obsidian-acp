@@ -8,13 +8,8 @@ import type { AcpBackendConfig, AcpBackendId } from "./types";
 
 /**
  * 内置 Agent 配置
- *
- * 不包含 "custom" 类型，自定义 Agent 由用户配置
  */
-export const ACP_BACKENDS: Record<
-	Exclude<AcpBackendId, "custom">,
-	AcpBackendConfig
-> = {
+export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 	claude: {
 		id: "claude",
 		name: "Claude Code",
@@ -57,12 +52,9 @@ export const ACP_BACKENDS: Record<
  * 获取 Agent 配置
  *
  * @param id Agent ID
- * @returns Agent 配置，如果不存在返回 undefined
+ * @returns Agent 配置
  */
-export function getBackendConfig(
-	id: AcpBackendId,
-): AcpBackendConfig | undefined {
-	if (id === "custom") return undefined;
+export function getBackendConfig(id: AcpBackendId): AcpBackendConfig {
 	return ACP_BACKENDS[id];
 }
 
@@ -73,7 +65,6 @@ export function getBackendConfig(
  * @returns ACP 启动参数数组
  */
 export function getBackendAcpArgs(id: AcpBackendId): string[] {
-	if (id === "custom") return [];
 	return ACP_BACKENDS[id]?.acpArgs || [];
 }
 
@@ -84,7 +75,6 @@ export function getBackendAcpArgs(id: AcpBackendId): string[] {
  * @returns 启动命令字符串
  */
 export function getBackendStartCommand(id: AcpBackendId): string {
-	if (id === "custom") return "";
 	return ACP_BACKENDS[id]?.defaultCliPath || ACP_BACKENDS[id]?.cliCommand || "";
 }
 
@@ -104,7 +94,7 @@ export function getAllBackends(): AcpBackendConfig[] {
  * @returns 是否为内置 Agent
  */
 export function isBuiltinBackend(id: AcpBackendId): boolean {
-	return id !== "custom" && id in ACP_BACKENDS;
+	return id in ACP_BACKENDS;
 }
 
 /**
@@ -116,6 +106,5 @@ export function isBuiltinBackend(id: AcpBackendId): boolean {
 export function getBackendStreamingMode(
 	id: AcpBackendId,
 ): "incremental" | "cumulative" {
-	if (id === "custom") return "incremental";
 	return ACP_BACKENDS[id]?.streamingMode || "incremental";
 }

@@ -14,7 +14,7 @@ import type {
 	RequestPermissionParams,
 	PermissionOutcome,
 } from "../../../acp/types/permissions";
-import type { AcpBackendId, CustomAgentConfig } from "../../../acp/backends";
+import type { AcpBackendId } from "../../../acp/backends";
 import { getBackendConfig } from "../../../acp/backends/registry";
 
 /**
@@ -32,8 +32,6 @@ export interface EnvSettings {
 export interface ConnectionConfig {
 	/** 获取当前选中的 Agent ID */
 	getCurrentAgentId: () => AcpBackendId;
-	/** 获取自定义 Agent 配置 */
-	getCustomAgentConfig: () => CustomAgentConfig | undefined;
 	/** 获取工作目录 */
 	getWorkingDirectory: () => string;
 	/** 获取手动设置的 CLI 路径 */
@@ -168,30 +166,16 @@ export class ConnectionManager {
 		this.isConnecting = true;
 
 		try {
-			const customAgentConfig = this.config.getCustomAgentConfig();
-
-			// 获取 Agent 名称和配置
-			let agentName: string;
-			let cliPath: string;
-			let acpArgs: string[] = [];
-
-			if (agentId === "custom" && customAgentConfig) {
-				// 自定义 Agent
-				agentName = customAgentConfig.name || "自定义 Agent";
-				cliPath = customAgentConfig.cliPath;
-				acpArgs = customAgentConfig.acpArgs || [];
-			} else {
-				// 内置 Agent
-				const backendConfig = getBackendConfig(agentId);
-				agentName = backendConfig?.name || agentId;
-				const manualPath = this.config.getManualCliPath(agentId);
-				cliPath =
-					manualPath ||
-					backendConfig?.defaultCliPath ||
-					backendConfig?.cliCommand ||
-					"";
-				acpArgs = backendConfig?.acpArgs || [];
-			}
+			// 获取内置 Agent 配置
+			const backendConfig = getBackendConfig(agentId);
+			const agentName = backendConfig.name || agentId;
+			const manualPath = this.config.getManualCliPath(agentId);
+			const cliPath =
+				manualPath ||
+				backendConfig.defaultCliPath ||
+				backendConfig.cliCommand ||
+				"";
+			const acpArgs = backendConfig.acpArgs || [];
 
 			if (!cliPath) {
 				throw new Error(`未配置 ${agentName} 的 CLI 路径`);

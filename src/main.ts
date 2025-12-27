@@ -225,8 +225,15 @@ export default class AcpPlugin extends Plugin {
 		if (!forceNew && leaves.length > 0) {
 			// 已存在且不强制新建，激活第一个
 			leaf = leaves[0];
+		} else if (forceNew && leaves.length > 0) {
+			// 强制新建：在现有 Chat 旁边分割
+			leaf = workspace.createLeafBySplit(leaves[0], "horizontal");
+			await leaf.setViewState({
+				type: ACP_CHAT_VIEW_TYPE,
+				active: true,
+			});
 		} else {
-			// 不存在或强制新建，在右侧创建新的
+			// 不存在，在右侧创建新的
 			leaf = workspace.getRightLeaf(false);
 			if (leaf) {
 				await leaf.setViewState({

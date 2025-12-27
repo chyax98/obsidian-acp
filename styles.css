@@ -196,15 +196,18 @@
 	margin-bottom: 0.5em;
 }
 
-/* 减小标题间距 */
+/* AI 消息中的标题：不使用大字体，只加粗区分 */
 .acp-message-content h1,
 .acp-message-content h2,
 .acp-message-content h3,
 .acp-message-content h4,
 .acp-message-content h5,
 .acp-message-content h6 {
-	margin-top: 0.5em;
+	font-size: 1em;
+	font-weight: 600;
+	margin-top: 0.8em;
 	margin-bottom: 0.3em;
+	line-height: 1.4;
 }
 
 /* 流式输出光标 */

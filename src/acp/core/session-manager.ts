@@ -634,15 +634,21 @@ export class SessionManager {
 			if (update.kind) existingToolCall.kind = update.kind;
 			if (update.status)
 				existingToolCall.status = update.status as ToolCallStatus;
-			if (update.locations) existingToolCall.locations = update.locations;
-			// 合并 rawInput（新数据覆盖旧数据）
+			// 合并 locations（只有新数据有内容时才更新，避免被空数组覆盖）
+			if (update.locations && update.locations.length > 0) {
+				existingToolCall.locations = update.locations;
+			}
+			// 合并 rawInput（新数据覆盖旧数据，但不用空对象覆盖）
 			if (rawInput && Object.keys(rawInput).length > 0) {
 				existingToolCall.rawInput = {
 					...(existingToolCall.rawInput || {}),
 					...rawInput,
 				};
 			}
-			if (update.content) existingToolCall.content = update.content;
+			// 合并 content（追加或更新）
+			if (update.content && update.content.length > 0) {
+				existingToolCall.content = update.content;
+			}
 			this.onToolCall(existingToolCall);
 		} else {
 			// 创建新的工具调用时，打断当前消息流
@@ -722,7 +728,29 @@ export class SessionManager {
 			toolCall.status = update.status as ToolCallStatus;
 		}
 
-		if (update.content) {
+		// 处理 rawInput（OpenCode 在 tool_call_update 中发送）
+		const updateAny = update as unknown as Record<string, unknown>;
+		const rawInput = this.extractRawInput(update as unknown as ToolCallUpdateData);
+		if (rawInput && Object.keys(rawInput).length > 0) {
+			toolCall.rawInput = {
+				...(toolCall.rawInput || {}),
+				...rawInput,
+			};
+		}
+
+		// 处理 locations（OpenCode 在 tool_call_update 中发送）
+		const locations = updateAny.locations as Array<{ path: string; line?: number; column?: number }> | undefined;
+		if (locations && locations.length > 0) {
+			toolCall.locations = locations;
+		}
+
+		// 处理 title（OpenCode 在 completed 状态时更新 title 为文件名）
+		if (updateAny.title && typeof updateAny.title === "string") {
+			toolCall.title = updateAny.title;
+		}
+
+		// 处理 content
+		if (update.content && update.content.length > 0) {
 			toolCall.content = update.content;
 		}
 

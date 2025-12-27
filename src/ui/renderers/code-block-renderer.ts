@@ -88,9 +88,12 @@ export class CodeBlockRenderer {
 	): void {
 		const wrapperEl = container.createDiv({ cls: "acp-content-with-copy" });
 
+		// 清理行号格式（如 "00001| " 或 "   1→"）
+		const cleanedText = this.cleanLineNumbers(text);
+
 		// 文本内容
 		const textEl = wrapperEl.createDiv({ cls: "acp-content-text" });
-		textEl.textContent = text;
+		textEl.textContent = cleanedText;
 
 		// 复制按钮
 		const copyBtn = wrapperEl.createDiv({ cls: "acp-copy-button" });
@@ -109,5 +112,51 @@ export class CodeBlockRenderer {
 				}, 1500);
 			});
 		});
+	}
+
+	/**
+	 * 清理文本中的行号格式
+	 *
+	 * 支持的格式：
+	 * - "00001| content" (OpenCode 格式)
+	 * - "   1→content" (cat -n 格式)
+	 * - "  1: content" (其他格式)
+	 */
+	private static cleanLineNumbers(text: string): string {
+		if (!text) return text;
+
+		// 检测是否有行号前缀
+		const lines = text.split("\n");
+		if (lines.length === 0) return text;
+
+		// 检测常见的行号格式
+		const lineNumberPatterns = [
+			/^\d{5}\|\s?/, // 00001| (OpenCode)
+			/^\s*\d+→/, // "   1→" (cat -n 风格)
+			/^\s*\d+:\s?/, // "  1: " (grep 风格)
+			/^\s*\d+\t/, // "  1\t" (cat -n 标准格式)
+		];
+
+		// 检测第一行是否匹配行号格式
+		let matchedPattern: RegExp | null = null;
+		for (const pattern of lineNumberPatterns) {
+			if (pattern.test(lines[0])) {
+				matchedPattern = pattern;
+				break;
+			}
+		}
+
+		// 如果检测到行号格式，清理所有行
+		if (matchedPattern) {
+			return lines.map((line) => line.replace(matchedPattern!, "")).join("\n");
+		}
+
+		// 处理 <file> 标签包裹的内容
+		const fileTagMatch = text.match(/^<file>\s*\n?([\s\S]*?)\s*<\/file>$/);
+		if (fileTagMatch) {
+			return this.cleanLineNumbers(fileTagMatch[1]);
+		}
+
+		return text;
 	}
 }

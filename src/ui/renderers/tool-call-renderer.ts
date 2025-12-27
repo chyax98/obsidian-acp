@@ -136,7 +136,7 @@ export class ToolCallRenderer {
 	}
 
 	/**
-	 * 更新工具调用卡片
+	 * 更新工具调用卡片（增量更新）
 	 */
 	private static updateCard(
 		toolCallEl: HTMLElement,
@@ -154,6 +154,14 @@ export class ToolCallRenderer {
 					iconEl.className = `acp-tool-call-icon acp-status-${toolCall.status}`;
 					this.setStatusIcon(iconEl as HTMLElement, toolCall.status);
 				}
+
+				// 状态变为 completed 或 failed 时，清理渲染状态
+				if (
+					toolCall.status === "completed" ||
+					toolCall.status === "failed"
+				) {
+					ToolCallContentRenderer.cleanup(toolCall.toolCallId);
+				}
 			}
 
 			// 更新时间
@@ -165,23 +173,17 @@ export class ToolCallRenderer {
 				}
 			}
 
-			// 更新内容
+			// 增量更新内容（只渲染新增的内容块）
 			if (toolCall.content && toolCall.content.length > 0) {
 				const contentEl = toolCallEl.querySelector(
 					".acp-tool-call-content",
 				);
 				if (contentEl) {
-					const currentContentCount = contentEl.querySelectorAll(
-						".acp-tool-call-content-block",
-					).length;
-					if (currentContentCount !== toolCall.content.length) {
-						(contentEl as HTMLElement).empty();
-						ToolCallContentRenderer.render(
-							contentEl as HTMLElement,
-							toolCall,
-							app,
-						);
-					}
+					ToolCallContentRenderer.renderIncremental(
+						contentEl as HTMLElement,
+						toolCall,
+						app,
+					);
 				}
 			}
 		});

@@ -104,6 +104,8 @@ export class DiffRenderer {
 
 	/**
 	 * 渲染 Diff 行
+	 *
+	 * 使用 data-line 属性 + CSS 伪元素显示行号，确保复制时不包含行号
 	 */
 	private static renderDiffLines(
 		wrapperEl: HTMLElement,
@@ -119,15 +121,9 @@ export class DiffRenderer {
 			for (const line of oldLines) {
 				const lineEl = preEl.createEl("div", {
 					cls: "acp-diff-line acp-diff-removed",
+					attr: { "data-line": lineNumber.toString() },
 				});
-				const lineNumEl = lineEl.createEl("span", {
-					cls: "acp-diff-line-number",
-				});
-				lineNumEl.textContent = lineNumber.toString().padStart(4, " ");
-				const contentEl = lineEl.createEl("span", {
-					cls: "acp-diff-line-content",
-				});
-				contentEl.textContent = `-${line}`;
+				lineEl.textContent = `-${line}`;
 				lineNumber++;
 			}
 		}
@@ -141,15 +137,9 @@ export class DiffRenderer {
 			for (const line of newLines) {
 				const lineEl = preEl.createEl("div", {
 					cls: "acp-diff-line acp-diff-added",
+					attr: { "data-line": lineNumber.toString() },
 				});
-				const lineNumEl = lineEl.createEl("span", {
-					cls: "acp-diff-line-number",
-				});
-				lineNumEl.textContent = lineNumber.toString().padStart(4, " ");
-				const contentEl = lineEl.createEl("span", {
-					cls: "acp-diff-line-content",
-				});
-				contentEl.textContent = `+${line}`;
+				lineEl.textContent = `+${line}`;
 				lineNumber++;
 			}
 		}
@@ -185,6 +175,8 @@ export class DiffRenderer {
 
 	/**
 	 * 渲染紧凑版 Diff（用于工具调用卡片内）
+	 *
+	 * 使用 data-line 属性 + CSS 伪元素显示行号，确保复制时不包含行号
 	 */
 	public static renderCompact(
 		container: HTMLElement,
@@ -202,15 +194,9 @@ export class DiffRenderer {
 			for (let i = 0; i < oldLines.length; i++) {
 				const lineEl = preEl.createEl("div", {
 					cls: "acp-diff-line acp-diff-removed",
+					attr: { "data-line": (i + 1).toString() },
 				});
-				const lineNumEl = lineEl.createEl("span", {
-					cls: "acp-diff-line-number",
-				});
-				lineNumEl.textContent = (i + 1).toString().padStart(3, " ");
-				const contentEl = lineEl.createEl("span", {
-					cls: "acp-diff-line-content",
-				});
-				contentEl.textContent = `-${oldLines[i]}`;
+				lineEl.textContent = `-${oldLines[i]}`;
 			}
 		}
 
@@ -220,15 +206,9 @@ export class DiffRenderer {
 			for (let i = 0; i < newLines.length; i++) {
 				const lineEl = preEl.createEl("div", {
 					cls: "acp-diff-line acp-diff-added",
+					attr: { "data-line": (i + 1).toString() },
 				});
-				const lineNumEl = lineEl.createEl("span", {
-					cls: "acp-diff-line-number",
-				});
-				lineNumEl.textContent = (i + 1).toString().padStart(3, " ");
-				const contentEl = lineEl.createEl("span", {
-					cls: "acp-diff-line-content",
-				});
-				contentEl.textContent = `+${newLines[i]}`;
+				lineEl.textContent = `+${newLines[i]}`;
 			}
 		}
 	}

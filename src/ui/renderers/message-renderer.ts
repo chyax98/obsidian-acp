@@ -271,6 +271,10 @@ export class MessageRenderer {
 
 	/**
 	 * 执行 Markdown 渲染
+	 *
+	 * 优化策略：
+	 * - 流式时：使用纯文本渲染（快速，低开销）
+	 * - 流式结束：做完整 Markdown 渲染（只执行一次）
 	 */
 	private static doMarkdownRender(
 		contentEl: HTMLElement,
@@ -281,46 +285,59 @@ export class MessageRenderer {
 		isStreaming: boolean,
 	): void {
 		requestAnimationFrame(() => {
-			contentEl.empty();
-
 			if (!content.trim()) {
+				contentEl.empty();
 				return;
 			}
 
-			// 检查是否包含图片
-			const imagePattern =
-				/!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
-			const hasImages = imagePattern.test(content);
-
-			if (hasImages) {
-				// 有图片，特殊处理
-				void this.renderContentWithImages(
-					contentEl,
-					content,
-					app,
-					sourcePath,
-					component,
-				);
-			} else {
-				// 纯文本/Markdown
-				void MarkdownRenderer.render(
-					app,
-					content,
-					contentEl,
-					sourcePath,
-					component,
-				).catch((error) => {
-					console.error(
-						"[MessageRenderer] Markdown 渲染失败:",
-						error,
-					);
-					contentEl.textContent = content;
-				});
-			}
-
-			// 流式状态样式
 			if (isStreaming) {
+				// 流式渲染：使用纯文本渲染（快速）
+				// 查找或创建文本容器
+				let textEl = contentEl.querySelector(
+					".acp-streaming-text",
+				) as HTMLElement;
+				if (!textEl) {
+					contentEl.empty();
+					textEl = contentEl.createEl("pre", {
+						cls: "acp-streaming-text",
+					});
+				}
+				// 直接更新文本内容，避免 DOM 重建
+				textEl.textContent = content;
 				contentEl.addClass("acp-message-streaming");
+			} else {
+				// 流式结束：完整 Markdown 渲染
+				contentEl.empty();
+				contentEl.removeClass("acp-message-streaming");
+
+				// 检查是否包含图片
+				const imagePattern =
+					/!\[图像\]\((data:[^)]+|https?:[^)]+|file:[^)]+)\)/g;
+				const hasImages = imagePattern.test(content);
+
+				if (hasImages) {
+					void this.renderContentWithImages(
+						contentEl,
+						content,
+						app,
+						sourcePath,
+						component,
+					);
+				} else {
+					void MarkdownRenderer.render(
+						app,
+						content,
+						contentEl,
+						sourcePath,
+						component,
+					).catch((error) => {
+						console.error(
+							"[MessageRenderer] Markdown 渲染失败:",
+							error,
+						);
+						contentEl.textContent = content;
+					});
+				}
 			}
 		});
 	}

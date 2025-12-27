@@ -218,8 +218,20 @@
 .acp-message-streaming {
 	/* 流式期间使用固定最小高度，避免内容增长时的抖动 */
 	min-height: 2em;
-	/* 保留换行符和空格，但允许自动换行 */
+}
+
+/* 流式文本容器（纯文本渲染，高性能） */
+.acp-streaming-text {
+	font-family: inherit;
+	font-size: inherit;
+	line-height: 1.6;
+	margin: 0;
+	padding: 0;
 	white-space: pre-wrap;
+	word-wrap: break-word;
+	background: transparent;
+	border: none;
+	color: inherit;
 }
 
 @keyframes blink {
@@ -780,25 +792,33 @@
 }
 
 .acp-diff-line {
-	display: flex;
-	padding: 2px 8px;
+	display: block;
+	padding: 2px 8px 2px 60px;
 	white-space: pre;
-	user-select: text; /* 可选择 */
+	user-select: text;
+	position: relative;
 }
 
-/* T12 增强：行号 */
-.acp-diff-line-number {
-	display: inline-block;
-	width: 50px;
+/* 行号使用伪元素，完全不可复制 */
+.acp-diff-line::before {
+	content: attr(data-line);
+	position: absolute;
+	left: 8px;
+	width: 42px;
 	text-align: right;
-	margin-right: 12px;
 	color: var(--text-muted);
-	user-select: none;
 	opacity: 0.6;
+	pointer-events: none;
+	/* 伪元素天然不可复制 */
+}
+
+/* 兼容旧版行号 span（渐进式迁移） */
+.acp-diff-line-number {
+	display: none; /* 隐藏旧版行号 */
 }
 
 .acp-diff-line-content {
-	flex: 1;
+	display: inline;
 }
 
 .acp-diff-added {
@@ -2711,9 +2731,13 @@
 	font-size: 0.82em;
 }
 
-.acp-diff-compact .acp-diff-line-number {
-	width: 35px;
-	margin-right: 8px;
+/* compact 版本使用更小的行号区域 */
+.acp-diff-compact .acp-diff-line {
+	padding-left: 48px;
+}
+
+.acp-diff-compact .acp-diff-line::before {
+	width: 32px;
 }
 
 /* 写入操作输入 */

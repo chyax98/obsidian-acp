@@ -210,6 +210,50 @@
 	line-height: 1.4;
 }
 
+/* 行内代码 */
+.acp-message-content code:not(pre code) {
+	background: var(--background-modifier-hover);
+	padding: 0.1em 0.3em;
+	border-radius: 3px;
+	font-size: 0.9em;
+}
+
+/* 引用块 */
+.acp-message-content blockquote {
+	margin: 0.5em 0;
+	padding: 0.3em 0.8em;
+	border-left: 3px solid var(--text-muted);
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+}
+
+/* 表格 */
+.acp-message-content table {
+	border-collapse: collapse;
+	margin: 0.5em 0;
+	font-size: 0.9em;
+	width: 100%;
+}
+
+.acp-message-content th,
+.acp-message-content td {
+	border: 1px solid var(--background-modifier-border);
+	padding: 0.3em 0.6em;
+	text-align: left;
+}
+
+.acp-message-content th {
+	background: var(--background-modifier-hover);
+	font-weight: 600;
+}
+
+/* 分隔线 */
+.acp-message-content hr {
+	border: none;
+	border-top: 1px solid var(--background-modifier-border);
+	margin: 0.8em 0;
+}
+
 /* 流式输出光标 */
 .acp-message-streaming::after {
 	content: '▊';

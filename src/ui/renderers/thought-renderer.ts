@@ -89,13 +89,32 @@ export class ThoughtRenderer {
 
 	/**
 	 * 创建新的思考块
+	 *
+	 * 插入位置逻辑：
+	 * - 如果有正在流式输出的消息，插入到该消息之前
+	 * - 否则追加到容器末尾
 	 */
 	private static createNew(
 		container: HTMLElement,
 		thoughts: string[],
 		isStreaming: boolean,
 	): HTMLElement {
+		// 先创建元素（会追加到末尾）
 		const thoughtsEl = container.createDiv({ cls: "acp-thoughts" });
+
+		// 查找正在流式输出的消息，调整位置
+		const streamingMessage = container.querySelector(
+			".acp-message-assistant .acp-message-streaming",
+		);
+
+		if (streamingMessage) {
+			// 找到消息的父元素（.acp-message-assistant）
+			const messageEl = streamingMessage.closest(".acp-message-assistant");
+			if (messageEl && messageEl.parentElement === container) {
+				// 移动思考块到消息之前
+				container.insertBefore(thoughtsEl, messageEl);
+			}
+		}
 
 		// 头部
 		const headerEl = thoughtsEl.createDiv({ cls: "acp-thoughts-header" });

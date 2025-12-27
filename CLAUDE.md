@@ -19,9 +19,9 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 # Obsidian ACP Plugin
 
-**版本**: 0.4.0
-**日期**: 2025-12-24
-**状态**: 支持多 Agent (Claude Code, Goose, OpenCode, 自定义)
+**版本**: 0.4.1
+**日期**: 2025-12-28
+**状态**: 支持多 Agent (Claude Code, Goose, OpenCode)
 
 ---
 
@@ -31,7 +31,7 @@ Obsidian ACP Plugin 通过 ACP (Agent Client Protocol) 协议将多个 AI Agent 
 
 ### 核心特性
 
-- **多 Agent 支持**: Claude Code, Goose, OpenCode, 自定义 Agent
+- **多 Agent 支持**: Claude Code, Goose, OpenCode
 - **文件操作**: AI 可读写 Obsidian Vault 中的文件
 - **权限控制**: 2 种模式（每次询问 / 完全信任）
 - **@ 引用文件**: 输入 @ 弹出文件搜索
@@ -58,12 +58,12 @@ Obsidian ACP Plugin 通过 ACP (Agent Client Protocol) 协议将多个 AI Agent 
                                                     │
                                          JSON-RPC 2.0 over stdio
                                                     │
-                            ┌───────────────────────┼───────────────────────┐
-                            ▼                       ▼                       ▼
-┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐ ┌─────────────┐
-│   Claude Code     │ │      Goose        │ │     OpenCode      │ │  自定义 CLI  │
-│ (npx claude-acp)  │ │   (goose acp)     │ │  (opencode acp)   │ │             │
-└───────────────────┘ └───────────────────┘ └───────────────────┘ └─────────────┘
+                    ┌───────────────────────────────┼───────────────────────────────┐
+                    ▼                               ▼                               ▼
+      ┌───────────────────┐           ┌───────────────────┐           ┌───────────────────┐
+      │   Claude Code     │           │      Goose        │           │     OpenCode      │
+      │ (npx claude-acp)  │           │   (goose acp)     │           │  (opencode acp)   │
+      └───────────────────┘           └───────────────────┘           └───────────────────┘
 ```
 
 ### 目录结构
@@ -123,7 +123,6 @@ npm run build
 | Claude Code | `npx @zed-industries/claude-code-acp` | 无 |
 | Goose | `goose` | `acp` |
 | OpenCode | `opencode` | `acp` |
-| 自定义 | 用户配置 | 用户配置 |
 
 ### 核心方法
 
@@ -193,4 +192,4 @@ npm run build
 
 ---
 
-**最后更新**: 2025-12-24
+**最后更新**: 2025-12-28

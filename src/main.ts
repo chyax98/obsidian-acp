@@ -9,6 +9,7 @@ import { Plugin, Notice } from "obsidian";
 import { AcpSettingTab } from "./ui/SettingsTab";
 import { AcpChatView, ACP_CHAT_VIEW_TYPE } from "./ui/chat/ChatView";
 import type { AcpBackendId } from "./acp/backends";
+import { setDebugMode, debug } from "./acp/utils/logger";
 
 // ============================================================================
 // 类型定义
@@ -205,12 +206,19 @@ export default class AcpPlugin extends Plugin {
 			// 已存在且不强制新建，激活第一个
 			leaf = leaves[0];
 		} else if (forceNew && leaves.length > 0) {
-			// 强制新建：在现有 Chat 旁边分割
-			leaf = workspace.createLeafBySplit(leaves[0], "horizontal");
-			await leaf.setViewState({
-				type: ACP_CHAT_VIEW_TYPE,
-				active: true,
-			});
+			// 强制新建：在同一个侧边栏创建新 tab
+			const parent = leaves[0].parent;
+			if (parent) {
+				leaf = workspace.createLeafInParent(parent, -1);
+			} else {
+				leaf = workspace.getRightLeaf(false);
+			}
+			if (leaf) {
+				await leaf.setViewState({
+					type: ACP_CHAT_VIEW_TYPE,
+					active: true,
+				});
+			}
 		} else {
 			// 不存在，在右侧创建新的
 			leaf = workspace.getRightLeaf(false);
@@ -269,7 +277,9 @@ export default class AcpPlugin extends Plugin {
 			},
 		};
 
-		console.log("[ACP] 加载设置:", this.settings.permission);
+		// 初始化日志模式
+		setDebugMode(this.settings.debugMode);
+		debug("[ACP] 加载设置:", this.settings.permission);
 	}
 
 	public async saveSettings(): Promise<void> {

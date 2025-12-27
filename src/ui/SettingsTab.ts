@@ -15,6 +15,7 @@ import type { McpServerConfig } from "../main";
 import type { AcpBackendId } from "../acp/backends";
 import { ACP_BACKENDS, getAllBackends } from "../acp/backends/registry";
 import { McpServerModal, JsonImportModal } from "./McpServerModal";
+import { setDebugMode } from "../acp/utils/logger";
 
 /**
  * ACP 插件设置页面
@@ -719,6 +720,7 @@ export class AcpSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.debugMode)
 					.onChange(async (value) => {
 						this.plugin.settings.debugMode = value;
+						setDebugMode(value);
 						await this.plugin.saveSettings();
 					}),
 			);

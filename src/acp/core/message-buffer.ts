@@ -89,12 +89,8 @@ export class StreamingMessageBuffer {
 
 		// 更新内容
 		if (mode === "auto") {
-			// 智能检测：如果新 chunk 以当前内容为前缀，说明是累积的
-			if (chunk.startsWith(buffer.content)) {
-				buffer.content = chunk;
-			} else {
-				buffer.content += chunk;
-			}
+			// 智能检测：处理累积、增量和部分重叠的情况
+			buffer.content = this.smartMerge(buffer.content, chunk);
 		} else if (mode === "accumulate") {
 			buffer.content += chunk;
 		} else {
@@ -192,5 +188,48 @@ export class StreamingMessageBuffer {
 			totalBuffers: this.buffers.size,
 			totalChunks,
 		};
+	}
+
+	/**
+	 * 智能合并内容
+	 *
+	 * 处理三种情况：
+	 * 1. 累积模式：新 chunk 包含当前内容作为前缀
+	 * 2. 增量模式：新 chunk 是完全新的内容
+	 * 3. 部分重叠：新 chunk 与当前内容末尾有重叠
+	 *
+	 * @param current - 当前累积的内容
+	 * @param chunk - 新的 chunk
+	 * @returns 合并后的内容
+	 */
+	private smartMerge(current: string, chunk: string): string {
+		// 空内容直接返回
+		if (!current) return chunk;
+		if (!chunk) return current;
+
+		// 情况 1：累积模式 - 新 chunk 以当前内容为前缀
+		if (chunk.startsWith(current)) {
+			return chunk;
+		}
+
+		// 情况 2：当前内容以新 chunk 为前缀（罕见，可能是重发）
+		if (current.startsWith(chunk)) {
+			return current;
+		}
+
+		// 情况 3：检测部分重叠
+		// 查找当前内容末尾与新 chunk 开头的最长重叠
+		const maxOverlap = Math.min(current.length, chunk.length);
+		for (let overlap = maxOverlap; overlap > 0; overlap--) {
+			const suffix = current.slice(-overlap);
+			const prefix = chunk.slice(0, overlap);
+			if (suffix === prefix) {
+				// 找到重叠，只追加非重叠部分
+				return current + chunk.slice(overlap);
+			}
+		}
+
+		// 情况 4：无重叠，直接追加（增量模式）
+		return current + chunk;
 	}
 }

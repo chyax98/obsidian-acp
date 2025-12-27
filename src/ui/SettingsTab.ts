@@ -305,22 +305,19 @@ export class AcpSettingTab extends PluginSettingTab {
 				this.openMcpServerModal(server);
 			});
 
-			if (server.id !== "filesystem") {
-				// 内置 filesystem 不允许删除
-				const deleteBtn = actionsEl.createEl("button", {
-					text: "删除",
-					cls: "mod-warning",
+			const deleteBtn = actionsEl.createEl("button", {
+				text: "删除",
+				cls: "mod-warning",
+			});
+			deleteBtn.addEventListener("click", () => {
+				this.plugin.settings.mcpServers =
+					this.plugin.settings.mcpServers.filter(
+						(s) => s.id !== server.id,
+					);
+				void this.plugin.saveSettings().then(() => {
+					this.display(); // 重新渲染
 				});
-				deleteBtn.addEventListener("click", () => {
-					this.plugin.settings.mcpServers =
-						this.plugin.settings.mcpServers.filter(
-							(s) => s.id !== server.id,
-						);
-					void this.plugin.saveSettings().then(() => {
-						this.display(); // 重新渲染
-					});
-				});
-			}
+			});
 		}
 
 		// 按钮容器

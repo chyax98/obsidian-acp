@@ -624,6 +624,39 @@
 	border-top: 1px solid var(--background-modifier-border);
 }
 
+/* 工具基本信息 */
+.acp-tool-call-info {
+	padding: 8px 12px;
+	background: var(--background-modifier-hover);
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: 0.85em;
+}
+
+.acp-tool-info-row {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 4px;
+}
+
+.acp-tool-info-row:last-child {
+	margin-bottom: 0;
+}
+
+.acp-tool-info-label {
+	color: var(--text-muted);
+	min-width: 40px;
+}
+
+.acp-tool-info-value {
+	color: var(--text-normal);
+	font-family: var(--font-monospace);
+}
+
+.acp-tool-info-id {
+	font-size: 0.9em;
+	opacity: 0.8;
+}
+
 .acp-tool-call-content-text {
 	white-space: pre-wrap;
 	word-wrap: break-word;

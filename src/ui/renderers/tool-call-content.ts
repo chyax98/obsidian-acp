@@ -43,6 +43,20 @@ export class ToolCallContentRenderer {
 		const hasLocations =
 			toolCall.locations && toolCall.locations.length > 0;
 
+		// 调试日志
+		console.log("[ACP] ToolCallContentRenderer.render:", {
+			toolCallId: toolCall.toolCallId,
+			title: toolCall.title,
+			kind: toolCall.kind,
+			hasRawInput,
+			rawInputKeys: toolCall.rawInput ? Object.keys(toolCall.rawInput) : [],
+			hasContent,
+			hasLocations,
+		});
+
+		// 始终显示工具基本信息（即使没有 rawInput）
+		this.renderToolInfo(contentEl, toolCall);
+
 		// 渲染输入参数
 		if (hasRawInput && toolCall.rawInput) {
 			ToolCallInputRenderer.render(
@@ -66,12 +80,69 @@ export class ToolCallContentRenderer {
 				renderedCount: toolCall.content?.length || 0,
 				outputSection,
 			});
-		} else if (!hasRawInput && !hasLocations) {
-			contentEl.createDiv({
-				cls: "acp-tool-call-empty",
-				text: "（无内容）",
+		}
+	}
+
+	/**
+	 * 渲染工具基本信息
+	 *
+	 * 始终显示，即使没有 rawInput
+	 */
+	private static renderToolInfo(
+		container: HTMLElement,
+		toolCall: ToolCall,
+	): void {
+		const infoSection = container.createDiv({
+			cls: "acp-tool-call-info",
+		});
+
+		// 工具名称/标题
+		if (toolCall.title) {
+			const titleRow = infoSection.createDiv({ cls: "acp-tool-info-row" });
+			titleRow.createSpan({ cls: "acp-tool-info-label", text: "工具" });
+			titleRow.createSpan({
+				cls: "acp-tool-info-value acp-tool-info-title",
+				text: toolCall.title,
 			});
 		}
+
+		// 工具类型
+		const kindRow = infoSection.createDiv({ cls: "acp-tool-info-row" });
+		kindRow.createSpan({ cls: "acp-tool-info-label", text: "类型" });
+		kindRow.createSpan({
+			cls: "acp-tool-info-value",
+			text: toolCall.kind || "unknown",
+		});
+
+		// 状态
+		const statusRow = infoSection.createDiv({ cls: "acp-tool-info-row" });
+		statusRow.createSpan({ cls: "acp-tool-info-label", text: "状态" });
+		const statusText = this.getStatusText(toolCall.status);
+		statusRow.createSpan({
+			cls: `acp-tool-info-value acp-tool-info-status acp-status-${toolCall.status}`,
+			text: statusText,
+		});
+
+		// 工具 ID（简短显示）
+		const idRow = infoSection.createDiv({ cls: "acp-tool-info-row" });
+		idRow.createSpan({ cls: "acp-tool-info-label", text: "ID" });
+		const shortId = toolCall.toolCallId.length > 20
+			? toolCall.toolCallId.slice(0, 8) + "..." + toolCall.toolCallId.slice(-8)
+			: toolCall.toolCallId;
+		idRow.createSpan({ cls: "acp-tool-info-value acp-tool-info-id", text: shortId });
+	}
+
+	/**
+	 * 获取状态文本
+	 */
+	private static getStatusText(status: string): string {
+		const statusMap: Record<string, string> = {
+			pending: "等待中",
+			in_progress: "执行中",
+			completed: "已完成",
+			failed: "失败",
+		};
+		return statusMap[status] || status;
 	}
 
 	/**

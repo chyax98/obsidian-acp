@@ -616,21 +616,31 @@ export class SessionManager {
 	private handleToolCall(update: ToolCallUpdateData): void {
 		if (!this.currentTurn) return;
 
+		// 调试：打印原始工具调用数据（包含所有字段）
+		console.log("[ACP] tool_call 原始数据:", JSON.stringify(update, null, 2));
+
+		// 提取入参：尝试多个可能的字段名
+		const rawInput = this.extractRawInput(update);
+		console.log("[ACP] tool_call 提取的 rawInput:", JSON.stringify(rawInput));
+
 		// 检查是否已存在相同 ID 的工具调用（ACP 会发送多次更新）
 		const existingToolCall = this.currentTurn.toolCalls.find(
 			(tc) => tc.toolCallId === update.toolCallId,
 		);
 
 		if (existingToolCall) {
-			// 更新已存在的工具调用（不需要打断消息流）
+			// 更新已存在的工具调用
 			if (update.title) existingToolCall.title = update.title;
 			if (update.kind) existingToolCall.kind = update.kind;
 			if (update.status)
 				existingToolCall.status = update.status as ToolCallStatus;
 			if (update.locations) existingToolCall.locations = update.locations;
-			// 只有当新的 rawInput 有数据时才更新
-			if (update.rawInput && Object.keys(update.rawInput).length > 0) {
-				existingToolCall.rawInput = update.rawInput;
+			// 合并 rawInput（新数据覆盖旧数据）
+			if (rawInput && Object.keys(rawInput).length > 0) {
+				existingToolCall.rawInput = {
+					...(existingToolCall.rawInput || {}),
+					...rawInput,
+				};
 			}
 			if (update.content) existingToolCall.content = update.content;
 			this.onToolCall(existingToolCall);
@@ -644,13 +654,51 @@ export class SessionManager {
 				kind: update.kind || "other",
 				status: (update.status as ToolCallStatus) || "pending",
 				locations: update.locations,
-				rawInput: update.rawInput,
+				rawInput: rawInput,
 				startTime: Date.now(),
 			};
 
 			this.currentTurn.toolCalls.push(toolCall);
 			this.onToolCall(toolCall);
 		}
+	}
+
+	/**
+	 * 从工具调用更新中提取入参
+	 *
+	 * 不同的 ACP Agent 可能使用不同的字段名：
+	 * - rawInput (Claude Code)
+	 * - input
+	 * - params
+	 * - arguments
+	 * - toolInput
+	 */
+	private extractRawInput(
+		update: ToolCallUpdateData,
+	): Record<string, unknown> | undefined {
+		const updateAny = update as unknown as Record<string, unknown>;
+
+		// 按优先级尝试不同字段名
+		const candidates = [
+			update.rawInput,
+			updateAny.input,
+			updateAny.params,
+			updateAny.arguments,
+			updateAny.toolInput,
+			updateAny.tool_input,
+		];
+
+		for (const candidate of candidates) {
+			if (
+				candidate &&
+				typeof candidate === "object" &&
+				Object.keys(candidate as object).length > 0
+			) {
+				return candidate as Record<string, unknown>;
+			}
+		}
+
+		return undefined;
 	}
 
 	private interruptCurrentMessage(): void {

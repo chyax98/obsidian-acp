@@ -31,14 +31,19 @@ export class ToolCallInputRenderer {
 			cls: "acp-tool-call-section acp-tool-call-input",
 		});
 
-		// 按类型处理
-		if (["read", "write", "edit", "patch"].includes(kind)) {
+		// 按类型处理（支持更多变体名称）
+		const fileOps = ["read", "write", "edit", "patch", "create", "delete", "move", "copy"];
+		const commandOps = ["bash", "execute", "shell", "terminal", "run", "command"];
+		const searchOps = ["search", "grep", "find", "glob", "list", "ls"];
+
+		if (fileOps.includes(kind)) {
 			this.renderFileOperationInput(inputSection, rawInput, kind, app);
-		} else if (["bash", "execute", "shell", "terminal"].includes(kind)) {
+		} else if (commandOps.includes(kind)) {
 			this.renderCommandInput(inputSection, rawInput);
-		} else if (["search", "grep", "find", "glob"].includes(kind)) {
+		} else if (searchOps.includes(kind)) {
 			this.renderSearchInput(inputSection, rawInput);
 		} else {
+			// 兜底：显示所有参数
 			this.renderAllParams(inputSection, rawInput);
 		}
 	}

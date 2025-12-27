@@ -95,10 +95,8 @@ export class ToolCallRenderer {
 		// 展开/折叠指示器
 		const chevronEl = rightEl.createDiv({ cls: "acp-tool-call-chevron" });
 
-		// 判断是否默认展开
-		const kind = toolCall.kind?.toLowerCase() || "";
-		const shouldExpandByDefault =
-			kind === "edit" || kind === "write" || kind === "patch";
+		// 默认展开所有工具调用，让用户看到入参和出参
+		const shouldExpandByDefault = true;
 		setIcon(
 			chevronEl,
 			shouldExpandByDefault ? "chevron-down" : "chevron-right",

@@ -573,8 +573,14 @@ export class SessionManager {
 	private handleAgentThoughtChunk(update: SessionUpdateData): void {
 		if (!this.currentTurn) return;
 
-		const content = (update as { content?: { text?: string } }).content;
-		const text = content?.text || "";
+		// 调试：打印原始数据
+		console.log("[ACP] agent_thought_chunk 原始数据:", JSON.stringify(update));
+
+		// 尝试多种可能的字段
+		const updateAny = update as unknown as Record<string, unknown>;
+		const content = updateAny.content as { text?: string } | undefined;
+		const thought = updateAny.thought as string | undefined;
+		const text = content?.text || thought || "";
 
 		if (text) {
 			// 智能合并思考内容

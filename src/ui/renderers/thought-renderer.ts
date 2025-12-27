@@ -25,7 +25,15 @@ export class ThoughtRenderer {
 		container: HTMLElement,
 		thoughts: string[],
 		isStreaming = false,
-	): HTMLElement {
+	): HTMLElement | null {
+		// 过滤空内容
+		const validThoughts = thoughts.filter((t) => t && t.trim());
+
+		// 如果没有有效思考内容，不渲染
+		if (validThoughts.length === 0) {
+			return null;
+		}
+
 		// 查找已存在的思考块
 		const thoughtsEl = container.querySelector(
 			".acp-thoughts",
@@ -33,12 +41,12 @@ export class ThoughtRenderer {
 
 		if (thoughtsEl) {
 			// 增量更新
-			this.updateExisting(thoughtsEl, thoughts, isStreaming);
+			this.updateExisting(thoughtsEl, validThoughts, isStreaming);
 			return thoughtsEl;
 		}
 
 		// 创建新元素
-		return this.createNew(container, thoughts, isStreaming);
+		return this.createNew(container, validThoughts, isStreaming);
 	}
 
 	/**

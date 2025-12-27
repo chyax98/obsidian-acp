@@ -358,14 +358,60 @@ export class AcpSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * 导出 MCP 服务器配置为 JSON
+	 * 导出 MCP 服务器配置为标准 JSON 格式
+	 *
+	 * 输出格式：
+	 * {
+	 *   "mcpServers": {
+	 *     "server-name": { "type": "stdio", "command": "...", ... }
+	 *   }
+	 * }
 	 */
 	private exportMcpServersJson(): void {
 		const servers = this.plugin.settings.mcpServers;
-		const json = JSON.stringify(servers, null, 2);
+
+		// 转换为标准格式
+		const mcpServers: Record<string, Record<string, unknown>> = {};
+
+		for (const server of servers) {
+			const config: Record<string, unknown> = {
+				type: server.type,
+				enabled: server.enabled,
+			};
+
+			// stdio 类型
+			if (server.type === "stdio") {
+				config.command = server.command;
+				if (server.args && server.args.length > 0) {
+					config.args = server.args;
+				}
+			}
+
+			// http/sse 类型
+			if (server.type === "http" || server.type === "sse") {
+				config.url = server.url;
+				if (server.headers && server.headers.length > 0) {
+					config.headers = server.headers;
+				}
+			}
+
+			// 环境变量 - 转换为标准对象格式
+			if (server.env && server.env.length > 0) {
+				const envObj: Record<string, string> = {};
+				for (const e of server.env) {
+					envObj[e.name] = e.value;
+				}
+				config.env = envObj;
+			}
+
+			mcpServers[server.name] = config;
+		}
+
+		const output = { mcpServers };
+		const json = JSON.stringify(output, null, 2);
 
 		void navigator.clipboard.writeText(json).then(() => {
-			new Notice("MCP 配置已复制到剪贴板");
+			new Notice(`已复制 ${servers.length} 个 MCP 服务器配置到剪贴板`);
 		});
 	}
 
@@ -373,36 +419,52 @@ export class AcpSettingTab extends PluginSettingTab {
 	 * 打开 JSON 导入弹窗
 	 */
 	private openJsonImportModal(): void {
-		const modal = new JsonImportModal(this.app, (servers) => {
-			// 合并导入的服务器（按 id 去重）
-			const existingIds = new Set(
-				this.plugin.settings.mcpServers.map((s) => s.id),
-			);
+		const modal = new JsonImportModal(this.app, (servers, replaceAll) => {
+			if (replaceAll) {
+				// 全量替换模式：清空现有配置，使用导入的配置
+				this.plugin.settings.mcpServers = servers;
 
-			let added = 0;
-			let updated = 0;
+				void this.plugin.saveSettings().then(() => {
+					this.display();
+					new Notice(`已替换为 ${servers.length} 个 MCP 服务器配置`);
+				});
+			} else {
+				// 增量合并模式：按 name 去重
+				const existingNames = new Map<string, number>();
+				this.plugin.settings.mcpServers.forEach((s, index) => {
+					existingNames.set(s.name, index);
+				});
 
-			for (const server of servers) {
-				if (existingIds.has(server.id)) {
-					// 更新现有
-					const index = this.plugin.settings.mcpServers.findIndex(
-						(s) => s.id === server.id,
-					);
-					if (index !== -1) {
-						this.plugin.settings.mcpServers[index] = server;
+				let added = 0;
+				let updated = 0;
+
+				for (const server of servers) {
+					const existingIndex = existingNames.get(server.name);
+					if (existingIndex !== undefined) {
+						// 更新现有（保留原有 id）
+						const existingId =
+							this.plugin.settings.mcpServers[existingIndex].id;
+						this.plugin.settings.mcpServers[existingIndex] = {
+							...server,
+							id: existingId,
+						};
 						updated++;
+					} else {
+						// 添加新的
+						this.plugin.settings.mcpServers.push(server);
+						existingNames.set(
+							server.name,
+							this.plugin.settings.mcpServers.length - 1,
+						);
+						added++;
 					}
-				} else {
-					// 添加新的
-					this.plugin.settings.mcpServers.push(server);
-					added++;
 				}
-			}
 
-			void this.plugin.saveSettings().then(() => {
-				this.display();
-				new Notice(`导入完成: 新增 ${added} 个, 更新 ${updated} 个`);
-			});
+				void this.plugin.saveSettings().then(() => {
+					this.display();
+					new Notice(`导入完成: 新增 ${added} 个, 更新 ${updated} 个`);
+				});
+			}
 		});
 
 		modal.open();

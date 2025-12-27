@@ -233,9 +233,13 @@ export class McpServerModal extends Modal {
  * 支持直接粘贴 JSON 快速配置 MCP 服务器
  */
 export class JsonImportModal extends Modal {
-	private onImport: (servers: McpServerConfig[]) => void;
+	private onImport: (servers: McpServerConfig[], replaceAll: boolean) => void;
+	private replaceAll = false;
 
-	constructor(app: App, onImport: (servers: McpServerConfig[]) => void) {
+	constructor(
+		app: App,
+		onImport: (servers: McpServerConfig[], replaceAll: boolean) => void,
+	) {
 		super(app);
 		this.onImport = onImport;
 	}
@@ -249,21 +253,45 @@ export class JsonImportModal extends Modal {
 		const descEl = contentEl.createDiv({ cls: "setting-item-description" });
 		descEl.style.marginBottom = "1em";
 		descEl.innerHTML = `
-			粘贴 MCP 服务器配置 JSON（数组或单个对象）：<br><br>
-			<code style="font-size: 0.85em; background: var(--background-secondary); padding: 2px 4px; border-radius: 3px;">
-			[{ "id": "xxx", "name": "xxx", "type": "stdio", "command": "npx", "args": [...], "enabled": true }]
-			</code>
+			粘贴标准 MCP 配置格式：<br>
+			<pre style="font-size: 0.8em; background: var(--background-secondary); padding: 8px; border-radius: 4px; margin-top: 8px; overflow-x: auto;">
+{
+  "mcpServers": {
+    "server-name": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["package-name"]
+    }
+  }
+}</pre>
 		`;
 
 		// JSON 输入区域
 		const textAreaEl = contentEl.createEl("textarea", {
 			cls: "acp-json-import-textarea",
-			attr: { rows: "12", placeholder: '粘贴 JSON 配置...' },
+			attr: { rows: "10", placeholder: "粘贴 JSON 配置..." },
 		});
 		textAreaEl.style.width = "100%";
 		textAreaEl.style.fontFamily = "var(--font-monospace)";
 		textAreaEl.style.fontSize = "0.9em";
 		textAreaEl.style.resize = "vertical";
+
+		// 导入模式选择
+		const modeEl = contentEl.createDiv({ cls: "acp-import-mode" });
+		modeEl.style.marginTop = "1em";
+
+		new Setting(modeEl)
+			.setName("导入模式")
+			.setDesc("增量合并：按名称更新或新增；全量替换：清空后导入")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("merge", "增量合并（推荐）")
+					.addOption("replace", "全量替换")
+					.setValue("merge")
+					.onChange((value) => {
+						this.replaceAll = value === "replace";
+					}),
+			);
 
 		// 错误提示区域
 		const errorEl = contentEl.createDiv({
@@ -275,7 +303,7 @@ export class JsonImportModal extends Modal {
 
 		// 按钮
 		const btnEl = contentEl.createDiv({ cls: "modal-button-container" });
-		btnEl.style.marginTop = "1.5em";
+		btnEl.style.marginTop = "1em";
 
 		const importBtn = btnEl.createEl("button", {
 			cls: "mod-cta",
@@ -291,15 +319,23 @@ export class JsonImportModal extends Modal {
 
 			try {
 				const parsed = JSON.parse(json) as unknown;
-				const servers = this.validateAndNormalize(parsed);
+				const result = this.validateAndNormalize(parsed);
 
-				if (servers.length === 0) {
-					errorEl.textContent = "未找到有效的服务器配置";
+				if (result.servers.length === 0) {
+					errorEl.textContent =
+						result.errors.length > 0
+							? result.errors.join("；")
+							: "未找到有效的服务器配置";
 					errorEl.style.display = "block";
 					return;
 				}
 
-				this.onImport(servers);
+				// 如果有警告但也有有效配置，显示警告但继续
+				if (result.errors.length > 0) {
+					console.warn("[MCP Import]", result.errors);
+				}
+
+				this.onImport(result.servers, this.replaceAll);
 				this.close();
 			} catch (e) {
 				errorEl.textContent = `JSON 解析错误: ${(e as Error).message}`;
@@ -316,60 +352,163 @@ export class JsonImportModal extends Modal {
 
 	/**
 	 * 验证并规范化配置
+	 *
+	 * 支持标准 MCP 配置格式：
+	 * {
+	 *   "mcpServers": {
+	 *     "server-name": {
+	 *       "type": "stdio",
+	 *       "command": "npx",
+	 *       "args": ["package-name"]
+	 *     }
+	 *   }
+	 * }
 	 */
-	private validateAndNormalize(parsed: unknown): McpServerConfig[] {
+	private validateAndNormalize(parsed: unknown): {
+		servers: McpServerConfig[];
+		errors: string[];
+	} {
 		const servers: McpServerConfig[] = [];
+		const errors: string[] = [];
 
-		// 支持单个对象或数组
-		const items = Array.isArray(parsed) ? parsed : [parsed];
+		if (typeof parsed !== "object" || parsed === null) {
+			errors.push("无效的 JSON 格式");
+			return { servers, errors };
+		}
 
-		for (const item of items) {
-			if (typeof item !== "object" || item === null) {
+		const root = parsed as Record<string, unknown>;
+
+		// 检查是否是标准格式 { mcpServers: { ... } }
+		let mcpServersObj: Record<string, unknown> | null = null;
+
+		if (root.mcpServers && typeof root.mcpServers === "object") {
+			// 标准格式
+			mcpServersObj = root.mcpServers as Record<string, unknown>;
+		} else if (!root.mcpServers && !Array.isArray(root)) {
+			// 可能直接是 { "server-name": { ... } } 格式
+			// 检查第一个值是否像服务器配置
+			const firstKey = Object.keys(root)[0];
+			if (firstKey && typeof root[firstKey] === "object") {
+				const firstValue = root[firstKey] as Record<string, unknown>;
+				if (firstValue.type || firstValue.command || firstValue.url) {
+					mcpServersObj = root;
+				}
+			}
+		}
+
+		if (!mcpServersObj) {
+			errors.push("未找到 mcpServers 配置");
+			return { servers, errors };
+		}
+
+		// 遍历每个服务器配置
+		for (const [serverName, serverConfig] of Object.entries(mcpServersObj)) {
+			if (typeof serverConfig !== "object" || serverConfig === null) {
+				errors.push(`${serverName}: 配置无效`);
 				continue;
 			}
 
-			const obj = item as Record<string, unknown>;
+			const config = serverConfig as Record<string, unknown>;
+			const type = (config.type as string) || "stdio";
 
-			// 必需字段检查
-			if (!obj.name || typeof obj.name !== "string") {
+			// 验证类型
+			if (!["stdio", "http", "sse"].includes(type)) {
+				errors.push(`${serverName}: 不支持的类型 "${type}"`);
 				continue;
 			}
 
 			const server: McpServerConfig = {
-				id: (obj.id as string) || `mcp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-				name: obj.name,
-				type: (obj.type as "stdio" | "http" | "sse") || "stdio",
-				enabled: obj.enabled !== false, // 默认启用
+				id: `mcp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+				name: serverName,
+				type: type as "stdio" | "http" | "sse",
+				enabled: config.enabled !== false, // 默认启用
 			};
 
-			// stdio 类型
+			// stdio 类型验证
 			if (server.type === "stdio") {
-				server.command = (obj.command as string) || "npx";
-				server.args = Array.isArray(obj.args)
-					? (obj.args as string[])
+				const command = config.command as string | undefined;
+				if (!command) {
+					errors.push(`${serverName}: stdio 类型必须指定 command`);
+					continue;
+				}
+				server.command = command;
+				server.args = Array.isArray(config.args)
+					? (config.args as unknown[])
+							.filter((arg) => typeof arg === "string")
+							.map((arg) => arg as string)
 					: [];
 			}
 
-			// http/sse 类型
+			// http/sse 类型验证
 			if (server.type === "http" || server.type === "sse") {
-				server.url = obj.url as string;
-				if (Array.isArray(obj.headers)) {
-					server.headers = obj.headers as Array<{
-						name: string;
-						value: string;
-					}>;
+				const url = config.url as string | undefined;
+				if (!url) {
+					errors.push(`${serverName}: ${server.type} 类型必须指定 url`);
+					continue;
+				}
+				// 简单的 URL 格式验证
+				if (!url.startsWith("http://") && !url.startsWith("https://")) {
+					errors.push(`${serverName}: url 必须以 http:// 或 https:// 开头`);
+					continue;
+				}
+				server.url = url;
+
+				// headers 验证
+				if (config.headers) {
+					if (Array.isArray(config.headers)) {
+						server.headers = (config.headers as unknown[])
+							.filter(
+								(h): h is { name: string; value: string } =>
+									typeof h === "object" &&
+									h !== null &&
+									typeof (h as Record<string, unknown>).name ===
+										"string" &&
+									typeof (h as Record<string, unknown>).value ===
+										"string",
+							)
+							.map((h) => ({ name: h.name, value: h.value }));
+					} else if (typeof config.headers === "object") {
+						// 对象格式: { "Header-Name": "value" }
+						const headersObj = config.headers as Record<string, unknown>;
+						server.headers = Object.entries(headersObj)
+							.filter(([, v]) => typeof v === "string")
+							.map(([name, value]) => ({
+								name,
+								value: value as string,
+							}));
+					}
 				}
 			}
 
-			// 环境变量
-			if (Array.isArray(obj.env)) {
-				server.env = obj.env as Array<{ name: string; value: string }>;
+			// 环境变量验证 - 支持两种格式
+			if (config.env) {
+				if (Array.isArray(config.env)) {
+					// 数组格式: [{ name: "KEY", value: "VALUE" }]
+					server.env = (config.env as unknown[])
+						.filter(
+							(e): e is { name: string; value: string } =>
+								typeof e === "object" &&
+								e !== null &&
+								typeof (e as Record<string, unknown>).name === "string" &&
+								typeof (e as Record<string, unknown>).value === "string",
+						)
+						.map((e) => ({ name: e.name, value: e.value }));
+				} else if (typeof config.env === "object") {
+					// 对象格式: { KEY: "VALUE" } - 标准格式
+					const envObj = config.env as Record<string, unknown>;
+					server.env = Object.entries(envObj)
+						.filter(([, v]) => typeof v === "string" || typeof v === "number")
+						.map(([name, value]) => ({
+							name,
+							value: String(value),
+						}));
+				}
 			}
 
 			servers.push(server);
 		}
 
-		return servers;
+		return { servers, errors };
 	}
 
 	public onClose(): void {

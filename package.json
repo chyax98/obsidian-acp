@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-acp",
-	"version": "0.4.0",
+	"version": "0.4.1",
 	"description": "Agent Client Protocol integration for Obsidian - Connect with Claude Code, Goose, OpenCode and custom AI agents",
 	"main": "main.js",
 	"scripts": {

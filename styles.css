@@ -147,7 +147,7 @@
 
 /* 消息内容 */
 .acp-message-content {
-	font-size: 1em;
+	font-size: 0.9em;
 	line-height: 1.4;
 	word-wrap: break-word;
 	white-space: normal !important;

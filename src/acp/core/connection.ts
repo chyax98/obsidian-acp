@@ -690,6 +690,7 @@ export class AcpConnection {
 		// 获取 Agent 的 MCP 能力
 		const mcpCapabilities =
 			this.initializeResponse?.capabilities?.mcpCapabilities;
+		console.log(`[ACP] Agent MCP 能力:`, JSON.stringify(mcpCapabilities));
 
 		// 使用 McpConfigProcessor 获取配置，根据能力过滤
 		const mcpProcessor = new McpConfigProcessor(cwd, this.app);
@@ -706,6 +707,7 @@ export class AcpConnection {
 		console.log(
 			`[ACP] 发送 session/new 请求 (${mcpServers.length} 个 MCP 服务器)...`,
 		);
+		console.log(`[ACP] session/new 参数:`, JSON.stringify(params, null, 2));
 		const startTime = Date.now();
 
 		try {

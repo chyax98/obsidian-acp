@@ -108,8 +108,8 @@ npm run dev
 # 构建
 npm run build
 
-# 安装到 Vault（支持环境变量 ACP_DEV_VAULT）
-./install-to-vault.sh /path/to/vault
+# 部署到 Vault
+npm run deploy -- /path/to/vault
 ```
 
 ---

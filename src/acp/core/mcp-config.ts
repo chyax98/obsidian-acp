@@ -170,18 +170,21 @@ export class McpConfigProcessor {
 							value: this.replaceVariables(envVar.value),
 						}))
 					: [],
+			// OpenCode 要求 headers 必填，即使为空也要传空数组
 			headers:
 				server.headers && server.headers.length > 0
 					? server.headers.map((header) => ({
 							name: header.name,
 							value: this.replaceVariables(header.value),
 						}))
-					: undefined,
+					: [],
 		};
 	}
 
 	/**
 	 * 构建 sse 类型配置
+	 *
+	 * 注意：某些 Agent（如 OpenCode）不支持 sse 类型，会被能力过滤器过滤掉
 	 */
 	private buildSseConfig(server: McpServerConfig): SessionNewMcpServerConfig {
 		return {
@@ -201,12 +204,17 @@ export class McpConfigProcessor {
 							name: header.name,
 							value: this.replaceVariables(header.value),
 						}))
-					: undefined,
+					: [],
 		};
 	}
 
 	/**
 	 * 替换字符串中的变量
+	 *
+	 * 支持的变量格式：
+	 * - {VAULT_PATH} / ${VAULT_PATH} - Obsidian Vault 路径
+	 * - {USER_HOME} / ${USER_HOME} / $HOME - 用户主目录
+	 * - {PWD} / ${PWD} / $PWD - 当前工作目录
 	 */
 	private replaceVariables(value: string): string {
 		if (!value) return value;
@@ -217,8 +225,20 @@ export class McpConfigProcessor {
 		// 获取用户主目录
 		const userHome = process.env.HOME || process.env.USERPROFILE || "";
 
+		// 获取当前工作目录
+		const pwd = this.workingDir;
+
 		return value
-			.replace(/{VAULT_PATH}/g, vaultPath)
-			.replace(/{USER_HOME}/g, userHome);
+			// Vault 路径（先替换 ${} 格式，再替换 {} 格式）
+			.replace(/\$\{VAULT_PATH\}/g, vaultPath)
+			.replace(/\{VAULT_PATH\}/g, vaultPath)
+			// 用户主目录
+			.replace(/\$\{USER_HOME\}/g, userHome)
+			.replace(/\{USER_HOME\}/g, userHome)
+			.replace(/\$HOME\b/g, userHome)
+			// 当前工作目录
+			.replace(/\$\{PWD\}/g, pwd)
+			.replace(/\{PWD\}/g, pwd)
+			.replace(/\$PWD\b/g, pwd);
 	}
 }

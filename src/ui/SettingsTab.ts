@@ -14,7 +14,7 @@ import type AcpPlugin from "../main";
 import type { McpServerConfig } from "../main";
 import type { AcpBackendId } from "../acp/backends";
 import { ACP_BACKENDS, getAllBackends } from "../acp/backends/registry";
-import { McpServerModal } from "./McpServerModal";
+import { McpServerModal, JsonImportModal } from "./McpServerModal";
 
 /**
  * ACP 插件设置页面
@@ -323,16 +323,89 @@ export class AcpSettingTab extends PluginSettingTab {
 			}
 		}
 
-		// 添加 MCP server 按钮
-		const addBtn = containerEl.createEl("button", {
-			cls: "mod-cta",
-			text: "+ 添加 MCP 服务器",
+		// 按钮容器
+		const btnContainer = containerEl.createDiv({
+			cls: "acp-mcp-buttons",
 		});
-		addBtn.style.marginTop = "1em";
+		btnContainer.style.marginTop = "1em";
+		btnContainer.style.display = "flex";
+		btnContainer.style.gap = "0.5em";
 
+		// 添加 MCP server 按钮
+		const addBtn = btnContainer.createEl("button", {
+			cls: "mod-cta",
+			text: "+ 添加服务器",
+		});
 		addBtn.addEventListener("click", () => {
 			this.openMcpServerModal();
 		});
+
+		// 导入 JSON 按钮
+		const importBtn = btnContainer.createEl("button", {
+			text: "导入 JSON",
+		});
+		importBtn.addEventListener("click", () => {
+			this.openJsonImportModal();
+		});
+
+		// 导出 JSON 按钮
+		const exportBtn = btnContainer.createEl("button", {
+			text: "导出 JSON",
+		});
+		exportBtn.addEventListener("click", () => {
+			this.exportMcpServersJson();
+		});
+	}
+
+	/**
+	 * 导出 MCP 服务器配置为 JSON
+	 */
+	private exportMcpServersJson(): void {
+		const servers = this.plugin.settings.mcpServers;
+		const json = JSON.stringify(servers, null, 2);
+
+		void navigator.clipboard.writeText(json).then(() => {
+			new Notice("MCP 配置已复制到剪贴板");
+		});
+	}
+
+	/**
+	 * 打开 JSON 导入弹窗
+	 */
+	private openJsonImportModal(): void {
+		const modal = new JsonImportModal(this.app, (servers) => {
+			// 合并导入的服务器（按 id 去重）
+			const existingIds = new Set(
+				this.plugin.settings.mcpServers.map((s) => s.id),
+			);
+
+			let added = 0;
+			let updated = 0;
+
+			for (const server of servers) {
+				if (existingIds.has(server.id)) {
+					// 更新现有
+					const index = this.plugin.settings.mcpServers.findIndex(
+						(s) => s.id === server.id,
+					);
+					if (index !== -1) {
+						this.plugin.settings.mcpServers[index] = server;
+						updated++;
+					}
+				} else {
+					// 添加新的
+					this.plugin.settings.mcpServers.push(server);
+					added++;
+				}
+			}
+
+			void this.plugin.saveSettings().then(() => {
+				this.display();
+				new Notice(`导入完成: 新增 ${added} 个, 更新 ${updated} 个`);
+			});
+		});
+
+		modal.open();
 	}
 
 	/**

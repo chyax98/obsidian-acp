@@ -226,3 +226,153 @@ export class McpServerModal extends Modal {
 		this.contentEl.empty();
 	}
 }
+
+/**
+ * JSON 导入 Modal
+ *
+ * 支持直接粘贴 JSON 快速配置 MCP 服务器
+ */
+export class JsonImportModal extends Modal {
+	private onImport: (servers: McpServerConfig[]) => void;
+
+	constructor(app: App, onImport: (servers: McpServerConfig[]) => void) {
+		super(app);
+		this.onImport = onImport;
+	}
+
+	public onOpen(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		contentEl.createEl("h2", { text: "导入 MCP 服务器配置" });
+
+		const descEl = contentEl.createDiv({ cls: "setting-item-description" });
+		descEl.style.marginBottom = "1em";
+		descEl.innerHTML = `
+			粘贴 MCP 服务器配置 JSON（数组或单个对象）：<br><br>
+			<code style="font-size: 0.85em; background: var(--background-secondary); padding: 2px 4px; border-radius: 3px;">
+			[{ "id": "xxx", "name": "xxx", "type": "stdio", "command": "npx", "args": [...], "enabled": true }]
+			</code>
+		`;
+
+		// JSON 输入区域
+		const textAreaEl = contentEl.createEl("textarea", {
+			cls: "acp-json-import-textarea",
+			attr: { rows: "12", placeholder: '粘贴 JSON 配置...' },
+		});
+		textAreaEl.style.width = "100%";
+		textAreaEl.style.fontFamily = "var(--font-monospace)";
+		textAreaEl.style.fontSize = "0.9em";
+		textAreaEl.style.resize = "vertical";
+
+		// 错误提示区域
+		const errorEl = contentEl.createDiv({
+			cls: "acp-json-import-error",
+		});
+		errorEl.style.color = "var(--text-error)";
+		errorEl.style.marginTop = "0.5em";
+		errorEl.style.display = "none";
+
+		// 按钮
+		const btnEl = contentEl.createDiv({ cls: "modal-button-container" });
+		btnEl.style.marginTop = "1.5em";
+
+		const importBtn = btnEl.createEl("button", {
+			cls: "mod-cta",
+			text: "导入",
+		});
+		importBtn.addEventListener("click", () => {
+			const json = textAreaEl.value.trim();
+			if (!json) {
+				errorEl.textContent = "请输入 JSON 配置";
+				errorEl.style.display = "block";
+				return;
+			}
+
+			try {
+				const parsed = JSON.parse(json) as unknown;
+				const servers = this.validateAndNormalize(parsed);
+
+				if (servers.length === 0) {
+					errorEl.textContent = "未找到有效的服务器配置";
+					errorEl.style.display = "block";
+					return;
+				}
+
+				this.onImport(servers);
+				this.close();
+			} catch (e) {
+				errorEl.textContent = `JSON 解析错误: ${(e as Error).message}`;
+				errorEl.style.display = "block";
+			}
+		});
+
+		const cancelBtn = btnEl.createEl("button", { text: "取消" });
+		cancelBtn.style.marginLeft = "0.5em";
+		cancelBtn.addEventListener("click", () => {
+			this.close();
+		});
+	}
+
+	/**
+	 * 验证并规范化配置
+	 */
+	private validateAndNormalize(parsed: unknown): McpServerConfig[] {
+		const servers: McpServerConfig[] = [];
+
+		// 支持单个对象或数组
+		const items = Array.isArray(parsed) ? parsed : [parsed];
+
+		for (const item of items) {
+			if (typeof item !== "object" || item === null) {
+				continue;
+			}
+
+			const obj = item as Record<string, unknown>;
+
+			// 必需字段检查
+			if (!obj.name || typeof obj.name !== "string") {
+				continue;
+			}
+
+			const server: McpServerConfig = {
+				id: (obj.id as string) || `mcp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+				name: obj.name,
+				type: (obj.type as "stdio" | "http" | "sse") || "stdio",
+				enabled: obj.enabled !== false, // 默认启用
+			};
+
+			// stdio 类型
+			if (server.type === "stdio") {
+				server.command = (obj.command as string) || "npx";
+				server.args = Array.isArray(obj.args)
+					? (obj.args as string[])
+					: [];
+			}
+
+			// http/sse 类型
+			if (server.type === "http" || server.type === "sse") {
+				server.url = obj.url as string;
+				if (Array.isArray(obj.headers)) {
+					server.headers = obj.headers as Array<{
+						name: string;
+						value: string;
+					}>;
+				}
+			}
+
+			// 环境变量
+			if (Array.isArray(obj.env)) {
+				server.env = obj.env as Array<{ name: string; value: string }>;
+			}
+
+			servers.push(server);
+		}
+
+		return servers;
+	}
+
+	public onClose(): void {
+		this.contentEl.empty();
+	}
+}

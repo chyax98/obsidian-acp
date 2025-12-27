@@ -186,9 +186,9 @@ export default class AcpPlugin extends Plugin {
 			},
 		});
 
-		// 添加 Ribbon 图标
+		// 添加 Ribbon 图标（每次点击创建新窗口）
 		this.addRibbonIcon("bot", "ACP Agent Chat", () => {
-			void this.activateChatView();
+			void this.activateChatView(true);
 		});
 
 		// 发送选中文本到 ACP Chat

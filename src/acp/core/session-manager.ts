@@ -522,9 +522,7 @@ export class SessionManager {
 			this.onMessage(message, true);
 		}
 
-		// 根据 Agent 配置选择消息处理模式
-		const bufferMode =
-			this.streamingMode === "cumulative" ? "replace" : "accumulate";
+		// 使用 auto 模式：智能检测累积/增量/重叠情况
 		this.messageBuffer.append(
 			this.currentTurn.assistantMessage.id,
 			text,
@@ -534,7 +532,7 @@ export class SessionManager {
 					this.onMessage(this.currentTurn.assistantMessage, false);
 				}
 			},
-			bufferMode,
+			"auto",
 		);
 	}
 
@@ -579,17 +577,34 @@ export class SessionManager {
 		const text = content?.text || "";
 
 		if (text) {
-			// 根据 Agent 配置选择处理模式
-			if (this.streamingMode === "cumulative") {
-				// 累积模式：直接替换
-				this.currentTurn.thoughts = [text];
-			} else {
-				// 增量模式：追加到现有内容
-				const currentThought = this.currentTurn.thoughts[0] || "";
-				this.currentTurn.thoughts = [currentThought + text];
-			}
-			this.onThought(text);
+			// 智能合并思考内容
+			const currentThought = this.currentTurn.thoughts[0] || "";
+			this.currentTurn.thoughts = [this.smartMergeThought(currentThought, text)];
+			this.onThought(this.currentTurn.thoughts[0]);
 		}
+	}
+
+	/**
+	 * 智能合并思考内容
+	 */
+	private smartMergeThought(current: string, chunk: string): string {
+		if (!current) return chunk;
+		if (!chunk) return current;
+
+		// 累积模式检测
+		if (chunk.startsWith(current)) return chunk;
+		if (current.startsWith(chunk)) return current;
+
+		// 检测部分重叠
+		const maxOverlap = Math.min(current.length, chunk.length);
+		for (let overlap = maxOverlap; overlap > 0; overlap--) {
+			if (current.slice(-overlap) === chunk.slice(0, overlap)) {
+				return current + chunk.slice(overlap);
+			}
+		}
+
+		// 无重叠，追加
+		return current + chunk;
 	}
 
 	private handleToolCall(update: ToolCallUpdateData): void {
@@ -681,6 +696,9 @@ export class SessionManager {
 	}
 
 	private handleDisconnect(): void {
+		// 通知用户连接已断开
+		this.onError(new Error("Agent 连接已断开，请重新发送消息"));
+
 		if (this.currentTurn) {
 			this.completeTurn("error");
 		}

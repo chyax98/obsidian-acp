@@ -64,7 +64,7 @@ export class ToolCallContentRenderer {
 		const extractedInput = this.extractInputFromContext(toolCall);
 
 		// 始终显示工具基本信息，传递提取的输入以显示路径
-		this.renderToolInfo(contentEl, toolCall, extractedInput);
+		this.renderToolInfo(contentEl, toolCall, extractedInput, app);
 
 		// 渲染输入参数（仅当有 rawInput 且不是简单的路径时才显示详细输入区）
 		if (hasRawInput && toolCall.rawInput) {
@@ -121,6 +121,7 @@ export class ToolCallContentRenderer {
 		container: HTMLElement,
 		toolCall: ToolCall,
 		extractedInput?: Record<string, unknown> | null,
+		app?: App,
 	): void {
 		const infoSection = container.createDiv({
 			cls: "acp-tool-call-info",
@@ -149,10 +150,19 @@ export class ToolCallContentRenderer {
 		if (filePath) {
 			const pathRow = infoSection.createDiv({ cls: "acp-tool-info-row" });
 			pathRow.createSpan({ cls: "acp-tool-info-label", text: "文件" });
-			pathRow.createSpan({
+			const pathEl = pathRow.createSpan({
 				cls: "acp-tool-info-value acp-tool-info-path",
 				text: filePath,
 			});
+
+			// 添加点击跳转功能
+			if (app) {
+				pathEl.addClass("acp-tool-info-path-clickable");
+				pathEl.addEventListener("click", (e) => {
+					e.stopPropagation();
+					void this.openFileAtLocation(app, filePath);
+				});
+			}
 		}
 
 		// 显示命令（如果是 bash/execute 类型）

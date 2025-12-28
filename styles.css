@@ -748,6 +748,18 @@
 	word-break: break-all;
 }
 
+.acp-tool-info-path-clickable {
+	cursor: pointer;
+	text-decoration: underline;
+	text-decoration-style: dotted;
+	text-underline-offset: 2px;
+}
+
+.acp-tool-info-path-clickable:hover {
+	text-decoration-style: solid;
+	color: var(--interactive-accent-hover);
+}
+
 .acp-tool-info-command {
 	flex: 1;
 }

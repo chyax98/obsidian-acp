@@ -32,6 +32,8 @@ module.exports = {
 
 	// Mock 外部依赖
 	moduleNameMapper: {
+		// Mock Obsidian API (types-only package, no runtime entry)
+		'^obsidian$': '<rootDir>/tests/mocks/obsidian-module.ts',
 		// Mock Claude Agent SDK (ESM 模块)
 		'^@anthropic-ai/claude-agent-sdk$': '<rootDir>/tests/mocks/claude-sdk.ts',
 		// 路径别名

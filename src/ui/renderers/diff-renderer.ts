@@ -127,7 +127,6 @@ export class DiffRenderer {
 		newLines: string[],
 		lcs: number[][],
 	): DiffLine[] {
-		const result: DiffLine[] = [];
 		let i = oldLines.length;
 		let j = newLines.length;
 

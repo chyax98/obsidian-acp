@@ -101,19 +101,43 @@ describe('修复验证测试', () => {
 					timeout: 5000,
 				});
 
-				const timeout = setTimeout(() => {
+				let finished = false;
+				const finish = () => {
+					if (finished) return;
+					finished = true;
+					clearTimeout(killTimer);
+					clearTimeout(guard);
+					resolve();
+				};
+
+				// 2 秒后触发超时：仅杀进程，等待 close 事件再结束测试，避免留下 open handle
+				const killTimer = setTimeout(() => {
 					try {
 						proc.kill();
-						resolve(); // 超时处理成功
 					} catch (error) {
 						expect.fail(`无法杀死进程: ${error}`);
-						resolve();
+						finish();
 					}
-				}, 2000); // 2 秒后触发超时
+				}, 2000);
+
+				// 防止无限等待（kill 后仍未退出）
+				const guard = setTimeout(() => {
+					try {
+						proc.kill("SIGKILL");
+					} catch {
+						// ignore
+					}
+					expect.fail("进程在超时 kill 后仍未退出");
+					finish();
+				}, 6000);
 
 				proc.on('close', () => {
-					clearTimeout(timeout);
-					resolve();
+					finish();
+				});
+
+				proc.on('error', (error) => {
+					expect.fail(`进程启动失败: ${error.message}`);
+					finish();
 				});
 			});
 		});
@@ -127,24 +151,32 @@ describe('修复验证测试', () => {
 				});
 
 				let errorCaught = false;
+				let finished = false;
+
+				const finish = () => {
+					if (finished) return;
+					finished = true;
+					clearTimeout(guard);
+					resolve();
+				};
+
+				const guard = setTimeout(() => {
+					if (!errorCaught) {
+						expect.fail('应该捕获 ENOENT 错误');
+					}
+					finish();
+				}, 3000);
 
 				proc.on('error', (error) => {
 					errorCaught = true;
 					expect(error.message).toContain('ENOENT');
+					finish();
 				});
 
 				proc.on('close', () => {
 					expect(errorCaught).toBe(true);
-					resolve();
+					finish();
 				});
-
-				// 防止无限等待
-				setTimeout(() => {
-					if (!errorCaught) {
-						expect.fail('应该捕获 ENOENT 错误');
-					}
-					resolve();
-				}, 3000);
 			});
 		});
 	});

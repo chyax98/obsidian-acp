@@ -66,7 +66,6 @@ describe('修复验证测试', () => {
 			await new Promise<void>((resolve) => {
 				const proc = spawn('echo', ['hello'], {
 					stdio: 'pipe',
-					timeout: 5000,
 				});
 
 				let stdout = '';
@@ -98,7 +97,6 @@ describe('修复验证测试', () => {
 			await new Promise<void>((resolve) => {
 				const proc = spawn('sleep', ['30'], {
 					stdio: 'pipe',
-					timeout: 5000,
 				});
 
 				let finished = false;
@@ -147,7 +145,6 @@ describe('修复验证测试', () => {
 			await new Promise<void>((resolve) => {
 				const proc = spawn('non-existent-command-xyz', ['--version'], {
 					stdio: 'pipe',
-					timeout: 5000,
 				});
 
 				let errorCaught = false;

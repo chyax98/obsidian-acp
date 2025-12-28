@@ -28,6 +28,20 @@ export class ToolCallContentRenderer {
 	/** 渲染状态跟踪（按 toolCallId） */
 	private static renderStates: Map<string, RenderState> = new Map();
 
+	/** 工具名列表，用于排除从 title 中误提取 */
+	private static readonly TOOL_NAME_BLACKLIST = [
+		"read",
+		"write",
+		"edit",
+		"bash",
+		"execute",
+		"search",
+		"grep",
+		"glob",
+		"list",
+		"patch",
+	];
+
 	/**
 	 * 渲染工具调用内容（完整渲染）
 	 */
@@ -240,112 +254,135 @@ export class ToolCallContentRenderer {
 	): Record<string, unknown> | null {
 		const result: Record<string, unknown> = {};
 
-		// 工具名列表，用于排除从 title 中误提取
-		const toolNames = ["read", "write", "edit", "bash", "execute", "search", "grep", "glob", "list", "patch"];
-
-		// 1. 优先从 locations 中提取（最可靠）
-		if (toolCall.locations && toolCall.locations.length > 0) {
-			result.path = toolCall.locations[0].path;
-			if (toolCall.locations[0].line) {
-				result.line = toolCall.locations[0].line;
-			}
-		}
-
-		// 2. 从 title 中提取文件路径
-		// 格式可能是: "读取 /path/to/file", "Read /path/to/file", "编辑 xxx:10" 等
+		this.applyLocationsExtraction(result, toolCall);
 		if (!result.path && toolCall.title) {
-			const title = toolCall.title;
-
-			// 匹配 "读取 path" 或 "Read path" 格式
-			const readMatch = title.match(/^(?:读取|Read)\s+(.+)$/i);
-			if (readMatch) {
-				const extracted = readMatch[1].trim();
-				// 排除工具名作为路径
-				if (!toolNames.includes(extracted.toLowerCase()) && extracted.includes("/")) {
-					result.path = extracted;
-				}
-			}
-
-			// 匹配 "编辑 path:line" 格式
-			const editMatch = title.match(/^(?:编辑|Edit)\s+(.+?)(?::(\d+))?$/i);
-			if (editMatch && !result.path) {
-				const extracted = editMatch[1].trim();
-				if (!toolNames.includes(extracted.toLowerCase()) && extracted.includes("/")) {
-					result.path = extracted;
-					if (editMatch[2]) {
-						result.line = parseInt(editMatch[2], 10);
-					}
-				}
-			}
-
-			// 匹配 "搜索 pattern" 格式
-			const searchMatch = title.match(/^(?:搜索|Search|Grep)\s+"?(.+?)"?$/i);
-			if (searchMatch) {
-				const extracted = searchMatch[1].trim();
-				if (!toolNames.includes(extracted.toLowerCase())) {
-					result.pattern = extracted;
-				}
-			}
-
-			// 匹配 "执行 command" 格式
-			const execMatch = title.match(/^(?:执行|Execute|Bash)(?::\s*|\s+)(.+)$/i);
-			if (execMatch) {
-				result.command = execMatch[1].trim();
-			}
-
-			// 直接从 title 提取路径（如果 title 本身就是路径）
-			if (!result.path) {
-				const pathInTitle = title.match(/(\/[^\s:]+(?:\.[a-zA-Z0-9]+)?)/);
-				if (pathInTitle) {
-					result.path = pathInTitle[1];
-				}
-			}
+			this.applyTitleExtraction(result, toolCall.title);
 		}
-
-		// 3. 从 content 中提取文件路径
 		if (!result.path && toolCall.content && toolCall.content.length > 0) {
-			for (const content of toolCall.content) {
-				if (content.type === "content" && content.content?.type === "text") {
-					const text = content.content.text || "";
-
-					// 匹配 <file>path</file> 标签
-					const fileTagMatch = text.match(/<file>([^<]+)<\/file>/);
-					if (fileTagMatch) {
-						result.path = fileTagMatch[1].trim();
-						break;
-					}
-
-					// 匹配 "File: /path" 或 "文件: /path" 格式
-					const fileLineMatch = text.match(/^(?:File|文件)[:\s]+(.+)$/im);
-					if (fileLineMatch) {
-						result.path = fileLineMatch[1].trim();
-						break;
-					}
-
-					// 匹配文件路径格式（以 / 开头，必须有扩展名或多级目录）
-					const pathMatch = text.match(/^(\/(?:[^/\s]+\/)+[^/\s]+|\/[^/\s]+\.[a-zA-Z0-9]+)/m);
-					if (pathMatch) {
-						result.path = pathMatch[1];
-						break;
-					}
-
-					// 匹配 Windows 路径
-					const winPathMatch = text.match(/^([a-zA-Z]:\\[^\s\n]+)/m);
-					if (winPathMatch) {
-						result.path = winPathMatch[1];
-						break;
-					}
-				}
-
-				// 从 diff 内容中提取路径
-				if (content.type === "diff" && content.path) {
-					result.path = content.path;
-					break;
-				}
-			}
+			this.applyContentExtraction(result, toolCall.content);
 		}
 
 		return Object.keys(result).length > 0 ? result : null;
+	}
+
+	private static applyLocationsExtraction(
+		result: Record<string, unknown>,
+		toolCall: ToolCall,
+	): void {
+		if (!toolCall.locations || toolCall.locations.length === 0) return;
+		result.path = toolCall.locations[0].path;
+		if (toolCall.locations[0].line) {
+			result.line = toolCall.locations[0].line;
+		}
+	}
+
+	private static applyTitleExtraction(
+		result: Record<string, unknown>,
+		title: string,
+	): void {
+		const toolNames = this.TOOL_NAME_BLACKLIST;
+
+		// 匹配 "读取 path" 或 "Read path" 格式
+		const readMatch = title.match(/^(?:读取|Read)\s+(.+)$/i);
+		if (readMatch) {
+			const extracted = readMatch[1].trim();
+			// 排除工具名作为路径
+			if (
+				!toolNames.includes(extracted.toLowerCase()) &&
+				extracted.includes("/")
+			) {
+				result.path = extracted;
+			}
+		}
+
+		// 匹配 "编辑 path:line" 格式
+		const editMatch = title.match(/^(?:编辑|Edit)\s+(.+?)(?::(\d+))?$/i);
+		if (editMatch && !result.path) {
+			const extracted = editMatch[1].trim();
+			if (
+				!toolNames.includes(extracted.toLowerCase()) &&
+				extracted.includes("/")
+			) {
+				result.path = extracted;
+				if (editMatch[2]) {
+					result.line = parseInt(editMatch[2], 10);
+				}
+			}
+		}
+
+		// 匹配 "搜索 pattern" 格式
+		const searchMatch = title.match(/^(?:搜索|Search|Grep)\s+"?(.+?)"?$/i);
+		if (searchMatch) {
+			const extracted = searchMatch[1].trim();
+			if (!toolNames.includes(extracted.toLowerCase())) {
+				result.pattern = extracted;
+			}
+		}
+
+		// 匹配 "执行 command" 格式
+		const execMatch = title.match(
+			/^(?:执行|Execute|Bash)(?::\s*|\s+)(.+)$/i,
+		);
+		if (execMatch) {
+			result.command = execMatch[1].trim();
+		}
+
+		// 直接从 title 提取路径（如果 title 本身就是路径）
+		if (!result.path) {
+			const pathInTitle = title.match(
+				/(\/[^\s:]+(?:\.[a-zA-Z0-9]+)?)/,
+			);
+			if (pathInTitle) {
+				result.path = pathInTitle[1];
+			}
+		}
+	}
+
+	private static applyContentExtraction(
+		result: Record<string, unknown>,
+		contents: ToolCallContent[],
+	): void {
+		for (const content of contents) {
+			if (content.type === "content" && content.content?.type === "text") {
+				const text = content.content.text || "";
+
+				// 匹配 <file>path</file> 标签
+				const fileTagMatch = text.match(/<file>([^<]+)<\/file>/);
+				if (fileTagMatch) {
+					result.path = fileTagMatch[1].trim();
+					break;
+				}
+
+				// 匹配 "File: /path" 或 "文件: /path" 格式
+				const fileLineMatch = text.match(/^(?:File|文件)[:\s]+(.+)$/im);
+				if (fileLineMatch) {
+					result.path = fileLineMatch[1].trim();
+					break;
+				}
+
+				// 匹配文件路径格式（以 / 开头，必须有扩展名或多级目录）
+				const pathMatch = text.match(
+					/^(\/(?:[^/\s]+\/)+[^/\s]+|\/[^/\s]+\.[a-zA-Z0-9]+)/m,
+				);
+				if (pathMatch) {
+					result.path = pathMatch[1];
+					break;
+				}
+
+				// 匹配 Windows 路径
+				const winPathMatch = text.match(/^([a-zA-Z]:\\[^\s\n]+)/m);
+				if (winPathMatch) {
+					result.path = winPathMatch[1];
+					break;
+				}
+			}
+
+			// 从 diff 内容中提取路径
+			if (content.type === "diff" && content.path) {
+				result.path = content.path;
+				break;
+			}
+		}
 	}
 
 	/**

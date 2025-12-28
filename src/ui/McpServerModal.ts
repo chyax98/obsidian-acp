@@ -372,144 +372,175 @@ export class JsonImportModal extends Modal {
 		const servers: McpServerConfig[] = [];
 		const errors: string[] = [];
 
+		const mcpServersObj = this.findMcpServersObject(parsed, errors);
+		if (!mcpServersObj) return { servers, errors };
+
+		for (const [serverName, serverConfig] of Object.entries(mcpServersObj)) {
+			const server = this.parseServerConfig(serverName, serverConfig, errors);
+			if (server) servers.push(server);
+		}
+
+		return { servers, errors };
+	}
+
+	private findMcpServersObject(
+		parsed: unknown,
+		errors: string[],
+	): Record<string, unknown> | null {
 		if (typeof parsed !== "object" || parsed === null) {
 			errors.push("无效的 JSON 格式");
-			return { servers, errors };
+			return null;
 		}
 
 		const root = parsed as Record<string, unknown>;
 
-		// 检查是否是标准格式 { mcpServers: { ... } }
-		let mcpServersObj: Record<string, unknown> | null = null;
-
+		// 标准格式 { mcpServers: { ... } }
 		if (root.mcpServers && typeof root.mcpServers === "object") {
-			// 标准格式
-			mcpServersObj = root.mcpServers as Record<string, unknown>;
-		} else if (!root.mcpServers && !Array.isArray(root)) {
-			// 可能直接是 { "server-name": { ... } } 格式
-			// 检查第一个值是否像服务器配置
+			return root.mcpServers as Record<string, unknown>;
+		}
+
+		// 兼容格式：直接是 { "server-name": { ... } }
+		if (!root.mcpServers && !Array.isArray(root)) {
 			const firstKey = Object.keys(root)[0];
-			if (firstKey && typeof root[firstKey] === "object") {
+			if (firstKey && typeof root[firstKey] === "object" && root[firstKey]) {
 				const firstValue = root[firstKey] as Record<string, unknown>;
 				if (firstValue.type || firstValue.command || firstValue.url) {
-					mcpServersObj = root;
+					return root;
 				}
 			}
 		}
 
-		if (!mcpServersObj) {
-			errors.push("未找到 mcpServers 配置");
-			return { servers, errors };
+		errors.push("未找到 mcpServers 配置");
+		return null;
+	}
+
+	private parseServerConfig(
+		serverName: string,
+		serverConfig: unknown,
+		errors: string[],
+	): McpServerConfig | null {
+		if (typeof serverConfig !== "object" || serverConfig === null) {
+			errors.push(`${serverName}: 配置无效`);
+			return null;
 		}
 
-		// 遍历每个服务器配置
-		for (const [serverName, serverConfig] of Object.entries(mcpServersObj)) {
-			if (typeof serverConfig !== "object" || serverConfig === null) {
-				errors.push(`${serverName}: 配置无效`);
-				continue;
-			}
-
-			const config = serverConfig as Record<string, unknown>;
-			const type = (config.type as string) || "stdio";
-
-			// 验证类型
-			if (!["stdio", "http", "sse"].includes(type)) {
-				errors.push(`${serverName}: 不支持的类型 "${type}"`);
-				continue;
-			}
-
-			const server: McpServerConfig = {
-				id: `mcp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-				name: serverName,
-				type: type as "stdio" | "http" | "sse",
-				enabled: config.enabled !== false, // 默认启用
-			};
-
-			// stdio 类型验证
-			if (server.type === "stdio") {
-				const command = config.command as string | undefined;
-				if (!command) {
-					errors.push(`${serverName}: stdio 类型必须指定 command`);
-					continue;
-				}
-				server.command = command;
-				server.args = Array.isArray(config.args)
-					? (config.args as unknown[])
-							.filter((arg) => typeof arg === "string")
-							.map((arg) => arg as string)
-					: [];
-			}
-
-			// http/sse 类型验证
-			if (server.type === "http" || server.type === "sse") {
-				const url = config.url as string | undefined;
-				if (!url) {
-					errors.push(`${serverName}: ${server.type} 类型必须指定 url`);
-					continue;
-				}
-				// 简单的 URL 格式验证
-				if (!url.startsWith("http://") && !url.startsWith("https://")) {
-					errors.push(`${serverName}: url 必须以 http:// 或 https:// 开头`);
-					continue;
-				}
-				server.url = url;
-
-				// headers 验证
-				if (config.headers) {
-					if (Array.isArray(config.headers)) {
-						server.headers = (config.headers as unknown[])
-							.filter(
-								(h): h is { name: string; value: string } =>
-									typeof h === "object" &&
-									h !== null &&
-									typeof (h as Record<string, unknown>).name ===
-										"string" &&
-									typeof (h as Record<string, unknown>).value ===
-										"string",
-							)
-							.map((h) => ({ name: h.name, value: h.value }));
-					} else if (typeof config.headers === "object") {
-						// 对象格式: { "Header-Name": "value" }
-						const headersObj = config.headers as Record<string, unknown>;
-						server.headers = Object.entries(headersObj)
-							.filter(([, v]) => typeof v === "string")
-							.map(([name, value]) => ({
-								name,
-								value: value as string,
-							}));
-					}
-				}
-			}
-
-			// 环境变量验证 - 支持两种格式
-			if (config.env) {
-				if (Array.isArray(config.env)) {
-					// 数组格式: [{ name: "KEY", value: "VALUE" }]
-					server.env = (config.env as unknown[])
-						.filter(
-							(e): e is { name: string; value: string } =>
-								typeof e === "object" &&
-								e !== null &&
-								typeof (e as Record<string, unknown>).name === "string" &&
-								typeof (e as Record<string, unknown>).value === "string",
-						)
-						.map((e) => ({ name: e.name, value: e.value }));
-				} else if (typeof config.env === "object") {
-					// 对象格式: { KEY: "VALUE" } - 标准格式
-					const envObj = config.env as Record<string, unknown>;
-					server.env = Object.entries(envObj)
-						.filter(([, v]) => typeof v === "string" || typeof v === "number")
-						.map(([name, value]) => ({
-							name,
-							value: String(value),
-						}));
-				}
-			}
-
-			servers.push(server);
+		const config = serverConfig as Record<string, unknown>;
+		const type = (config.type as string) || "stdio";
+		if (!["stdio", "http", "sse"].includes(type)) {
+			errors.push(`${serverName}: 不支持的类型 "${type}"`);
+			return null;
 		}
 
-		return { servers, errors };
+		const server: McpServerConfig = {
+			id: this.createServerId(),
+			name: serverName,
+			type: type as "stdio" | "http" | "sse",
+			enabled: config.enabled !== false, // 默认启用
+		};
+
+		if (server.type === "stdio") {
+			const command = typeof config.command === "string" ? config.command : "";
+			if (!command) {
+				errors.push(`${serverName}: stdio 类型必须指定 command`);
+				return null;
+			}
+			server.command = command;
+			server.args = this.normalizeArgs(config.args);
+		}
+
+		if (server.type === "http" || server.type === "sse") {
+			const url = typeof config.url === "string" ? config.url : "";
+			if (!url) {
+				errors.push(`${serverName}: ${server.type} 类型必须指定 url`);
+				return null;
+			}
+			if (!url.startsWith("http://") && !url.startsWith("https://")) {
+				errors.push(`${serverName}: url 必须以 http:// 或 https:// 开头`);
+				return null;
+			}
+
+			server.url = url;
+			const headers = this.normalizeHeaders(config.headers);
+			if (headers) server.headers = headers;
+		}
+
+		const env = this.normalizeEnv(config.env);
+		if (env) server.env = env;
+
+		return server;
+	}
+
+	private createServerId(): string {
+		return `mcp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+	}
+
+	private normalizeArgs(value: unknown): string[] {
+		if (!Array.isArray(value)) return [];
+		return (value as unknown[])
+			.filter((arg) => typeof arg === "string")
+			.map((arg) => arg as string);
+	}
+
+	private normalizeHeaders(
+		value: unknown,
+	): Array<{ name: string; value: string }> | undefined {
+		if (!value) return undefined;
+
+		// 数组格式: [{ name, value }]
+		if (Array.isArray(value)) {
+			const headers = (value as unknown[])
+				.filter(
+					(h): h is { name: string; value: string } =>
+						typeof h === "object" &&
+						h !== null &&
+						typeof (h as Record<string, unknown>).name === "string" &&
+						typeof (h as Record<string, unknown>).value === "string",
+				)
+				.map((h) => ({ name: h.name, value: h.value }));
+			return headers.length > 0 ? headers : undefined;
+		}
+
+		// 对象格式: { "Header-Name": "value" }
+		if (typeof value === "object") {
+			const headersObj = value as Record<string, unknown>;
+			const headers = Object.entries(headersObj)
+				.filter(([, v]) => typeof v === "string")
+				.map(([name, v]) => ({ name, value: v as string }));
+			return headers.length > 0 ? headers : undefined;
+		}
+
+		return undefined;
+	}
+
+	private normalizeEnv(
+		value: unknown,
+	): Array<{ name: string; value: string }> | undefined {
+		if (!value) return undefined;
+
+		// 数组格式: [{ name: "KEY", value: "VALUE" }]
+		if (Array.isArray(value)) {
+			const env = (value as unknown[])
+				.filter(
+					(e): e is { name: string; value: string } =>
+						typeof e === "object" &&
+						e !== null &&
+						typeof (e as Record<string, unknown>).name === "string" &&
+						typeof (e as Record<string, unknown>).value === "string",
+				)
+				.map((e) => ({ name: e.name, value: e.value }));
+			return env.length > 0 ? env : undefined;
+		}
+
+		// 对象格式: { KEY: "VALUE" } - 标准格式
+		if (typeof value === "object") {
+			const envObj = value as Record<string, unknown>;
+			const env = Object.entries(envObj)
+				.filter(([, v]) => typeof v === "string" || typeof v === "number")
+				.map(([name, v]) => ({ name, value: String(v) }));
+			return env.length > 0 ? env : undefined;
+		}
+
+		return undefined;
 	}
 
 	public onClose(): void {

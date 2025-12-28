@@ -2,7 +2,7 @@
  * 验证关键修复是否真的能工作
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect } from '@jest/globals';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';

@@ -113,13 +113,9 @@ export class PermissionModal extends Modal {
 	}
 
 	private isHighRiskTool(toolName: string): boolean {
-		const highRiskTools = [
-			"fs/write",
-			"fs/delete",
-			"fs/move",
-			"bash/run",
-			"bash/background",
-		];
+		// 当前项目传入的 toolName 实际上是 ACP 的 ToolCallKind（如 "edit"/"delete"/"execute"）
+		// 因此这里按“高风险类别”判断，而不是按具体工具路径（fs/write 等）。
+		const highRiskTools = ["edit", "delete", "move", "execute"];
 		return highRiskTools.includes(toolName);
 	}
 }

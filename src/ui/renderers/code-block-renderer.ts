@@ -148,7 +148,9 @@ export class CodeBlockRenderer {
 
 		// 如果检测到行号格式，清理所有行
 		if (matchedPattern) {
-			return lines.map((line) => line.replace(matchedPattern!, "")).join("\n");
+			// 将匹配模式收窄为 const，避免在闭包中触发非空断言
+			const pattern = matchedPattern;
+			return lines.map((line) => line.replace(pattern, "")).join("\n");
 		}
 
 		// 处理 <file> 标签包裹的内容

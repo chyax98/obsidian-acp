@@ -28,3 +28,6 @@ export type {
 
 export { HistoryManager } from "./history-manager";
 export type { HistoryManagerCallbacks } from "./history-manager";
+
+export { exportChatSessionMarkdown } from "./chat-export";
+export { requestPermissionWithModal } from "./permission-request";

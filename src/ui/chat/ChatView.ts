@@ -5,7 +5,7 @@
  */
 
 import type { WorkspaceLeaf } from "obsidian";
-import { ItemView, Notice, Component, setIcon, TFolder, normalizePath } from "obsidian";
+import { ItemView, Notice, Component, setIcon } from "obsidian";
 import type AcpPlugin from "../../main";
 import type { SessionManager } from "../../acp/core/session-manager";
 import type { AcpConnection } from "../../acp/core/connection";
@@ -16,7 +16,6 @@ import type {
 	SessionState,
 } from "../../acp/core/session-manager";
 import type { SessionModeState } from "../../acp/types";
-import { PermissionModal } from "../PermissionModal";
 import type {
 	RequestPermissionParams,
 	PermissionOutcome,
@@ -48,6 +47,8 @@ import {
 	ObsidianContextGenerator,
 	ConnectionManager,
 	HistoryManager,
+	exportChatSessionMarkdown,
+	requestPermissionWithModal,
 } from "./helpers";
 
 /** ChatView 的唯一标识符 */
@@ -136,10 +137,7 @@ export class AcpChatView extends ItemView {
 		this.markdownComponent.unload();
 	}
 
-	// ========================================================================
-	// 初始化
-	// ========================================================================
-
+	// ===== 初始化 =====
 	private async initializeManagers(): Promise<void> {
 		// 滚动管理
 		this.scrollHelper = new ScrollHelper(this.messagesEl);
@@ -240,9 +238,7 @@ export class AcpChatView extends ItemView {
 		this.updateAgentSelectorState();
 	}
 
-	// ========================================================================
-	// UI 创建
-	// ========================================================================
+	// ===== UI 创建 =====
 
 	private createHeader(container: HTMLElement): void {
 		this.headerEl = container.createDiv({ cls: "acp-chat-header-compact" });
@@ -465,9 +461,7 @@ export class AcpChatView extends ItemView {
 		});
 	}
 
-	// ========================================================================
-	// 连接与会话
-	// ========================================================================
+	// ===== 连接与会话 =====
 
 	private getWorkingDirectory(): string {
 		try {
@@ -549,38 +543,7 @@ export class AcpChatView extends ItemView {
 		}
 
 		try {
-			const exportFolder = "export-acp-agent";
-			const existingFolder = this.app.vault.getAbstractFileByPath(exportFolder);
-			if (!existingFolder) {
-				await this.app.vault.createFolder(exportFolder);
-			} else if (!(existingFolder instanceof TFolder)) {
-				throw new Error(
-					`无法创建导出文件夹：路径已被文件占用 (${exportFolder})`,
-				);
-			}
-
-			const markdown = sm.toMarkdown();
-			const timestamp = new Date().toISOString().slice(0, 10);
-			const firstMsg =
-				sm.turns[0]?.userMessage.content
-					.slice(0, 30)
-					.replace(/[/\\?%*:|"<>]/g, "-") || "chat";
-			const fileName = `ACP-${timestamp}-${firstMsg}.md`;
-
-			const basePath = normalizePath(`${exportFolder}/${fileName}`);
-			let finalPath = basePath;
-			if (this.app.vault.getAbstractFileByPath(finalPath)) {
-				finalPath = normalizePath(
-					`${exportFolder}/ACP-${Date.now()}-${firstMsg.slice(0, 20)}.md`,
-				);
-			}
-			// 极端情况下（同毫秒重复导出）避免冲突
-			while (this.app.vault.getAbstractFileByPath(finalPath)) {
-				finalPath = normalizePath(
-					`${exportFolder}/ACP-${Date.now()}-${Math.floor(Math.random() * 10000)}-${firstMsg.slice(0, 20)}.md`,
-				);
-			}
-			await this.app.vault.create(finalPath, markdown);
+			const finalPath = await exportChatSessionMarkdown(this.app, sm);
 			new Notice(`对话已导出到: ${finalPath}`);
 		} catch (error) {
 			logError("[ChatView] 导出失败:", error);
@@ -612,9 +575,7 @@ export class AcpChatView extends ItemView {
 		}
 	}
 
-	// ========================================================================
-	// 会话回调
-	// ========================================================================
+	// ===== 会话回调 =====
 
 	private setupSessionCallbacks(sm: SessionManager): void {
 		sm.onMessage = (msg, isNew) => this.handleMessage(msg, isNew);
@@ -703,54 +664,14 @@ export class AcpChatView extends ItemView {
 	private async handlePermissionRequest(
 		params: RequestPermissionParams,
 	): Promise<PermissionOutcome> {
-		return new Promise((resolve) => {
-			try {
-				const modal = new PermissionModal(
-					this.app,
-					{
-						toolCallId: params.toolCall?.toolCallId || "",
-						toolName: params.toolCall?.kind || "",
-						title: params.toolCall?.title || "",
-						kind: params.toolCall?.kind || "",
-						rawInput: params.toolCall?.rawInput || {},
-					},
-					(response) => {
-						if (response.outcome === "selected") {
-							const actionText = response.optionId?.includes(
-								"reject",
-							)
-								? "✗ 已拒绝"
-								: "✓ 已允许";
-							this.addSystemMessage(
-								`${actionText}: ${params.toolCall.title || "操作"}`,
-							);
-						} else {
-							this.addSystemMessage(
-								`⚠ 已取消: ${params.toolCall.title || "操作"}`,
-							);
-						}
-						resolve(
-							response.outcome === "cancelled"
-								? { type: "cancelled" }
-								: {
-										type: "selected",
-										optionId:
-											response.optionId || "reject-once",
-									},
-						);
-					},
-				);
-				modal.open();
-			} catch (error) {
-				logError("[ChatView] 权限请求处理失败:", error);
-				resolve({ type: "cancelled" });
-			}
-		});
+		return await requestPermissionWithModal(
+			this.app,
+			params,
+			(text) => this.addSystemMessage(text),
+		);
 	}
 
-	// ========================================================================
-	// 用户操作
-	// ========================================================================
+	// ===== 用户操作 =====
 
 	private async handleSend(): Promise<void> {
 		let text = this.inputEl.value.trim();
@@ -822,9 +743,7 @@ export class AcpChatView extends ItemView {
 		this.commandMenu?.hide();
 	}
 
-	// ========================================================================
-	// 模式选择（注意：模型切换不支持，ACP 协议没有定义模型切换方法）
-	// ========================================================================
+	// ===== 模式选择（注意：模型切换不支持，ACP 协议没有定义模型切换方法）=====
 
 	private updateModeSelector(state: SessionModeState): void {
 		if (!this.modeSelectorEl) return;
@@ -862,9 +781,7 @@ export class AcpChatView extends ItemView {
 		}
 	}
 
-	// ========================================================================
-	// UI 状态
-	// ========================================================================
+	// ===== UI 状态 =====
 
 	private addSystemMessage(text: string): void {
 		const el = this.messagesEl.createDiv({
@@ -1026,9 +943,7 @@ export class AcpChatView extends ItemView {
 			this.backToCurrentButton.style.display = "";
 	}
 
-	// ========================================================================
-	// 会话历史
-	// ========================================================================
+	// ===== 会话历史 =====
 
 	public async getSessionHistory(): Promise<SessionMeta[]> {
 		return (await this.historyManager?.listSessions()) ?? [];
@@ -1075,9 +990,7 @@ export class AcpChatView extends ItemView {
 		}
 	}
 
-	// ========================================================================
-	// 公共方法
-	// ========================================================================
+	// ===== 公共方法 =====
 
 	public appendText(text: string): void {
 		this.inputEl.value += text;

@@ -262,6 +262,7 @@ export class SessionExporter {
 		const icons: Record<ToolCallStatus, string> = {
 			completed: "✅",
 			failed: "❌",
+			blocked: "🛡️",
 			in_progress: "⏳",
 			pending: "⏸️",
 		};

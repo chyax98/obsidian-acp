@@ -2,9 +2,11 @@
  * Obsidian 上下文生成器
  *
  * 生成发送给 AI 的 Obsidian Vault 上下文信息
+ * 支持自定义系统提示词和预设
  */
 
 import type { App, TFolder } from "obsidian";
+import type { AcpPluginSettings, PromptPreset } from "../../../main";
 
 /**
  * 上下文生成配置
@@ -25,14 +27,17 @@ export class ObsidianContextGenerator {
 	private app: App;
 	private config: ContextConfig;
 	private getWorkingDirectory: () => string;
+	private getSettings: () => AcpPluginSettings;
 
 	constructor(
 		app: App,
 		getWorkingDirectory: () => string,
+		getSettings: () => AcpPluginSettings,
 		config: Partial<ContextConfig> = {},
 	) {
 		this.app = app;
 		this.getWorkingDirectory = getWorkingDirectory;
+		this.getSettings = getSettings;
 		this.config = { ...DEFAULT_CONFIG, ...config };
 	}
 
@@ -40,22 +45,31 @@ export class ObsidianContextGenerator {
 	 * 生成完整的 Obsidian 上下文
 	 */
 	public generate(): string {
-		const vault = this.app.vault;
+		const settings = this.getSettings();
 		const parts: string[] = [];
 
-		// 系统角色说明
-		parts.push("[System Context]");
-		parts.push(
-			"You are working in an Obsidian vault - a local knowledge base with interconnected markdown notes.",
-		);
-		parts.push(
-			"The user may reference files using @path syntax. You can read and write files in this vault.",
-		);
-		parts.push("");
+		// Layer 1: 用户自定义系统提示词
+		if (settings.systemPrompt && settings.systemPrompt.trim()) {
+			parts.push("[System Instructions]");
+			parts.push(settings.systemPrompt.trim());
+			parts.push("");
+		}
+
+		// Layer 2: 激活的预设
+		if (settings.activePresetId) {
+			const preset = settings.promptPresets.find(
+				(p) => p.id === settings.activePresetId,
+			);
+			if (preset) {
+				parts.push(`[Style: ${preset.name}]`);
+				parts.push(preset.content);
+				parts.push("");
+			}
+		}
 
 		// Vault 信息
 		parts.push("[Vault Info]");
-		parts.push(`- Name: ${vault.getName()}`);
+		parts.push(`- Name: ${this.app.vault.getName()}`);
 
 		// 工作目录
 		try {
@@ -65,37 +79,41 @@ export class ObsidianContextGenerator {
 			// 忽略
 		}
 
-		// 统计
-		const stats = this.getVaultStats();
-		parts.push(
-			`- Stats: ${stats.mdFiles} notes, ${stats.otherFiles} attachments, ${stats.folders} folders`,
-		);
-
-		// 顶级目录结构
-		const topFolders = this.getTopFolders();
-		if (topFolders.length > 0) {
-			parts.push(`- Top folders: ${topFolders.join(", ")}`);
-		}
-
-		parts.push("");
-
 		// 当前上下文
-		parts.push("[Current Context]");
 		const activeFile = this.app.workspace.getActiveFile();
 		if (activeFile) {
 			parts.push(`- Active file: ${activeFile.path}`);
-		} else {
-			parts.push("- No file currently open");
 		}
 
-		// Obsidian 语法提示
 		parts.push("");
+
+		// Obsidian 语法提示
 		parts.push("[Obsidian Syntax]");
 		parts.push("- Internal links: [[note]] or [[folder/note]]");
 		parts.push("- Tags: #tag or #nested/tag");
 		parts.push("- Frontmatter: YAML between --- at file start");
 
 		return parts.join("\n");
+	}
+
+	/**
+	 * 获取当前激活的预设
+	 */
+	public getActivePreset(): PromptPreset | null {
+		const settings = this.getSettings();
+		if (!settings.activePresetId) return null;
+		return (
+			settings.promptPresets.find(
+				(p) => p.id === settings.activePresetId,
+			) || null
+		);
+	}
+
+	/**
+	 * 获取所有预设
+	 */
+	public getPresets(): PromptPreset[] {
+		return this.getSettings().promptPresets;
 	}
 
 	/**

@@ -323,7 +323,9 @@ export class MessageRenderer {
 						app,
 						sourcePath,
 						component,
-					);
+					).then(() => {
+						this.enhanceCodeBlocks(contentEl);
+					});
 				} else {
 					void MarkdownRenderer.render(
 						app,
@@ -331,7 +333,9 @@ export class MessageRenderer {
 						contentEl,
 						sourcePath,
 						component,
-					).catch((error) => {
+					).then(() => {
+						this.enhanceCodeBlocks(contentEl);
+					}).catch((error) => {
 						logError(
 							"[MessageRenderer] Markdown 渲染失败:",
 							error,
@@ -473,6 +477,57 @@ export class MessageRenderer {
 						setIcon(copyBtn, "copy");
 					}, 1500);
 				});
+			}
+		});
+	}
+
+	/**
+	 * 增强代码块（添加语言标签和复制按钮）
+	 */
+	private static enhanceCodeBlocks(container: HTMLElement): void {
+		container.querySelectorAll("pre").forEach((pre) => {
+			// 已经增强过的跳过
+			if (pre.parentElement?.classList.contains("acp-code-enhanced")) {
+				return;
+			}
+
+			const code = pre.querySelector("code");
+			if (!code) return;
+
+			// 提取语言
+			const langMatch = code.className.match(/language-(\w+)/);
+			const language = langMatch ? langMatch[1] : "";
+
+			// 创建包装器
+			const wrapper = document.createElement("div");
+			wrapper.className = "acp-code-enhanced";
+			if (language) {
+				wrapper.classList.add("has-language");
+			}
+			pre.parentElement?.insertBefore(wrapper, pre);
+			wrapper.appendChild(pre);
+
+			// 添加语言标签（可点击复制）
+			if (language) {
+				const langLabel = document.createElement("span");
+				langLabel.className = "acp-code-lang-label";
+				langLabel.textContent = language;
+				langLabel.setAttribute("aria-label", "点击复制代码");
+
+				langLabel.addEventListener("click", async (e) => {
+					e.stopPropagation();
+					const text = code.textContent || "";
+					await navigator.clipboard.writeText(text);
+					const original = langLabel.textContent;
+					langLabel.textContent = "copied!";
+					langLabel.classList.add("copied");
+					setTimeout(() => {
+						langLabel.textContent = original;
+						langLabel.classList.remove("copied");
+					}, 1500);
+				});
+
+				wrapper.appendChild(langLabel);
 			}
 		});
 	}

@@ -39,8 +39,9 @@ export type MessageRole = "user" | "assistant";
  * - in_progress: 执行中
  * - completed: 执行成功
  * - failed: 执行失败（协议标准，包含错误和取消场景）
+ * - blocked: 被安全策略拦截（用户拒绝、黑名单等）
  */
-export type ToolCallStatus = "pending" | "in_progress" | "completed" | "failed";
+export type ToolCallStatus = "pending" | "in_progress" | "completed" | "failed" | "blocked";
 
 // ============================================================================
 // 数据类型

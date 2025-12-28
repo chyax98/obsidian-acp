@@ -60,6 +60,9 @@ export class AcpSettingTab extends PluginSettingTab {
 		// UI 偏好设置
 		this.displayUiPreferences(containerEl);
 
+		// 系统提示词设置
+		this.displayPromptSettings(containerEl);
+
 		// 关于信息
 		this.displayAboutSection(containerEl);
 	}
@@ -724,6 +727,185 @@ export class AcpSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+	}
+
+	/**
+	 * 系统提示词设置
+	 */
+	private displayPromptSettings(containerEl: HTMLElement): void {
+		containerEl.createEl("h3", { text: "系统提示词" });
+
+		// 基础系统提示词
+		new Setting(containerEl)
+			.setName("基础系统提示词")
+			.setDesc("描述 Obsidian 环境和基本规则，每次对话都会发送")
+			.addTextArea((text) => {
+				text.inputEl.rows = 8;
+				text.inputEl.cols = 50;
+				text.inputEl.style.width = "100%";
+				text.inputEl.style.fontFamily = "var(--font-monospace)";
+				text.inputEl.style.fontSize = "0.85em";
+				return text
+					.setPlaceholder("输入系统提示词...")
+					.setValue(this.plugin.settings.systemPrompt || "")
+					.onChange(async (value) => {
+						this.plugin.settings.systemPrompt = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// 风格预设
+		containerEl.createEl("h4", { text: "风格预设" });
+
+		const presetDesc = containerEl.createDiv({
+			cls: "setting-item-description",
+		});
+		presetDesc.style.marginBottom = "1em";
+		presetDesc.setText("风格预设可在聊天时动态切换");
+
+		// 当前激活的预设
+		const presets = this.plugin.settings.promptPresets || [];
+		new Setting(containerEl)
+			.setName("当前预设")
+			.setDesc("选择要激活的风格预设")
+			.addDropdown((dropdown) => {
+				dropdown.addOption("", "不使用预设");
+				for (const preset of presets) {
+					dropdown.addOption(preset.id, preset.name);
+				}
+				dropdown
+					.setValue(this.plugin.settings.activePresetId || "")
+					.onChange(async (value) => {
+						this.plugin.settings.activePresetId = value || null;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// 预设列表
+		for (const preset of presets) {
+			new Setting(containerEl)
+				.setName(preset.name)
+				.setDesc(preset.content.slice(0, 60) + (preset.content.length > 60 ? "..." : ""))
+				.addButton((btn) =>
+					btn.setButtonText("编辑").onClick(() => {
+						this.editPreset(preset);
+					}),
+				)
+				.addButton((btn) =>
+					btn
+						.setButtonText("删除")
+						.setWarning()
+						.onClick(async () => {
+							this.plugin.settings.promptPresets =
+								this.plugin.settings.promptPresets.filter(
+									(p) => p.id !== preset.id,
+								);
+							if (this.plugin.settings.activePresetId === preset.id) {
+								this.plugin.settings.activePresetId = null;
+							}
+							await this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+		}
+
+		// 添加新预设
+		new Setting(containerEl).addButton((btn) =>
+			btn.setButtonText("添加预设").onClick(() => {
+				this.editPreset(null);
+			}),
+		);
+	}
+
+	/**
+	 * 编辑预设弹窗
+	 */
+	private editPreset(preset: { id: string; name: string; content: string } | null): void {
+		const isNew = !preset;
+		const editingPreset = preset || {
+			id: `preset-${Date.now()}`,
+			name: "",
+			content: "",
+		};
+
+		const modal = document.createElement("div");
+		modal.className = "modal-container mod-dim";
+		modal.innerHTML = `
+			<div class="modal" style="width: 500px;">
+				<div class="modal-title">${isNew ? "添加预设" : "编辑预设"}</div>
+				<div class="modal-content">
+					<div class="setting-item">
+						<div class="setting-item-info">
+							<div class="setting-item-name">预设名称</div>
+						</div>
+						<div class="setting-item-control">
+							<input type="text" id="preset-name" value="${editingPreset.name}" placeholder="如：学术写作" style="width: 100%;">
+						</div>
+					</div>
+					<div class="setting-item" style="flex-direction: column; align-items: stretch;">
+						<div class="setting-item-info">
+							<div class="setting-item-name">预设内容</div>
+						</div>
+						<textarea id="preset-content" rows="6" style="width: 100%; margin-top: 8px; font-family: var(--font-monospace);" placeholder="描述这个风格的特点...">${editingPreset.content}</textarea>
+					</div>
+				</div>
+				<div class="modal-button-container">
+					<button class="mod-cta" id="save-preset">保存</button>
+					<button id="cancel-preset">取消</button>
+				</div>
+			</div>
+		`;
+
+		document.body.appendChild(modal);
+
+		const nameInput = modal.querySelector("#preset-name") as HTMLInputElement;
+		const contentInput = modal.querySelector("#preset-content") as HTMLTextAreaElement;
+		const saveBtn = modal.querySelector("#save-preset") as HTMLButtonElement;
+		const cancelBtn = modal.querySelector("#cancel-preset") as HTMLButtonElement;
+
+		saveBtn.onclick = async () => {
+			const name = nameInput.value.trim();
+			const content = contentInput.value.trim();
+			if (!name || !content) {
+				new Notice("请填写名称和内容");
+				return;
+			}
+
+			if (isNew) {
+				this.plugin.settings.promptPresets.push({
+					id: editingPreset.id,
+					name,
+					content,
+				});
+			} else {
+				const idx = this.plugin.settings.promptPresets.findIndex(
+					(p) => p.id === editingPreset.id,
+				);
+				if (idx >= 0) {
+					this.plugin.settings.promptPresets[idx] = {
+						id: editingPreset.id,
+						name,
+						content,
+					};
+				}
+			}
+
+			await this.plugin.saveSettings();
+			modal.remove();
+			this.display();
+		};
+
+		cancelBtn.onclick = () => {
+			modal.remove();
+		};
+
+		modal.onclick = (e) => {
+			if (e.target === modal) {
+				modal.remove();
+			}
+		};
+
+		nameInput.focus();
 	}
 
 	/**

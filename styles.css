@@ -474,6 +474,11 @@
 	background: linear-gradient(to right, var(--background-secondary), rgba(248, 81, 73, 0.05));
 }
 
+.acp-tool-call-blocked {
+	border-color: rgba(255, 165, 0, 0.3);
+	background: linear-gradient(to right, var(--background-secondary), rgba(255, 165, 0, 0.05));
+}
+
 .acp-tool-call-header {
 	display: flex;
 	align-items: center;
@@ -530,6 +535,10 @@
 
 .acp-tool-call-icon.acp-status-failed .svg-icon {
 	color: var(--color-red);
+}
+
+.acp-tool-call-icon.acp-status-blocked .svg-icon {
+	color: var(--color-orange);
 }
 
 /* 旋转动画（用于 in_progress 状态） */
@@ -789,6 +798,60 @@
 .acp-code-block-content code {
 	font-family: var(--font-monospace);
 	white-space: pre;
+}
+
+/* Markdown 渲染后的代码块增强 */
+.acp-code-enhanced {
+	position: relative;
+	margin: 8px 0;
+}
+
+.acp-code-enhanced pre {
+	margin: 0;
+	border-radius: 6px;
+}
+
+/* 语言标签 */
+.acp-code-lang-label {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	z-index: 2;
+	padding: 2px 8px;
+	font-size: 10px;
+	font-weight: 500;
+	font-family: var(--font-monospace);
+	color: var(--text-muted);
+	background: var(--background-modifier-hover);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: color 0.15s ease, background 0.15s ease;
+	user-select: none;
+}
+
+.acp-code-lang-label:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-border);
+}
+
+.acp-code-lang-label.copied {
+	color: var(--color-green);
+	background: rgba(46, 160, 67, 0.15);
+}
+
+/* 有语言标签时隐藏 Obsidian 默认复制按钮 */
+.acp-code-enhanced.has-language .copy-code-button {
+	display: none;
+}
+
+/* 无语言标签时，悬停显示默认复制按钮 */
+.acp-code-enhanced:not(.has-language) .copy-code-button {
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+.acp-code-enhanced:not(.has-language):hover .copy-code-button {
+	opacity: 1;
 }
 
 /* ============================================================================

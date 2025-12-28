@@ -157,8 +157,10 @@ export class AcpChatView extends ItemView {
 		this.errorDisplay = new ErrorDisplayHelper(this.messagesEl);
 
 		// 上下文生成器
-		this.contextGenerator = new ObsidianContextGenerator(this.app, () =>
-			this.getWorkingDirectory(),
+		this.contextGenerator = new ObsidianContextGenerator(
+			this.app,
+			() => this.getWorkingDirectory(),
+			() => this.plugin.settings,
 		);
 
 		// 命令菜单

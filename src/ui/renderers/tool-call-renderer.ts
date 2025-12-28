@@ -274,9 +274,26 @@ export class ToolCallRenderer {
 			in_progress: "loader-2",
 			completed: "check-circle",
 			failed: "x-circle",
+			blocked: "shield-off",
 		};
 
 		setIcon(iconEl, iconMap[status] || "help-circle");
+	}
+
+	/**
+	 * 检测是否为 blocked 状态
+	 * 根据工具调用结果内容判断
+	 */
+	public static isBlockedResult(content: string, isError?: boolean): boolean {
+		const lower = content.toLowerCase();
+		if (lower.includes("blocked by blocklist")) return true;
+		if (lower.includes("outside the vault")) return true;
+		if (lower.includes("access denied")) return true;
+		if (lower.includes("user denied")) return true;
+		if (lower.includes("permission denied")) return true;
+		if (lower.includes("not allowed")) return true;
+		if (isError && lower.includes("deny")) return true;
+		return false;
 	}
 
 	/**

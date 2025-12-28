@@ -100,11 +100,68 @@ export interface AcpPluginSettings {
 
 	/** 请求超时时间（秒） */
 	promptTimeout: number;
+
+	/** 系统提示词（基础层，描述 Obsidian 环境） */
+	systemPrompt: string;
+
+	/** 提示词预设（风格层，可动态切换） */
+	promptPresets: PromptPreset[];
+
+	/** 当前激活的预设 ID */
+	activePresetId: string | null;
+}
+
+/**
+ * 提示词预设
+ */
+export interface PromptPreset {
+	/** 预设 ID */
+	id: string;
+	/** 预设名称 */
+	name: string;
+	/** 预设内容 */
+	content: string;
 }
 
 /**
  * 默认设置
  */
+/**
+ * 默认系统提示词
+ */
+const DEFAULT_SYSTEM_PROMPT = `你正在 Obsidian 笔记应用中工作。
+
+环境说明：
+- 这是一个个人知识管理库
+- 用户主要进行写作、整理笔记、知识管理等任务
+- 支持 Markdown 语法和 Obsidian 特有的 [[链接]] 语法
+
+安全限制：
+- 删除文件前请确认
+- 批量编辑时告知影响范围
+- 不要修改 .obsidian 配置目录`;
+
+/**
+ * 默认预设
+ */
+const DEFAULT_PRESETS: PromptPreset[] = [
+	{
+		id: "academic",
+		name: "学术写作",
+		content: "使用正式、学术的语言风格。注重逻辑清晰、论证严谨。适当使用专业术语。",
+	},
+	{
+		id: "casual",
+		name: "日常笔记",
+		content: "使用轻松、自然的语言风格。简洁明了，不需要过于正式。",
+	},
+	{
+		id: "technical",
+		name: "技术文档",
+		content: "使用精确的技术语言。包含代码示例时使用正确的语法高亮。步骤清晰，便于操作。",
+	},
+];
+
 const DEFAULT_SETTINGS: AcpPluginSettings = {
 	currentAgentId: "claude", // 默认使用 Claude Code
 	workingDir: "vault",
@@ -120,6 +177,9 @@ const DEFAULT_SETTINGS: AcpPluginSettings = {
 	debugMode: false,
 	promptTimeout: 300, // 5 分钟
 	mcpServers: [],
+	systemPrompt: DEFAULT_SYSTEM_PROMPT,
+	promptPresets: DEFAULT_PRESETS,
+	activePresetId: null,
 };
 
 // ============================================================================

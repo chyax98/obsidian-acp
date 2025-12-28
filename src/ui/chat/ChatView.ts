@@ -100,6 +100,10 @@ export class AcpChatView extends ItemView {
 		to: { line: number; ch: number };
 	} | null = null;
 
+	// 待发送的图片
+	private pendingImages: Array<{ data: string; mimeType: string }> = [];
+	private imagePreviewEl: HTMLElement | null = null;
+
 	// 实例级 Agent 选择
 	private instanceAgentId: AcpBackendId = "claude";
 	private isAgentLocked: boolean = false;
@@ -358,6 +362,12 @@ export class AcpChatView extends ItemView {
 	private createInputArea(container: HTMLElement): void {
 		this.inputContainerEl = container.createDiv({ cls: "acp-chat-input" });
 
+		// 图片预览区域
+		this.imagePreviewEl = this.inputContainerEl.createDiv({
+			cls: "acp-image-preview",
+		});
+		this.imagePreviewEl.style.display = "none";
+
 		this.inputEl = this.inputContainerEl.createEl("textarea", {
 			cls: "acp-input-textarea",
 			attr: { placeholder: "输入消息，/ 查看命令", rows: "3" },
@@ -366,6 +376,7 @@ export class AcpChatView extends ItemView {
 		this.setupInputKeyboard();
 		this.setupInputWatcher();
 		this.setupSelectionCapture();
+		this.setupImagePaste();
 
 		const buttonContainer = this.inputContainerEl.createDiv({
 			cls: "acp-input-buttons",
@@ -527,6 +538,126 @@ export class AcpChatView extends ItemView {
 	 */
 	public getLastEditorSelection() {
 		return this.lastEditorSelection;
+	}
+
+	/**
+	 * 设置图片粘贴处理
+	 */
+	private setupImagePaste(): void {
+		const SUPPORTED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
+		this.inputEl.addEventListener("paste", (e) => {
+			const items = e.clipboardData?.items;
+			if (!items) return;
+
+			let hasImage = false;
+			for (let i = 0; i < items.length; i++) {
+				const item = items[i];
+				if (SUPPORTED_TYPES.includes(item.type)) {
+					const file = item.getAsFile();
+					if (file) {
+						hasImage = true;
+						void this.handleImageFile(file);
+					}
+				}
+			}
+
+			// 有图片时阻止默认粘贴行为
+			if (hasImage) {
+				e.preventDefault();
+			}
+		});
+	}
+
+	/**
+	 * 处理图片文件，转换为 base64
+	 */
+	private async handleImageFile(file: File): Promise<void> {
+		const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+		if (file.size > MAX_SIZE) {
+			new Notice("图片太大，最大支持 5MB");
+			return;
+		}
+
+		try {
+			const base64 = await this.fileToBase64(file);
+			this.pendingImages.push({
+				data: base64,
+				mimeType: file.type,
+			});
+			this.updateImagePreview();
+		} catch (error) {
+			logError("[ChatView] 图片处理失败:", error);
+			new Notice("图片处理失败");
+		}
+	}
+
+	/**
+	 * 将 File 转换为 base64
+	 */
+	private fileToBase64(file: File): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = reader.result as string;
+				// 移除 data:image/xxx;base64, 前缀
+				const parts = result.split(",");
+				if (parts.length < 2 || !parts[1]) {
+					reject(new Error("无效的图片数据"));
+					return;
+				}
+				resolve(parts[1]);
+			};
+			reader.onerror = () => reject(new Error("读取图片失败"));
+			reader.readAsDataURL(file);
+		});
+	}
+
+	/**
+	 * 更新图片预览区域
+	 */
+	private updateImagePreview(): void {
+		if (!this.imagePreviewEl) return;
+
+		this.imagePreviewEl.empty();
+
+		if (this.pendingImages.length === 0) {
+			this.imagePreviewEl.style.display = "none";
+			return;
+		}
+
+		this.imagePreviewEl.style.display = "flex";
+
+		for (let i = 0; i < this.pendingImages.length; i++) {
+			const img = this.pendingImages[i];
+			const wrapper = this.imagePreviewEl.createDiv({
+				cls: "acp-image-preview-item",
+			});
+
+			wrapper.createEl("img", {
+				attr: {
+					src: `data:${img.mimeType};base64,${img.data}`,
+					alt: `图片 ${i + 1}`,
+				},
+			});
+
+			const removeBtn = wrapper.createEl("button", {
+				cls: "acp-image-preview-remove",
+				text: "×",
+			});
+			removeBtn.addEventListener("click", () => {
+				this.pendingImages.splice(i, 1);
+				this.updateImagePreview();
+			});
+		}
+	}
+
+	/**
+	 * 清空待发送图片
+	 */
+	private clearPendingImages(): void {
+		this.pendingImages = [];
+		this.updateImagePreview();
 	}
 
 	// ===== 连接与会话 =====
@@ -743,7 +874,10 @@ export class AcpChatView extends ItemView {
 
 	private async handleSend(): Promise<void> {
 		let text = this.inputEl.value.trim();
-		if (!text) return;
+		const hasImages = this.pendingImages.length > 0;
+
+		// 没有文本也没有图片，不发送
+		if (!text && !hasImages) return;
 
 		if (text.startsWith("、")) text = "/" + text.slice(1);
 
@@ -759,20 +893,28 @@ export class AcpChatView extends ItemView {
 		this.hideEmptyState();
 		this.updateUIState("idle");
 
-		this.inputHistory?.add(text);
+		if (text) this.inputHistory?.add(text);
 		this.inputEl.value = "";
+
+		// 获取待发送的图片（发送成功后才清空）
+		const images = hasImages ? [...this.pendingImages] : undefined;
+
+		// 如果只有图片没有文字，添加默认文字
+		const displayText = text || "[图片]";
 
 		let fullText: string | undefined;
 		if (this.isFirstMessage) {
 			const context = this.contextGenerator?.generate();
-			if (context) fullText = `${context}\n\n---\n\n${text}`;
+			if (context) fullText = `${context}\n\n---\n\n${displayText}`;
 			this.isFirstMessage = false;
 		}
 
 		try {
 			const sm = this.connectionManager?.getSessionManager();
 			if (!sm) throw new Error("会话管理器未初始化");
-			await sm.sendPrompt(text, fullText);
+			await sm.sendPrompt(displayText, fullText, images);
+			// 发送成功后清空图片
+			this.clearPendingImages();
 		} catch (error) {
 			logError("[ChatView] 发送失败:", error);
 			this.errorDisplay?.showError(error as Error, "send");

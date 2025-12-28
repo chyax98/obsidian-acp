@@ -208,7 +208,7 @@ export class AcpConnection {
 	 * 启动 ACP Agent 进程
 	 *
 	 * 根据后端配置启动相应的 Agent 进程。支持：
-	 * - 内置 Agent (claude, goose, opencode)
+	 * - 内置 Agent (claude, goose, opencode, gemini)
 	 * - 自定义 Agent (custom)
 	 */
 	private connectAgent(

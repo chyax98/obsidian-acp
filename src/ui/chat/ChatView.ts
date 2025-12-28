@@ -5,7 +5,7 @@
  */
 
 import type { WorkspaceLeaf } from "obsidian";
-import { ItemView, Notice, Component, setIcon } from "obsidian";
+import { ItemView, Notice, Component, setIcon, TFolder, normalizePath } from "obsidian";
 import type AcpPlugin from "../../main";
 import type { SessionManager } from "../../acp/core/session-manager";
 import type { AcpConnection } from "../../acp/core/connection";
@@ -549,6 +549,16 @@ export class AcpChatView extends ItemView {
 		}
 
 		try {
+			const exportFolder = "export-acp-agent";
+			const existingFolder = this.app.vault.getAbstractFileByPath(exportFolder);
+			if (!existingFolder) {
+				await this.app.vault.createFolder(exportFolder);
+			} else if (!(existingFolder instanceof TFolder)) {
+				throw new Error(
+					`无法创建导出文件夹：路径已被文件占用 (${exportFolder})`,
+				);
+			}
+
 			const markdown = sm.toMarkdown();
 			const timestamp = new Date().toISOString().slice(0, 10);
 			const firstMsg =
@@ -557,10 +567,19 @@ export class AcpChatView extends ItemView {
 					.replace(/[/\\?%*:|"<>]/g, "-") || "chat";
 			const fileName = `ACP-${timestamp}-${firstMsg}.md`;
 
-			const existing = this.app.vault.getAbstractFileByPath(fileName);
-			const finalPath = existing
-				? `ACP-${Date.now()}-${firstMsg.slice(0, 20)}.md`
-				: fileName;
+			const basePath = normalizePath(`${exportFolder}/${fileName}`);
+			let finalPath = basePath;
+			if (this.app.vault.getAbstractFileByPath(finalPath)) {
+				finalPath = normalizePath(
+					`${exportFolder}/ACP-${Date.now()}-${firstMsg.slice(0, 20)}.md`,
+				);
+			}
+			// 极端情况下（同毫秒重复导出）避免冲突
+			while (this.app.vault.getAbstractFileByPath(finalPath)) {
+				finalPath = normalizePath(
+					`${exportFolder}/ACP-${Date.now()}-${Math.floor(Math.random() * 10000)}-${firstMsg.slice(0, 20)}.md`,
+				);
+			}
 			await this.app.vault.create(finalPath, markdown);
 			new Notice(`对话已导出到: ${finalPath}`);
 		} catch (error) {

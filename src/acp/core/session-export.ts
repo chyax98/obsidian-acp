@@ -11,6 +11,7 @@ import type {
 	ToolCallStatus,
 	SessionExportData,
 } from "./types";
+import type { ToolCallContent, ToolCallDiffContent } from "../types";
 
 /**
  * 会话导出器
@@ -154,31 +155,87 @@ export class SessionExporter {
 		const statusIcon = this.getToolStatusIcon(toolCall.status);
 		lines.push(`- ${statusIcon} **${toolCall.title}** (${toolCall.kind})`);
 
-		// 工具输出 - 提取为单独处理避免深层嵌套
-		const outputText = this.extractToolCallOutput(toolCall);
-		if (outputText) {
-			this.appendCodeBlock(lines, outputText, "  ");
+		// 工具输出（不截断，按内容块完整导出）
+		const outputBlocks = this.extractToolCallOutputBlocks(toolCall);
+		for (const block of outputBlocks) {
+			this.appendCodeBlock(lines, block, "  ");
 		}
 	}
 
-	private static extractToolCallOutput(toolCall: ToolCall): string | null {
-		if (!toolCall.content || toolCall.content.length === 0) {
-			return null;
+	private static extractToolCallOutputBlocks(toolCall: ToolCall): string[] {
+		const contents = toolCall.content;
+		if (!contents || contents.length === 0) return [];
+
+		const blocks: string[] = [];
+
+		for (const content of contents) {
+			const block = this.formatToolCallContentBlock(content, toolCall);
+			if (block) blocks.push(block);
 		}
 
-		for (const content of toolCall.content) {
-			if (content.type !== "content") continue;
-			if (content.content?.type !== "text") continue;
+		return blocks;
+	}
 
-			const text = content.content.text || "";
-			if (!text) continue;
+	private static formatToolCallContentBlock(
+		content: ToolCallContent,
+		toolCall: ToolCall,
+	): string | null {
+		switch (content.type) {
+			case "content": {
+				if (content.content?.type !== "text") return null;
+				const text = content.content.text || "";
+				return text ? text : null;
+			}
 
-			return text.length > 500
-				? text.slice(0, 500) + "...(truncated)"
-				: text;
+			case "diff":
+				return this.formatDiffContent(content);
+
+			case "terminal": {
+				// ACP 协议里 terminal 内容通常只包含 terminalId；尽量补充 command 便于追溯
+				const terminalId = content.terminalId;
+				const command =
+					typeof toolCall.rawInput?.command === "string"
+						? toolCall.rawInput.command
+						: null;
+				if (command && terminalId) return `$ ${command}\n\n[Terminal: ${terminalId}]`;
+				if (command) return `$ ${command}`;
+				if (terminalId) return `[Terminal: ${terminalId}]`;
+				return null;
+			}
+
+			default:
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				return JSON.stringify(content as any, null, 2);
+		}
+	}
+
+	private static formatDiffContent(diff: ToolCallDiffContent): string {
+		const lines: string[] = [];
+
+		if (diff.path) {
+			lines.push(`--- ${diff.path}`);
+			lines.push(`+++ ${diff.path}`);
 		}
 
-		return null;
+		if (typeof diff.oldText === "string") {
+			for (const line of diff.oldText.split("\n")) {
+				lines.push(`-${line}`);
+			}
+		}
+
+		if (typeof diff.newText === "string") {
+			for (const line of diff.newText.split("\n")) {
+				lines.push(`+${line}`);
+			}
+		}
+
+		// diff 内容为空时兜底输出 JSON
+		if (lines.length === 0) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			return JSON.stringify(diff as any, null, 2);
+		}
+
+		return lines.join("\n");
 	}
 
 	private static appendCodeBlock(

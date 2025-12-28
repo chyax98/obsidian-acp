@@ -21,7 +21,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 **版本**: 0.4.1
 **日期**: 2025-12-28
-**状态**: 支持多 Agent (Claude Code, Goose, OpenCode)
+**状态**: 支持多 Agent (Claude Code, Goose, OpenCode, Gemini CLI)
 
 ---
 
@@ -31,7 +31,7 @@ Obsidian ACP Plugin 通过 ACP (Agent Client Protocol) 协议将多个 AI Agent 
 
 ### 核心特性
 
-- **多 Agent 支持**: Claude Code, Goose, OpenCode
+- **多 Agent 支持**: Claude Code, Goose, OpenCode, Gemini CLI
 - **文件操作**: AI 可读写 Obsidian Vault 中的文件
 - **权限控制**: 2 种模式（每次询问 / 完全信任）
 - **@ 引用文件**: 输入 @ 弹出文件搜索
@@ -79,7 +79,7 @@ src/
 │   │   └── message-buffer.ts  # 流式消息缓冲
 │   ├── backends/
 │   │   ├── types.ts           # 多 Agent 类型定义
-│   │   └── registry.ts        # Agent 注册表 (Claude, Goose, OpenCode)
+│   │   └── registry.ts        # Agent 注册表 (Claude, Goose, OpenCode, Gemini)
 │   └── types/                 # ACP 协议类型
 └── ui/
     ├── chat/
@@ -123,6 +123,7 @@ npm run deploy -- /path/to/vault
 | Claude Code | `npx @zed-industries/claude-code-acp` | 无 |
 | Goose | `goose` | `acp` |
 | OpenCode | `opencode` | `acp` |
+| Gemini CLI | `gemini` | `--experimental-acp` |
 
 ### 核心方法
 

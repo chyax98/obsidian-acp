@@ -46,6 +46,18 @@ export const ACP_BACKENDS: Record<AcpBackendId, AcpBackendConfig> = {
 		streamingMode: "incremental", // OpenCode 每次发送增量内容
 		acpArgs: ["acp"],
 	},
+	gemini: {
+		id: "gemini",
+		name: "Gemini CLI",
+		description: "Google Gemini CLI (ACP 参考实现)",
+		cliCommand: "gemini",
+		defaultCliPath: "gemini",
+		authRequired: false,
+		enabled: true,
+		supportsStreaming: false,
+		streamingMode: "incremental",
+		acpArgs: ["--experimental-acp"],
+	},
 };
 
 /**

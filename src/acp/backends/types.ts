@@ -14,8 +14,9 @@
  * - claude: Anthropic Claude Code (Zed ACP 适配器)
  * - goose: Block (Square) Goose
  * - opencode: OpenCode 多模型 Agent
+ * - gemini: Google Gemini CLI (ACP 参考实现)
  */
-export type AcpBackendId = "claude" | "goose" | "opencode";
+export type AcpBackendId = "claude" | "goose" | "opencode" | "gemini";
 
 // ============================================================================
 // 后端配置接口

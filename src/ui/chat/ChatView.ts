@@ -92,6 +92,14 @@ export class AcpChatView extends ItemView {
 	private isFirstMessage: boolean = true;
 	private fileInputSuggest: FileInputSuggest | null = null;
 
+	// 编辑器选区捕获
+	private lastEditorSelection: {
+		path: string;
+		text: string;
+		from: { line: number; ch: number };
+		to: { line: number; ch: number };
+	} | null = null;
+
 	// 实例级 Agent 选择
 	private instanceAgentId: AcpBackendId = "claude";
 	private isAgentLocked: boolean = false;
@@ -355,6 +363,7 @@ export class AcpChatView extends ItemView {
 
 		this.setupInputKeyboard();
 		this.setupInputWatcher();
+		this.setupSelectionCapture();
 
 		const buttonContainer = this.inputContainerEl.createDiv({
 			cls: "acp-input-buttons",
@@ -459,6 +468,63 @@ export class AcpChatView extends ItemView {
 				this.commandMenu?.hide();
 			}
 		});
+	}
+
+	/**
+	 * 设置选区捕获
+	 * 在输入框获得焦点前捕获编辑器的选区
+	 */
+	private setupSelectionCapture(): void {
+		this.inputEl.addEventListener("mousedown", () => {
+			this.captureEditorSelection();
+		});
+
+		this.inputEl.addEventListener("focus", () => {
+			// focus 事件作为后备，但 mousedown 更早
+			if (!this.lastEditorSelection) {
+				this.captureEditorSelection();
+			}
+		});
+	}
+
+	/**
+	 * 捕获当前活动编辑器的选区
+	 */
+	private captureEditorSelection(): void {
+		const activeLeaf = this.app.workspace.activeLeaf;
+		if (!activeLeaf) return;
+
+		const view = activeLeaf.view;
+		// 检查是否是 MarkdownView
+		if (view.getViewType() !== "markdown") return;
+
+		// 使用类型断言访问 editor
+		const markdownView = view as import("obsidian").MarkdownView;
+		const editor = markdownView.editor;
+		if (!editor) return;
+
+		const selection = editor.getSelection();
+		if (!selection) {
+			this.lastEditorSelection = null;
+			return;
+		}
+
+		const file = markdownView.file;
+		if (!file) return;
+
+		this.lastEditorSelection = {
+			path: file.path,
+			text: selection,
+			from: editor.getCursor("from"),
+			to: editor.getCursor("to"),
+		};
+	}
+
+	/**
+	 * 获取上次捕获的编辑器选区
+	 */
+	public getLastEditorSelection() {
+		return this.lastEditorSelection;
 	}
 
 	// ===== 连接与会话 =====

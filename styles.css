@@ -489,13 +489,14 @@
 	background-color: var(--background-modifier-hover);
 }
 
-/* 左侧：图标 + 标题 */
+/* 左侧：图标 + 标题 + 参数（单行紧凑布局） */
 .acp-tool-call-left {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 	flex: 1;
 	min-width: 0;
+	overflow: hidden;
 }
 
 .acp-tool-call-icon {
@@ -552,7 +553,7 @@
 	text-overflow: ellipsis;
 }
 
-/* 参数预览：显示关键参数让用户知道具体操作 */
+/* 参数预览：与标题同行显示，用分隔符区分 */
 .acp-tool-call-params {
 	font-size: 0.8em;
 	color: var(--text-muted);
@@ -560,8 +561,15 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	margin-top: 2px;
-	max-width: 400px;
+	flex-shrink: 1;
+	min-width: 0;
+}
+
+/* 参数前的分隔符 */
+.acp-tool-call-params::before {
+	content: "·";
+	margin: 0 6px;
+	color: var(--text-faint);
 }
 
 /* 右侧：时间 + 展开箭头 */
@@ -957,6 +965,55 @@
 	background-color: var(--background-modifier-border);
 	color: var(--text-muted);
 	font-weight: 600;
+	padding-left: 8px !important;
+}
+
+/* Context 行样式 */
+.acp-diff-context {
+	background-color: transparent;
+	color: var(--text-muted);
+}
+
+/* 统计信息 */
+.acp-diff-stats {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: auto;
+	margin-right: 8px;
+}
+
+.acp-diff-stats-compact {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
+	font-size: 0.85em;
+	font-family: var(--font-monospace);
+}
+
+.acp-diff-stat-add {
+	color: var(--color-green);
+	font-weight: 500;
+	font-family: var(--font-monospace);
+}
+
+.acp-diff-stat-del {
+	color: var(--color-red);
+	font-weight: 500;
+	font-family: var(--font-monospace);
+}
+
+/* 双列行号显示 */
+.acp-diff-line[data-old-line][data-new-line]::before {
+	content: attr(data-old-line) " " attr(data-new-line);
+	position: absolute;
+	left: 8px;
+	width: 48px;
+	text-align: right;
+	color: var(--text-faint);
+	font-size: 0.85em;
+	user-select: none;
 }
 
 /* ============================================================================
@@ -1051,6 +1108,39 @@
 	margin: 4px 0;
 }
 
+/* Subagent 嵌套工具调用 */
+.acp-tool-call-nested {
+	margin-top: 8px;
+	padding-left: 16px;
+	border-left: 2px solid var(--background-modifier-border);
+}
+
+.acp-tool-call-child {
+	margin: 4px 0;
+	border-radius: 6px;
+}
+
+.acp-tool-call-child .acp-tool-call-header {
+	padding: 6px 10px;
+}
+
+.acp-tool-call-child .acp-tool-call-title {
+	font-size: 0.85em;
+}
+
+.acp-tool-call-child .acp-tool-call-params {
+	font-size: 0.75em;
+}
+
+/* 嵌套层级缩进 */
+.acp-tool-call-nested .acp-tool-call-nested {
+	border-left-color: var(--interactive-accent);
+}
+
+.acp-tool-call-nested .acp-tool-call-nested .acp-tool-call-nested {
+	border-left-color: var(--color-green);
+}
+
 /* ============================================================================
    计划显示
    ============================================================================ */
@@ -1138,6 +1228,22 @@
 .acp-thoughts-count {
 	font-size: 0.85em;
 	color: var(--text-muted);
+}
+
+/* 右侧容器 */
+.acp-thoughts-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* 计时器 */
+.acp-thoughts-timer {
+	font-size: 0.85em;
+	font-family: var(--font-monospace);
+	color: var(--text-muted);
+	min-width: 48px;
+	text-align: right;
 }
 
 .acp-thoughts-content {

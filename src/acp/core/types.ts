@@ -84,6 +84,8 @@ export interface ToolCall {
 	startTime: number;
 	/** 结束时间 */
 	endTime?: number;
+	/** 父工具调用 ID（用于 subagent 嵌套显示） */
+	parentToolUseId?: string;
 }
 
 /**

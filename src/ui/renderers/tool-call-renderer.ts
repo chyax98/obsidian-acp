@@ -6,6 +6,7 @@
  * - 可折叠详情
  * - 输入参数显示
  * - 输出结果显示
+ * - Subagent 嵌套显示
  */
 
 import type { App } from "obsidian";
@@ -38,6 +39,77 @@ export class ToolCallRenderer {
 		}
 
 		return this.createCard(container, toolCall, app);
+	}
+
+	/**
+	 * 渲染带嵌套结构的工具调用列表
+	 * 支持 subagent 嵌套显示
+	 */
+	public static renderWithNesting(
+		container: HTMLElement,
+		toolCalls: ToolCall[],
+		app?: App,
+	): void {
+		// 构建父子关系映射
+		const childrenMap = new Map<string, ToolCall[]>();
+		const rootCalls: ToolCall[] = [];
+
+		for (const tc of toolCalls) {
+			if (tc.parentToolUseId) {
+				const children = childrenMap.get(tc.parentToolUseId) || [];
+				children.push(tc);
+				childrenMap.set(tc.parentToolUseId, children);
+			} else {
+				rootCalls.push(tc);
+			}
+		}
+
+		// 只渲染根节点，子节点在内容区域嵌套渲染
+		for (const rootCall of rootCalls) {
+			const el = this.render(container, rootCall, app);
+			// 渲染子工具调用
+			const children = childrenMap.get(rootCall.toolCallId);
+			if (children && children.length > 0) {
+				this.renderChildren(el, children, childrenMap, app);
+			}
+		}
+	}
+
+	/**
+	 * 渲染子工具调用（嵌套）
+	 */
+	private static renderChildren(
+		parentEl: HTMLElement,
+		children: ToolCall[],
+		childrenMap: Map<string, ToolCall[]>,
+		app?: App,
+	): void {
+		// 查找或创建嵌套容器
+		let nestedContainer = parentEl.querySelector(
+			".acp-tool-call-nested",
+		) as HTMLElement;
+
+		if (!nestedContainer) {
+			const contentEl = parentEl.querySelector(".acp-tool-call-content");
+			if (contentEl) {
+				nestedContainer = (contentEl as HTMLElement).createDiv({
+					cls: "acp-tool-call-nested",
+				});
+			} else {
+				return;
+			}
+		}
+
+		for (const child of children) {
+			const childEl = this.render(nestedContainer, child, app);
+			childEl.addClass("acp-tool-call-child");
+
+			// 递归渲染孙子节点
+			const grandChildren = childrenMap.get(child.toolCallId);
+			if (grandChildren && grandChildren.length > 0) {
+				this.renderChildren(childEl, grandChildren, childrenMap, app);
+			}
+		}
 	}
 
 	/**

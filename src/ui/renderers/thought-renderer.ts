@@ -5,9 +5,22 @@
  * - 可折叠展示
  * - 流式更新
  * - 脉冲动画
+ * - 实时计时器
  */
 
 import { setIcon } from "obsidian";
+
+/**
+ * 计时器状态
+ */
+interface TimerState {
+	startTime: number;
+	intervalId: number;
+	element: HTMLElement;
+}
+
+// 全局计时器状态（按容器 ID 存储）
+const timerStates = new Map<string, TimerState>();
 
 /**
  * 思考块渲染器
@@ -80,6 +93,15 @@ export class ThoughtRenderer {
 				}
 			}
 
+			// 处理计时器
+			const thoughtsId = thoughtsEl.getAttribute("data-thoughts-id");
+			if (thoughtsId) {
+				if (!isStreaming) {
+					// 停止计时器
+					this.stopTimer(thoughtsId);
+				}
+			}
+
 			// 增量添加新的思考项
 			const contentEl = thoughtsEl.querySelector(".acp-thoughts-content");
 			if (contentEl) {
@@ -107,8 +129,14 @@ export class ThoughtRenderer {
 		thoughts: string[],
 		isStreaming: boolean,
 	): HTMLElement {
+		// 生成唯一 ID
+		const thoughtsId = `thoughts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
 		// 先创建元素（会追加到末尾）
-		const thoughtsEl = container.createDiv({ cls: "acp-thoughts" });
+		const thoughtsEl = container.createDiv({
+			cls: "acp-thoughts",
+			attr: { "data-thoughts-id": thoughtsId },
+		});
 
 		// 查找正在流式输出的消息，调整位置
 		const streamingMessage = container.querySelector(
@@ -152,6 +180,16 @@ export class ThoughtRenderer {
 			text: `(${thoughts.length})`,
 		});
 
+		// 计时器（右侧）
+		const rightEl = headerEl.createDiv({ cls: "acp-thoughts-right" });
+		const timerEl = rightEl.createDiv({ cls: "acp-thoughts-timer" });
+		timerEl.textContent = "0.0s";
+
+		// 启动计时器
+		if (isStreaming) {
+			this.startTimer(thoughtsId, timerEl);
+		}
+
 		// 内容区域（默认折叠）
 		const contentEl = thoughtsEl.createDiv({
 			cls: "acp-thoughts-content",
@@ -184,5 +222,43 @@ export class ThoughtRenderer {
 		});
 
 		return thoughtsEl;
+	}
+
+	/**
+	 * 启动计时器
+	 */
+	private static startTimer(id: string, element: HTMLElement): void {
+		const startTime = Date.now();
+
+		const intervalId = window.setInterval(() => {
+			const elapsed = (Date.now() - startTime) / 1000;
+			element.textContent = `${elapsed.toFixed(1)}s`;
+		}, 100);
+
+		timerStates.set(id, { startTime, intervalId, element });
+	}
+
+	/**
+	 * 停止计时器
+	 */
+	private static stopTimer(id: string): void {
+		const state = timerStates.get(id);
+		if (state) {
+			window.clearInterval(state.intervalId);
+			// 保持最终时间显示
+			const elapsed = (Date.now() - state.startTime) / 1000;
+			state.element.textContent = `${elapsed.toFixed(1)}s`;
+			timerStates.delete(id);
+		}
+	}
+
+	/**
+	 * 清理所有计时器（用于组件卸载时）
+	 */
+	public static cleanup(): void {
+		for (const [id, state] of timerStates.entries()) {
+			window.clearInterval(state.intervalId);
+			timerStates.delete(id);
+		}
 	}
 }
